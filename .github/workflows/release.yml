@@ -11,10 +11,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: "18.x"
 
@@ -24,7 +24,24 @@ jobs:
       - name: Build plugin
         run: npm run build
 
+      - name: Prepare release metadata
+        id: meta
+        shell: bash
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "zip_name=advanced-multi-column-${tag}.zip" >> "$GITHUB_OUTPUT"
+
+          # Treat any non-stable tag as prerelease:
+          # examples: 1.0.0b, 1.0.0-beta, 1.0.0-beta.1, 1.0.0-rc.1
+          if [[ "$tag" =~ [A-Za-z] || "$tag" == *"-"* ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create release assets
+        shell: bash
         run: |
           # Create a release directory
           mkdir -p release
@@ -34,21 +51,26 @@ jobs:
           
           # Create zip file for easy distribution
           cd release
-          zip -r ../obsidian-rss-dashboard.zip .
+          zip -r "../${{ steps.meta.outputs.zip_name }}" .
           cd ..
 
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          
+          tag="${{ steps.meta.outputs.tag }}"
+          prerelease_flag=""
+          if [[ "${{ steps.meta.outputs.is_prerelease }}" == "true" ]]; then
+            prerelease_flag="--prerelease"
+          fi
+
           # Create release with all assets
           gh release create "$tag" \
-            --title="$tag" \
-            --notes="Release $tag" \
-            --draft \
+            --title "$tag" \
+            --notes "Release $tag" \
+            ${prerelease_flag} \
             main.js \
             manifest.json \
             styles.css \
-            obsidian-rss-dashboard.zip
+            "${{ steps.meta.outputs.zip_name }}"
