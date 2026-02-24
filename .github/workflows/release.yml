@@ -19,7 +19,7 @@ jobs:
           node-version: "18.x"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build plugin
         run: npm run build
@@ -72,23 +72,28 @@ jobs:
           zip -r "../${{ steps.meta.outputs.zip_name }}" .
           cd ..
 
-      - name: Create release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify required assets exist
         shell: bash
         run: |
-          tag="${{ steps.meta.outputs.tag }}"
-          prerelease_flag=""
-          if [[ "${{ steps.meta.outputs.is_prerelease }}" == "true" ]]; then
-            prerelease_flag="--prerelease"
-          fi
+          for f in main.js manifest.json styles.css "${{ steps.meta.outputs.zip_name }}"; do
+            if [[ ! -f "$f" ]]; then
+              echo "Missing release asset: $f"
+              exit 1
+            fi
+          done
 
-          # Create release with all assets
-          gh release create "$tag" \
-            --title "$tag" \
-            --notes "Release $tag" \
-            ${prerelease_flag} \
-            main.js \
-            manifest.json \
-            styles.css \
-            "${{ steps.meta.outputs.zip_name }}"
+      - name: Create or update release with assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          body: Release ${{ steps.meta.outputs.tag }}
+          draft: false
+          prerelease: ${{ steps.meta.outputs.is_prerelease == 'true' }}
+          files: |
+            main.js
+            manifest.json
+            styles.css
+            ${{ steps.meta.outputs.zip_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
