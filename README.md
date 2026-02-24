@@ -10,16 +10,18 @@ Columns render in both **Live Preview** and **Reading View** while keeping your 
 
 <p align="center">
   <a href="https://github.com/amatya-aditya/obsidian-multi-columns/releases/latest">
-    <img src="https://img.shields.io/github/v/release/amatya-aditya/obsidian-multi-columns?style=flat-square&color=573E7A&label=release">
+    <img src="https://img.shields.io/github/v/release/amatya-aditya/advanced-multi-column?style=flat-square&color=573E7A&label=release">
   </a>
-  <a href="https://github.com/amatya-aditya/obsidian-multi-columns/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/amatya-aditya/obsidian-multi-columns">
+  <a href="https://github.com/amatya-aditya/advanced-multi-column/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/amatya-aditya/advanced-multi-column">
   </a>
-  <img src="https://img.shields.io/github/downloads/amatya-aditya/obsidian-multi-columns/total">
+  <img src="https://img.shields.io/github/downloads/amatya-aditya/advanced-multi-column/total">
 </p>
 
 <p align="center">
   <a href="#features">Features</a> &bull;
+  <a href="./docs/releases/usage.md">Usage</a> &bull;
+  <a href="./docs/releases/legacy-usage.md">Legacy Usage</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#syntax-reference">Syntax</a> &bull;
   <a href="#installation">Installation</a> &bull;
@@ -227,7 +229,3 @@ If you find this plugin useful, consider supporting development:
 ## Privacy
 
 This plugin runs locally in your vault and does not include telemetry.
-
-## License
-
-MIT (see `LICENSE`).
