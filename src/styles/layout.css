@@ -9,20 +9,45 @@
    Marker-based columns layout styles (Live Preview + Reading View)
    ========================================================================== */
 
-.columns-rv-wrapper {
-	margin: 0 0px !important;
-	/* Anchor the wrapper for CSS scroll anchoring so the browser
-	   maintains scroll position when sibling elements change size */
-	overflow-anchor: auto !important;
+/* Hidden marker/preamble sections inside column regions */
+[data-columns-hidden="true"] {
+	display: none !important;
 }
 
-/* Ensure the scroll container enables CSS scroll anchoring */
-.markdown-preview-view:has(.columns-rv-wrapper) {
-	overflow-anchor: auto;
+/* Invisible anchor that marks column container position in the sizer */
+[data-columns-anchor] {
+	display: none !important;
 }
 
-.columns-rv-height-pinned {
-	min-height: var(--columns-rv-min-height, 0px);
+/* Reading-view wrapper mode: hide only native markdown section blocks.
+   Keep plugin-injected UI (e.g., banners) visible. */
+.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer > [class^="el-"],
+.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer > [class*=" el-"] {
+	display: none !important;
+}
+
+.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer {
+	min-height: 0 !important;
+	height: auto !important;
+	padding-bottom: 0 !important;
+}
+
+.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer > .markdown-preview-pusher {
+	display: none !important;
+}
+
+.markdown-preview-view > .amc-reading-columns-host {
+	display: none;
+}
+
+.markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host {
+	display: block;
+	width: 100%;
+}
+
+.markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host > .columns-rv-wrapper {
+	display: block;
+	width: 100%;
 }
 
 .columns-container {
@@ -647,30 +672,6 @@
 	background: color-mix(in srgb, var(--interactive-accent) 10%, var(--columns-col-bg, transparent)) !important;
 }
 
-/* CSS-only hiding: when the columns wrapper is present inside a sizer,
-   automatically hide all other children except metadata containers.
-   This replaces the old JS-driven .columns-original-hidden class and
-   eliminates the MutationObserver feedback loop that caused scroll jumps
-   and flickering.  The :has() selector is evaluated synchronously by
-   the browser, so there is never a frame where both originals and the
-   wrapper are visible at the same time. */
-.markdown-preview-sizer:has(> .columns-rv-wrapper) > :not(
-	.columns-rv-wrapper,
-	.metadata-container,
-	.metadata-properties,
-	.frontmatter-container,
-	.mod-header
-) {
-	display: block !important;
-	visibility: hidden !important;
-	height: 0 !important;
-	overflow: hidden !important;
-	margin: 0 !important;
-	padding: 0 !important;
-	border: none !important;
-	pointer-events: none !important;
-	overflow-anchor: none !important;
-}
 
 .columns-container.columns-reading {
 	--columns-block-default-border-width: 0px;
