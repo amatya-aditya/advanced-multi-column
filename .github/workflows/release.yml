@@ -40,6 +40,24 @@ jobs:
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Validate tag and manifest version
+        shell: bash
+        run: |
+          tag="${{ steps.meta.outputs.tag }}"
+          manifest_version="$(node -p "require('./manifest.json').version")"
+
+          # Accept SemVer with optional prerelease/build metadata.
+          semver_re='^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z\.-]+)?(\+[0-9A-Za-z\.-]+)?$'
+          if [[ ! "$tag" =~ $semver_re ]]; then
+            echo "Tag '$tag' is not valid SemVer."
+            exit 1
+          fi
+
+          if [[ "$tag" != "$manifest_version" ]]; then
+            echo "Tag '$tag' must match manifest.json version '$manifest_version'."
+            exit 1
+          fi
+
       - name: Create release assets
         shell: bash
         run: |
