@@ -1,0 +1,133 @@
+/* Settings tab UI */
+.columns-settings-root .columns-settings-tab-bar {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding-bottom: 12px;
+	margin-bottom: 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.columns-settings-root .columns-settings-tab-btn {
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-muted);
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 0.85rem;
+	font-weight: 600;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.columns-settings-root .columns-settings-tab-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.columns-settings-root .columns-settings-tab-btn.is-active {
+	border-color: var(--interactive-accent);
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.columns-settings-root .columns-settings-panel {
+	display: none;
+}
+
+.columns-settings-root .columns-settings-panel.is-active {
+	display: block;
+}
+
+.columns-settings-root .columns-settings-section-title {
+	margin: 20px 0 8px;
+	font-size: 0.82rem;
+	font-weight: 700;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.columns-settings-root .columns-settings-section-title:first-child {
+	margin-top: 0;
+}
+
+.columns-settings-root .setting-item {
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary-alt);
+	border-radius: 10px;
+	padding: 10px 12px;
+	margin-bottom: 8px;
+}
+
+.columns-settings-root .setting-item-control .slider {
+	width: 130px;
+}
+
+.columns-settings-root .columns-settings-number-input {
+	width: 64px;
+	text-align: center;
+}
+
+/* About tab */
+.columns-settings-about {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.columns-settings-about-info {
+	text-align: center;
+	padding: 16px 0 8px;
+}
+
+.columns-settings-about-name {
+	font-size: 1.1rem;
+	font-weight: 700;
+	color: var(--text-normal);
+}
+
+.columns-settings-about-version {
+	font-size: 0.82rem;
+	color: var(--text-muted);
+	margin-top: 2px;
+}
+
+.columns-settings-about-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	justify-content: center;
+}
+
+.columns-settings-about-link {
+	display: inline-block;
+	padding: 5px 12px;
+	font-size: 0.82rem;
+	font-weight: 500;
+	color: var(--text-muted);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	text-decoration: none;
+	transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.columns-settings-about-link:hover {
+	color: var(--text-normal);
+	border-color: var(--interactive-accent);
+	text-decoration: none;
+}
+
+.columns-settings-about-support,
+.columns-settings-about-others {
+	text-align: center;
+}
+
+.columns-settings-about-support-label {
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--text-faint);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	margin-bottom: 8px;
+}
