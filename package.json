@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-sample-plugin",
-	"version": "1.0.1-beta.1",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"name": "advanced-multi-column",
+	"version": "1.0.1-beta.2",
+	"description": "Allows you to create columns in Obsidian Markdown.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {

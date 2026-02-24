@@ -9,7 +9,7 @@ Columns render in both **Live Preview** and **Reading View** while keeping your 
 </div>
 
 <p align="center">
-  <a href="https://github.com/amatya-aditya/obsidian-multi-columns/releases/latest">
+  <a href="https://github.com/amatya-aditya/advanced-multi-column/releases/latest">
     <img src="https://img.shields.io/github/v/release/amatya-aditya/advanced-multi-column?style=flat-square&color=573E7A&label=release">
   </a>
   <a href="https://github.com/amatya-aditya/advanced-multi-column/blob/main/LICENSE">
