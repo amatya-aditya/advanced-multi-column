@@ -320,7 +320,8 @@ function disconnectObserver(
  */
 function attachWrapper(sizer: HTMLElement, wrapper: HTMLElement): void {
 	// Save scroll position before DOM mutation.
-	const scrollEl = sizer.closest(".markdown-preview-view") as HTMLElement | null;
+	const scrollTarget = sizer.closest(".markdown-preview-view");
+	const scrollEl = scrollTarget instanceof HTMLElement ? scrollTarget : null;
 	const savedTop = scrollEl ? scrollEl.scrollTop : 0;
 
 	// Pin sizer height so appending + CSS hiding don't collapse it.

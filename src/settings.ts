@@ -383,7 +383,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 		// Plugin info
 		const infoEl = aboutEl.createDiv({cls: "columns-settings-about-info"});
 		infoEl.createEl("div", {
-			text: "Advanced Multi Column",
+			text: "Advanced multi column",
 			cls: "columns-settings-about-name",
 		});
 		infoEl.createEl("div", {
