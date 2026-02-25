@@ -17,14 +17,6 @@ Create interactive, nested multi-column layouts — without losing sibling colum
 </p>
 
 
-## Why this plugin?
-
-The problem with existing multi-column plugin? In **Live Preview**, when you click into one column to edit it, Obsidian collapses the entire block — **sibling columns disappear**, replaced by raw markup. You lose all visual context of the layout while editing.
-
-**Advanced Multi Column** fixes this. 
-It uses lightweight comment markers (`%% col-start %%`, `%% col-break %%`, `%% col-end %%`) instead of wrapping content in a single callout or codeblock. 
-This means when you edit one column, **the other columns stay rendered**. 
-You always see the full layout, making multi-column editing feel natural instead of fighting the editor.
 
 <p align="center">
   <a href="https://github.com/amatya-aditya/advanced-multi-column/releases/latest">
@@ -48,6 +40,17 @@ You always see the full layout, making multi-column editing feel natural instead
 
 <!-- Replace with actual screenshots once captured from docs/releases/usage.md examples -->
 <!-- ## Screenshots -->
+
+
+## Why this plugin?
+
+The problem with existing multi-column plugin? In **Live Preview**, when you click into one column to edit it, Obsidian collapses the entire block — **sibling columns disappear**, replaced by raw markup. You lose all visual context of the layout while editing.
+
+**Advanced Multi Column** fixes this. 
+It uses lightweight comment markers (`%% col-start %%`, `%% col-break %%`, `%% col-end %%`) instead of wrapping content in a single callout or codeblock. 
+This means when you edit one column, **the other columns stay rendered**. 
+You always see the full layout, making multi-column editing feel natural instead of fighting the editor.
+
 
 ## Features
 
