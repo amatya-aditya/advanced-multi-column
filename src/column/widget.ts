@@ -41,6 +41,7 @@ interface ActiveDragState {
 let activeDragState: ActiveDragState | null = null;
 let activeDragPoint: {x: number; y: number} | null = null;
 let cleanupActiveDragTracking: (() => void) | null = null;
+let cursorDropIndicator: HTMLElement | null = null;
 
 const BLOCK_LANGUAGE_PREVIEW_SELECTOR = [
 	".el-pre",
@@ -1183,16 +1184,20 @@ export class ColumnWidget extends WidgetType {
 		if (destinationIndex < 0 || destinationIndex >= destinationColumns.length) return;
 
 		const sameContainer = this.isSameContainerPath(sourcePath, destinationPath);
-		if (sameContainer && sourceIndex === destinationIndex) return;
 
 		const moving = sourceColumns[sourceIndex];
 		if (!moving) return;
 
 		if (sameContainer) {
+			// Adjust for index shift after removing the source element
+			const adjustedIndex = sourceIndex < destinationIndex
+				? destinationIndex - 1
+				: destinationIndex;
+			if (adjustedIndex === sourceIndex) return;
 			const reordered = [...sourceColumns];
 			const [removed] = reordered.splice(sourceIndex, 1);
 			if (!removed) return;
-			reordered.splice(destinationIndex, 0, removed);
+			reordered.splice(adjustedIndex, 0, removed);
 			const nextRoot = this.updateColumnsAtPath(rootColumns, sourcePath, () => reordered);
 			this.dispatchUpdate(nextRoot, view);
 			return;
@@ -1331,15 +1336,38 @@ export class ColumnWidget extends WidgetType {
 		view.dispatch({changes});
 	}
 
-	private startDragPointerTracking(initialEvent: DragEvent): void {
+	private startDragPointerTracking(initialEvent: DragEvent, view: EditorView): void {
 		if (cleanupActiveDragTracking) {
 			cleanupActiveDragTracking();
 			cleanupActiveDragTracking = null;
 		}
 
 		activeDragPoint = {x: initialEvent.clientX, y: initialEvent.clientY};
+
+		const showCursorIndicator = (x: number, y: number) => {
+			const target = document.elementFromPoint(x, y);
+			if (!(target instanceof HTMLElement) || !view.dom.contains(target)
+				|| target.closest(".columns-container") || target.closest(".column-item")) {
+				this.hideCursorDropIndicator();
+				return;
+			}
+			// Show indicator at the line nearest the pointer
+			const pos = view.posAtCoords({x, y});
+			if (pos === null) {
+				this.hideCursorDropIndicator();
+				return;
+			}
+			const coords = view.coordsAtPos(pos);
+			if (!coords) {
+				this.hideCursorDropIndicator();
+				return;
+			}
+			this.showCursorDropIndicator(view, coords.top, coords.left);
+		};
+
 		const updatePoint = (event: DragEvent) => {
 			activeDragPoint = {x: event.clientX, y: event.clientY};
+			showCursorIndicator(event.clientX, event.clientY);
 		};
 
 		document.addEventListener("dragover", updatePoint, true);
@@ -1350,12 +1378,31 @@ export class ColumnWidget extends WidgetType {
 		};
 	}
 
+	private showCursorDropIndicator(view: EditorView, top: number, left: number): void {
+		if (!cursorDropIndicator) {
+			cursorDropIndicator = document.createElement("div");
+			cursorDropIndicator.className = "amc-cursor-drop-indicator";
+		}
+		const scrollDom = view.scrollDOM;
+		const scrollRect = scrollDom.getBoundingClientRect();
+		cursorDropIndicator.style.top = `${top - scrollRect.top + scrollDom.scrollTop}px`;
+		cursorDropIndicator.style.left = `${left - scrollRect.left + scrollDom.scrollLeft}px`;
+		if (cursorDropIndicator.parentElement !== scrollDom) {
+			scrollDom.appendChild(cursorDropIndicator);
+		}
+	}
+
+	private hideCursorDropIndicator(): void {
+		cursorDropIndicator?.remove();
+	}
+
 	private stopDragPointerTracking(): void {
 		if (cleanupActiveDragTracking) {
 			cleanupActiveDragTracking();
 			cleanupActiveDragTracking = null;
 		}
 		activeDragPoint = null;
+		this.hideCursorDropIndicator();
 	}
 
 	private resolveDragPoint(event: DragEvent): {x: number; y: number} | null {
@@ -1644,7 +1691,7 @@ export class ColumnWidget extends WidgetType {
 				sourceIndex: index,
 				dropHandled: false,
 			};
-			this.startDragPointerTracking(e);
+			this.startDragPointerTracking(e, view);
 			item.classList.add("column-dragging");
 		});
 
@@ -1653,11 +1700,17 @@ export class ColumnWidget extends WidgetType {
 			e.preventDefault();
 			e.stopPropagation();
 			if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+
+			// Determine drop side based on cursor position within the column
+			const rect = item.getBoundingClientRect();
+			const dropBefore = e.clientX < rect.left + rect.width / 2;
+			item.classList.toggle("column-drop-before", dropBefore);
+			item.classList.toggle("column-drop-after", !dropBefore);
 			item.classList.add("column-drag-over");
 		});
 
 		item.addEventListener("dragleave", () => {
-			item.classList.remove("column-drag-over");
+			item.classList.remove("column-drag-over", "column-drop-before", "column-drop-after");
 		});
 
 		item.addEventListener("drop", (e: DragEvent) => {
@@ -1665,7 +1718,13 @@ export class ColumnWidget extends WidgetType {
 			e.preventDefault();
 			e.stopPropagation();
 			if (!e.dataTransfer) return;
-			item.classList.remove("column-drag-over");
+
+			// Resolve actual insertion index from drop side
+			const rect = item.getBoundingClientRect();
+			const dropBefore = e.clientX < rect.left + rect.width / 2;
+			const dropIndex = dropBefore ? index : index + 1;
+
+			item.classList.remove("column-drag-over", "column-drop-before", "column-drop-after");
 			const source = activeDragState;
 			source.dropHandled = true;
 			if (source.sourceRegionFrom === this.region.from) {
@@ -1673,18 +1732,18 @@ export class ColumnWidget extends WidgetType {
 					source.sourcePath,
 					source.sourceIndex,
 					containerPath,
-					index,
+					dropIndex,
 					view,
 				);
 				return;
 			}
-			this.moveColumnBetweenBlocks(source, containerPath, index, view);
+			this.moveColumnBetweenBlocks(source, containerPath, dropIndex, view);
 		});
 
 		item.addEventListener("dragend", (e: DragEvent) => {
 			if (e.target !== item) return;
 			e.stopPropagation();
-			item.classList.remove("column-dragging");
+			item.classList.remove("column-dragging", "column-drag-over", "column-drop-before", "column-drop-after");
 			item.setAttribute("draggable", "false");
 			const source = activeDragState;
 			if (

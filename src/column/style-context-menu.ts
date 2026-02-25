@@ -581,9 +581,9 @@ function renderPopoverContent(
 
 	createActionRow(popover, {
 		label: "Show border",
-		checked: readStyleValue(selectedColumn, "showBorder", DEFAULT_STYLE.showBorder),
+		checked: readStyleValue(selectedColumn, "showBorder", false),
 		onClick: () => {
-			const current = readStyleValue(selectedColumn, "showBorder", DEFAULT_STYLE.showBorder);
+			const current = readStyleValue(selectedColumn, "showBorder", false);
 			patchStylesAndRerender(menuData, state, {showBorder: !current});
 		},
 	});
@@ -634,13 +634,13 @@ function renderPopoverContent(
 		checked: readStyleField(
 			state.containerStyle,
 			"showBorder",
-			DEFAULT_STYLE.showBorder,
+			false,
 		),
 		onClick: () => {
 			const current = readStyleField(
 				state.containerStyle,
 				"showBorder",
-				DEFAULT_STYLE.showBorder,
+				false,
 			);
 			patchContainerStyleAndRerender(menuData, state, {showBorder: !current});
 		},

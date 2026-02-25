@@ -1,4 +1,4 @@
-import {Editor, Plugin} from "obsidian";
+import {Editor, Menu, Plugin} from "obsidian";
 import {ColumnsPluginSettings, ColumnsSettingTab, DEFAULT_SETTINGS} from "./settings";
 import {setPluginInstance} from "./column/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
@@ -57,6 +57,33 @@ export default class ColumnsPlugin extends Plugin {
 		});
 
 		this.addSettingTab(new ColumnsSettingTab(this.app, this));
+
+		// ── Editor context menu ──────────────────────────────────
+		this.registerEvent(
+			this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor) => {
+				menu.addItem((item) =>
+					item
+						.setSection("insert")
+						.setTitle("Insert 2 columns")
+						.setIcon("columns-2")
+						.onClick(() => this.insertColumns(editor, 2)),
+				);
+				menu.addItem((item) =>
+					item
+						.setSection("insert")
+						.setTitle("Insert 3 columns")
+						.setIcon("columns-3")
+						.onClick(() => this.insertColumns(editor, 3)),
+				);
+				menu.addItem((item) =>
+					item
+						.setSection("insert")
+						.setTitle("Insert nested columns")
+						.setIcon("git-merge")
+						.onClick(() => this.insertNestedTemplate(editor)),
+				);
+			}),
+		);
 	}
 
 	onunload() {
