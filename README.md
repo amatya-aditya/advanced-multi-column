@@ -12,6 +12,11 @@ Create interactive, nested multi-column layouts — without losing sibling colum
 
 </div>
 
+<p align="center">
+  <img  src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/img3.png">
+</p>
+
+
 ## Why this plugin?
 
 The problem with existing multi-column plugin? In **Live Preview**, when you click into one column to edit it, Obsidian collapses the entire block — **sibling columns disappear**, replaced by raw markup. You lose all visual context of the layout while editing.
