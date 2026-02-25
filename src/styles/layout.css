@@ -21,6 +21,11 @@
 	display: none !important;
 }
 
+/* Hide backlinks footer inside sizer — it gets relocated after the host wrapper */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .mod-footer {
+	display: none !important;
+}
+
 /* Collapse the sizer's own height/padding so it wraps tightly around
    the remaining visible children (banner, metadata, title). */
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
@@ -37,10 +42,21 @@
 
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host {
 	display: block;
-	max-width: var(--file-line-width);
-	margin: 0 auto;
 	width: 100%;
 	box-sizing: border-box;
+}
+
+/* Constrain relocated backlinks footer to full width by default */
+.markdown-preview-view.amc-reading-columns-active > .mod-footer {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* When readable line width is on, cap host and footer to the file line width */
+.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .amc-reading-columns-host,
+.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .mod-footer {
+	max-width: var(--file-line-width);
+	margin: 0 auto;
 }
 
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host > .columns-rv-wrapper {

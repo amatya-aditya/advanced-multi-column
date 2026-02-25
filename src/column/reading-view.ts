@@ -26,6 +26,7 @@ interface RenderState {
 	previewObserver?: MutationObserver;
 	hostObserver?: MutationObserver;
 	wrapperObserver?: MutationObserver;
+	sizerObserver?: MutationObserver;
 }
 
 function rvWarn(...args: unknown[]): void {
@@ -103,6 +104,27 @@ function ensureWrapperHost(
 	return host;
 }
 
+/** Move .mod-footer from sizer into previewEl (after host) so backlinks appear below columns. */
+function relocateFooter(sizer: HTMLElement, previewEl: HTMLElement, host: HTMLElement): void {
+	const footer = sizer.querySelector(":scope > .mod-footer");
+	if (footer instanceof HTMLElement) {
+		// Insert footer after the host
+		if (host.nextSibling) {
+			previewEl.insertBefore(footer, host.nextSibling);
+		} else {
+			previewEl.appendChild(footer);
+		}
+	}
+}
+
+/** Move .mod-footer back into sizer when tearing down columns. */
+function restoreFooter(previewEl: HTMLElement, sizer: HTMLElement): void {
+	const footer = previewEl.querySelector(":scope > .mod-footer");
+	if (footer instanceof HTMLElement) {
+		sizer.appendChild(footer);
+	}
+}
+
 function teardownSizer(
 	sizer: HTMLElement,
 	states: WeakMap<HTMLElement, RenderState>,
@@ -114,8 +136,10 @@ function teardownSizer(
 	state.previewObserver?.disconnect();
 	state.hostObserver?.disconnect();
 	state.wrapperObserver?.disconnect();
+	state.sizerObserver?.disconnect();
 	state.component.unload();
 	state.wrapper.remove();
+	restoreFooter(state.previewEl, sizer);
 	state.previewEl.classList.remove(RV_ACTIVE_CLASS);
 	if (!state.host.hasChildNodes()) {
 		state.host.remove();
@@ -343,6 +367,7 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		state.previewObserver?.disconnect();
 		state.hostObserver?.disconnect();
 		state.wrapperObserver?.disconnect();
+		state.sizerObserver?.disconnect();
 		state.component.unload();
 		states.delete(sizer);
 		state.previewEl.classList.remove(RV_ACTIVE_CLASS);
@@ -359,6 +384,16 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		state.previewObserver?.disconnect();
 		state.hostObserver?.disconnect();
 		state.wrapperObserver?.disconnect();
+		state.sizerObserver?.disconnect();
+
+		// Watch sizer for .mod-footer being (re-)added by Obsidian on scroll
+		const sizerObserver = new MutationObserver(() => {
+			const footer = sizer.querySelector(":scope > .mod-footer");
+			if (footer instanceof HTMLElement) {
+				relocateFooter(sizer, state.previewEl, state.host);
+			}
+		});
+		sizerObserver.observe(sizer, {childList: true});
 
 		const previewObserver = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
@@ -444,6 +479,7 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		state.previewObserver = previewObserver;
 		state.hostObserver = hostObserver;
 		state.wrapperObserver = wrapperObserver;
+		state.sizerObserver = sizerObserver;
 		rvWarn("lifecycle observers attached", sizerSnapshot(sizer, state));
 	}
 
@@ -585,6 +621,7 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 			wrapper.dataset.columnsRenderId = String(renderId);
 			host.appendChild(wrapper);
 			previewEl.classList.add(RV_ACTIVE_CLASS);
+			relocateFooter(sizer, previewEl, host);
 			const state: RenderState = {
 				sourcePath,
 				fingerprint,
