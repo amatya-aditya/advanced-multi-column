@@ -8,11 +8,15 @@
 
 # Advanced Multi Column
 
-Create interactive, nested multi-column layouts in Obsidian using simple Markdown markers.
-
-Columns render in both **Live Preview** and **Reading View** while keeping your notes in plain text.
+Create interactive, nested multi-column layouts in Obsidian using simple Markdown markers — without losing sibling columns when editing in Live Preview.
 
 </div>
+
+## Why this plugin?
+
+Existing multi-column plugins use callouts or codeblocks to create column layouts. The problem? In **Live Preview**, when you click into one column to edit it, Obsidian collapses the entire block — **sibling columns disappear**, replaced by raw markup. You lose all visual context of the layout while editing.
+
+**Advanced Multi Column** fixes this. It uses lightweight comment markers (`%% col-start %%`, `%% col-break %%`, `%% col-end %%`) instead of wrapping content in a single callout or codeblock. This means when you edit one column, **the other columns stay rendered**. You always see the full layout, making multi-column editing feel natural instead of fighting the editor.
 
 <p align="center">
   <a href="https://github.com/amatya-aditya/advanced-multi-column/releases/latest">
@@ -54,7 +58,7 @@ Columns render in both **Live Preview** and **Reading View** while keeping your 
 
 ## Quick Start
 
-1. Open the command palette and run **Insert 2-wide layout**.
+1. Open the command palette and run **Insert 2-wide layout**, or right-click in the editor and select **Insert Column Layout** from the context menu.
 2. Click inside each column preview area to edit.
 3. Drag the vertical divider between columns to resize.
 4. Right-click a column to open style options.
@@ -174,16 +178,23 @@ Right-click any column to:
 
 ## Installation
 
-### Community Plugins
+### Community Plugins (Not Available now)
 
 1. Open **Settings → Community Plugins**.
 2. Disable **Restricted mode**.
 3. Search for **Advanced Multi Column**.
 4. Install and enable.
 
+### USing BRAT Plugin
+
+1. Install the [BRAT plugin](https://github.com/TfTHacker/obsidian42-brat) if you haven't already.
+2. Open **Settings → BRAT → Add Beta Plugin**.
+3. Enter `https://github.com/amatya-aditya/advanced-multi-column` and click **Add Plugin**.
+4. Enable **Advanced Multi Column** in **Settings → Community Plugins**.
+
 ### Manual
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/amatya-aditya/advanced-multi-columns/releases).
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 2. Create folder: `.obsidian/plugins/advanced-multi-column/`
 3. Copy the files into that folder.
 4. Reload Obsidian and enable the plugin.
