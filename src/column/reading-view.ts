@@ -144,7 +144,7 @@ async function renderMarkdownSegment(
 	markdown: string,
 	sourcePath: string,
 ): Promise<void> {
-	if (markdown.length === 0) return;
+	if (markdown.trim().length === 0) return;
 
 	const host = document.createElement("div");
 	host.className = "columns-rv-segment";
@@ -158,10 +158,14 @@ async function renderColumnsRegion(
 	parent: HTMLElement,
 	region: ColumnRegion,
 	sourcePath: string,
+	depth = 0,
 ): Promise<void> {
+	if (depth > 8) return;
+
 	const containerEl = document.createElement("div");
 	containerEl.className = "columns-container columns-ui columns-reading";
 	applyContainerStyle(containerEl, region.containerStyle);
+	if (depth > 0) containerEl.classList.add("columns-nested");
 	parent.appendChild(containerEl);
 
 	for (let ci = 0; ci < region.columns.length; ci++) {
@@ -189,15 +193,66 @@ async function renderColumnsRegion(
 		containerEl.appendChild(colEl);
 
 		if (col.content.trim().length > 0) {
-			await MarkdownRenderer.render(
-				plugin.app,
-				col.content,
-				previewEl,
-				sourcePath,
-				component,
+			await renderColumnContent(
+				plugin, component, previewEl, col.content, sourcePath, depth + 1,
 			);
 		}
 	}
+}
+
+/** Render a column's content, recursively handling nested column regions. */
+async function renderColumnContent(
+	plugin: ColumnsPlugin,
+	component: Component,
+	parent: HTMLElement,
+	content: string,
+	sourcePath: string,
+	depth: number,
+): Promise<void> {
+	if (depth > 8) {
+		await MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component);
+		return;
+	}
+
+	const nested = findColumnRegions(content);
+	if (nested.length === 0) {
+		await MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component);
+		return;
+	}
+
+	const sorted = [...nested].sort((a, b) => a.from - b.from);
+	let cursor = 0;
+	for (const region of sorted) {
+		if (region.from > cursor) {
+			const text = content.slice(cursor, region.from).trim();
+			if (text) {
+				const div = document.createElement("div");
+				parent.appendChild(div);
+				await MarkdownRenderer.render(plugin.app, text, div, sourcePath, component);
+			}
+		}
+		await renderColumnsRegion(plugin, component, parent, region, sourcePath, depth);
+		cursor = region.to;
+	}
+
+	if (cursor < content.length) {
+		const text = content.slice(cursor).trim();
+		if (text) {
+			const div = document.createElement("div");
+			parent.appendChild(div);
+			await MarkdownRenderer.render(plugin.app, text, div, sourcePath, component);
+		}
+	}
+}
+
+/** Skip past frontmatter (--- ... ---) and return the char offset where content starts. */
+function getFrontmatterEnd(text: string): number {
+	if (!text.startsWith("---")) return 0;
+	const close = text.indexOf("\n---", 3);
+	if (close === -1) return 0;
+	// Move past the closing --- and its newline
+	const end = text.indexOf("\n", close + 4);
+	return end === -1 ? close + 4 : end + 1;
 }
 
 async function buildWrapper(
@@ -211,7 +266,7 @@ async function buildWrapper(
 	wrapper.className = "columns-rv-wrapper";
 	wrapper.dataset.columnsSourcePath = sourcePath;
 
-	let cursor = 0;
+	let cursor = getFrontmatterEnd(text);
 	for (const region of regions) {
 		const before = text.slice(cursor, region.from);
 		await renderMarkdownSegment(plugin, component, wrapper, before, sourcePath);

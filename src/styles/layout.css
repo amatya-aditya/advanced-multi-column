@@ -9,40 +9,38 @@
    Marker-based columns layout styles (Live Preview + Reading View)
    ========================================================================== */
 
-/* Hidden marker/preamble sections inside column regions */
-[data-columns-hidden="true"] {
+/* Reading-view wrapper mode: hide only rendered section divs (el-*)
+   and the pusher inside the sizer.  Banner images, metadata containers,
+   inline titles, and other plugin UI stay visible. */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > div[class^="el-"],
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > div[class*=" el-"] {
 	display: none !important;
 }
 
-/* Invisible anchor that marks column container position in the sizer */
-[data-columns-anchor] {
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .markdown-preview-pusher {
 	display: none !important;
 }
 
-/* Reading-view wrapper mode: hide only native markdown section blocks.
-   Keep plugin-injected UI (e.g., banners) visible. */
-.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer > [class^="el-"],
-.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer > [class*=" el-"] {
-	display: none !important;
-}
-
-.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer {
+/* Collapse the sizer's own height/padding so it wraps tightly around
+   the remaining visible children (banner, metadata, title). */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
 	min-height: 0 !important;
 	height: auto !important;
 	padding-bottom: 0 !important;
 }
 
-.markdown-preview-view.amc-reading-columns-active .markdown-preview-sizer > .markdown-preview-pusher {
-	display: none !important;
-}
-
+/* Host container: hidden by default, shown when columns are active.
+   Inherit the sizer's readable-line-width constraints. */
 .markdown-preview-view > .amc-reading-columns-host {
 	display: none;
 }
 
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host {
 	display: block;
+	max-width: var(--file-line-width);
+	margin: 0 auto;
 	width: 100%;
+	box-sizing: border-box;
 }
 
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host > .columns-rv-wrapper {
@@ -677,11 +675,13 @@
 	--columns-block-default-border-width: 0px;
 	border: none;
 	padding: 0;
-	overflow: hidden;
+	overflow: visible;
 }
 
 .columns-container.columns-reading .column-item {
 	border: none;
+	overflow-x: auto;
+	min-width: 0;
 }
 
 .columns-container.columns-reading .column-item:hover {
