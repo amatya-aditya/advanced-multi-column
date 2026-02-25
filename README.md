@@ -1,4 +1,10 @@
 <div align="center">
+  <a href="https://github.com/amatya-aditya/obsidian-rss-dashboard" target="_blank">
+    <img src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/amclogo.png" alt="AMC Logo" width="100%" />
+  </a>
+</div>
+
+<div align="center">
 
 # Advanced Multi Column
 
