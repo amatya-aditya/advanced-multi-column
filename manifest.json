@@ -2,7 +2,7 @@
 	"id": "advanced-multi-column",
 	"name": "Advanced Multi Column",
 	"minAppVersion": "0.15.0",
-	"description": "Allows you to create columns in Obsidian Markdown",
+	"description": "Allows to create interactive multi-columns in Obsidian",
 	"author": "Aditya Amatya",
 	"authorUrl": "https://github.com/amatya-aditya/advanced-multi-column/",
 	"isDesktopOnly": false,
