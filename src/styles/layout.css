@@ -9,15 +9,10 @@
    Marker-based columns layout styles (Live Preview + Reading View)
    ========================================================================== */
 
-/* Reading-view wrapper mode: hide only rendered section divs (el-*)
-   and the pusher inside the sizer.  Banner images, metadata containers,
-   inline titles, and other plugin UI stay visible. */
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > div[class^="el-"],
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > div[class*=" el-"] {
-	display: none !important;
-}
-
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .markdown-preview-pusher {
+/* Reading-view wrapper mode: content el-* divs and the pusher are hidden
+   individually via JS (amc-rv-hidden class) so that metadata containers,
+   banner plugin elements, inline titles, and other non-content UI survive. */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .amc-rv-hidden {
 	display: none !important;
 }
 
@@ -659,6 +654,37 @@
 	z-index: 2;
 }
 
+/* Separator line (::before) — always visible when .has-separator */
+.columns-container .column-resize-handle.has-separator::before {
+	content: "";
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	top: 8px;
+	bottom: 8px;
+	width: 0;
+	border-left: var(--sep-width, 1px) var(--sep-style, solid) var(--sep-color, var(--background-modifier-border));
+	pointer-events: none;
+}
+
+/* Custom character separator */
+.columns-container .column-resize-handle.has-separator-custom::before {
+	content: attr(data-sep-char);
+	border: none;
+	width: auto;
+	writing-mode: vertical-rl;
+	text-orientation: mixed;
+	color: var(--sep-color, var(--text-faint));
+	font-size: calc(var(--sep-width, 1px) * 6 + 6px);
+	line-height: 1;
+	letter-spacing: 0.15em;
+	opacity: 0.7;
+	overflow: hidden;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+/* Hover accent line (::after) — shown on hover/resizing */
 .columns-container .column-resize-handle::after {
 	content: "";
 	position: absolute;
@@ -673,8 +699,13 @@
 }
 
 .columns-container .column-resize-handle:hover::after,
-.columns-container.columns-resizing .column-resize-handle::after {
+.columns-container .column-resize-handle.is-active::after {
 	opacity: 0.6;
+}
+
+/* Hide separator line while actively resizing (show accent instead) */
+.columns-container .column-resize-handle.is-active.has-separator::before {
+	opacity: 0;
 }
 
 .columns-container .column-dragging {
@@ -707,16 +738,16 @@
 	right: -7px;
 }
 
-/* Cursor drop indicator: small vertical bar at the insertion point */
+/* Cursor drop indicator: horizontal line showing where a dragged column will be placed */
 .amc-cursor-drop-indicator {
 	position: absolute;
-	width: 2px;
-	height: 18px;
+	height: 3px;
 	background: var(--interactive-accent);
-	border-radius: 1px;
+	border-radius: 2px;
 	pointer-events: none;
 	z-index: 100;
 	opacity: 0.85;
+	box-shadow: 0 0 6px color-mix(in srgb, var(--interactive-accent) 50%, transparent);
 }
 
 
@@ -742,11 +773,147 @@
 	display: none;
 }
 
+/* ==========================================================================
+   Stacked (vertical) layout: columns arranged top-to-bottom
+   ========================================================================== */
+
+.columns-container.columns-stacked {
+	flex-direction: column !important;
+}
+
+.columns-container.columns-stacked > .column-item {
+	flex: none !important;
+	width: 100%;
+}
+
+/* Hide horizontal resize handles in stacked mode */
+.columns-container.columns-stacked > .column-resize-handle {
+	display: none !important;
+}
+
+/* Separators become horizontal lines in stacked mode */
+.columns-container.columns-stacked > .column-separator-visual {
+	width: 100%;
+	flex: 0 0 auto;
+	border-left: none;
+	border-top: var(--sep-width, 1px) var(--sep-style, solid) var(--sep-color, var(--background-modifier-border));
+	margin: 2px 8px;
+}
+
+.columns-container.columns-stacked > .column-separator-custom {
+	writing-mode: horizontal-tb;
+	text-orientation: initial;
+	width: 100%;
+	margin: 2px 8px;
+}
+
+/* Drop indicators switch to top/bottom in stacked mode */
+.columns-container.columns-stacked .column-drop-before::before {
+	left: 4px;
+	right: 4px;
+	top: -7px;
+	bottom: auto;
+	width: auto;
+	height: 3px;
+}
+
+.columns-container.columns-stacked .column-drop-after::before {
+	left: 4px;
+	right: 4px;
+	bottom: -7px;
+	top: auto;
+	width: auto;
+	height: 3px;
+}
+
+/* ==========================================================================
+   Per-column stack groups: consecutive stacked columns within a row container
+   ========================================================================== */
+
+.columns-container .columns-stack-group {
+	display: flex;
+	flex-direction: column;
+	flex: 1 1 0%;
+	min-width: 0;
+	align-items: stretch;
+}
+
+.columns-container .columns-stack-group > .column-item {
+	flex: none !important;
+	width: 100%;
+}
+
+/* Hide vertical resize handles inside stack groups */
+.columns-container .columns-stack-group > .column-resize-handle {
+	display: none !important;
+}
+
+/* Separators become horizontal lines inside stack groups */
+.columns-container .columns-stack-group > .column-separator-visual {
+	width: 100%;
+	flex: 0 0 auto;
+	border-left: none;
+	border-top: var(--sep-width, 1px) var(--sep-style, solid) var(--sep-color, var(--background-modifier-border));
+	margin: 2px 8px;
+}
+
+.columns-container .columns-stack-group > .column-separator-custom {
+	writing-mode: horizontal-tb;
+	text-orientation: initial;
+	width: 100%;
+	margin: 2px 8px;
+}
+
+/* Drop indicators switch to top/bottom inside stack groups */
+.columns-container .columns-stack-group .column-drop-before::before {
+	left: 4px;
+	right: 4px;
+	top: -7px;
+	bottom: auto;
+	width: auto;
+	height: 3px;
+}
+
+.columns-container .columns-stack-group .column-drop-after::before {
+	left: 4px;
+	right: 4px;
+	bottom: -7px;
+	top: auto;
+	width: auto;
+	height: 3px;
+}
+
+/* Column selection highlight */
+.columns-container .column-item.column-selected {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
+
 .columns-container .column-separator-visual {
-	width: 1px;
-	flex: 0 0 1px;
-	background: var(--background-modifier-border);
-	margin: 8px 4px;
+	width: 0;
+	flex: 0 0 var(--sep-width, 1px);
+	background: none;
+	border-left: var(--sep-width, 1px) var(--sep-style, solid) var(--sep-color, var(--background-modifier-border));
+	margin: 8px 2px;
+}
+
+.columns-container .column-separator-custom {
+	flex: 0 0 auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	writing-mode: vertical-rl;
+	text-orientation: mixed;
+	color: var(--sep-color, var(--text-faint));
+	font-size: var(--sep-size, 12px);
+	line-height: 1;
+	margin: 4px 2px;
+	overflow: hidden;
+	-webkit-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	letter-spacing: 0.15em;
+	opacity: 0.7;
 }
 
 .columns-container .column-empty-placeholder {
@@ -809,4 +976,32 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+.columns-suggest-icon {
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+	color: var(--text-muted);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.columns-suggest-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.columns-suggest-text {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+	overflow: hidden;
+}
+
+.columns-suggest-item:has(.columns-suggest-icon) {
+	flex-direction: row;
+	align-items: center;
+	gap: 8px;
 }

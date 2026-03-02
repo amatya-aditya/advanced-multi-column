@@ -1,4 +1,4 @@
-import type ColumnsPlugin from "../main";
+import type ColumnsPlugin from "../../main";
 
 let _plugin: ColumnsPlugin | null = null;
 

@@ -13,7 +13,7 @@ const BACKGROUND_CSS = {
 	"pink-soft": "rgba(236, 72, 153, 0.14)",
 } as const;
 
-const COLOR_CSS = {
+export const COLOR_CSS = {
 	gray: "var(--background-modifier-border)",
 	accent: "var(--interactive-accent)",
 	muted: "var(--text-muted)",
@@ -30,12 +30,21 @@ const COLOR_CSS = {
 type ColumnBackgroundOption = keyof typeof BACKGROUND_CSS;
 type StyleColorOption = keyof typeof COLOR_CSS;
 
+type SeparatorLineStyle = "solid" | "dashed" | "dotted" | "double" | "custom";
+
+const SEPARATOR_STYLE_VALUES = new Set<string>(["solid", "dashed", "dotted", "double", "custom"]);
+
 type ColumnStyleData = {
 	background?: ColumnBackgroundOption;
 	borderColor?: StyleColorOption;
 	textColor?: StyleColorOption;
 	showBorder?: boolean;
 	horizontalDividers?: boolean;
+	separator?: boolean;
+	separatorColor?: StyleColorOption;
+	separatorStyle?: SeparatorLineStyle;
+	separatorWidth?: number;
+	separatorCustomChar?: string;
 };
 
 const COLUMN_STYLE_VAR_KEYS = [
@@ -44,6 +53,9 @@ const COLUMN_STYLE_VAR_KEYS = [
 	"--columns-col-border-color",
 	"--columns-col-border-width",
 	"--columns-col-horizontal-width",
+	"--columns-col-sep-color",
+	"--columns-col-sep-width",
+	"--columns-col-sep-style",
 ] as const;
 
 const CONTAINER_STYLE_VAR_KEYS = [
@@ -87,6 +99,30 @@ function toStyleData(style: unknown): ColumnStyleData | null {
 		parsed.horizontalDividers = record.horizontalDividers;
 	}
 
+	if (typeof record.separator === "boolean") {
+		parsed.separator = record.separator;
+	}
+
+	const separatorColor = record.separatorColor;
+	if (typeof separatorColor === "string" && hasOwnKey(COLOR_CSS, separatorColor)) {
+		parsed.separatorColor = separatorColor;
+	}
+
+	const separatorStyle = record.separatorStyle;
+	if (typeof separatorStyle === "string" && SEPARATOR_STYLE_VALUES.has(separatorStyle)) {
+		parsed.separatorStyle = separatorStyle as SeparatorLineStyle;
+	}
+
+	const separatorWidth = record.separatorWidth;
+	if (typeof separatorWidth === "number" && separatorWidth >= 1 && separatorWidth <= 8) {
+		parsed.separatorWidth = separatorWidth;
+	}
+
+	const separatorCustomChar = record.separatorCustomChar;
+	if (typeof separatorCustomChar === "string" && separatorCustomChar.length > 0 && separatorCustomChar.length <= 3) {
+		parsed.separatorCustomChar = separatorCustomChar;
+	}
+
 	return Object.keys(parsed).length > 0 ? parsed : null;
 }
 
@@ -117,6 +153,14 @@ function buildColumnCssProps(parsed: ColumnStyleData): Record<string, string> {
 		cssProps["--columns-col-border-color"] = effectiveBorderColor;
 		cssProps["--columns-col-border-width"] = showBorder ? "1px" : "0px";
 		if (showHorizontal) cssProps["--columns-col-horizontal-width"] = "1px";
+	}
+
+	if (parsed.separator) {
+		cssProps["--columns-col-sep-color"] = COLOR_CSS[parsed.separatorColor ?? "gray"];
+		cssProps["--columns-col-sep-width"] = `${parsed.separatorWidth ?? 1}px`;
+		if (parsed.separatorStyle && parsed.separatorStyle !== "custom") {
+			cssProps["--columns-col-sep-style"] = parsed.separatorStyle;
+		}
 	}
 
 	return cssProps;

@@ -5,12 +5,13 @@ import {
 	MarkdownView,
 	TFile,
 } from "obsidian";
-import {findColumnRegions} from "./parser";
-import {applyColumnStyle, applyContainerStyle} from "./column-style";
-import type {ColumnRegion} from "./types";
+import {findColumnRegions} from "./core/parser";
+import {applyColumnStyle, applyContainerStyle} from "./core/column-style";
+import {buildSeparatorElement, groupColumns} from "./render/column-renderer";
+import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
 
-const RV_DEBUG = true;
+const RV_DEBUG = false;
 const RV_ACTIVE_CLASS = "amc-reading-columns-active";
 const RV_HOST_CLASS = "amc-reading-columns-host";
 
@@ -125,6 +126,30 @@ function restoreFooter(previewEl: HTMLElement, sizer: HTMLElement): void {
 	}
 }
 
+const RV_HIDDEN_CLASS = "amc-rv-hidden";
+
+/** Hide el-* content divs and the pusher inside the sizer, preserving
+ *  metadata containers, banner plugin elements, inline titles, etc. */
+function hideSizerContent(sizer: HTMLElement): void {
+	for (const child of Array.from(sizer.children)) {
+		if (!(child instanceof HTMLElement)) continue;
+		const cls = child.className;
+		const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
+		const isPusher = child.classList.contains("markdown-preview-pusher");
+		if (isElDiv || isPusher) {
+			child.classList.add(RV_HIDDEN_CLASS);
+		}
+	}
+}
+
+/** Restore hidden elements when tearing down. */
+function restoreSizerContent(sizer: HTMLElement): void {
+	const hidden = sizer.querySelectorAll<HTMLElement>(`:scope > .${RV_HIDDEN_CLASS}`);
+	for (let i = 0; i < hidden.length; i++) {
+		hidden[i]!.classList.remove(RV_HIDDEN_CLASS);
+	}
+}
+
 function teardownSizer(
 	sizer: HTMLElement,
 	states: WeakMap<HTMLElement, RenderState>,
@@ -140,6 +165,7 @@ function teardownSizer(
 	state.component.unload();
 	state.wrapper.remove();
 	restoreFooter(state.previewEl, sizer);
+	restoreSizerContent(sizer);
 	state.previewEl.classList.remove(RV_ACTIVE_CLASS);
 	if (!state.host.hasChildNodes()) {
 		state.host.remove();
@@ -188,38 +214,71 @@ async function renderColumnsRegion(
 
 	const containerEl = document.createElement("div");
 	containerEl.className = "columns-container columns-ui columns-reading";
+	const isContainerStacked = region.layout === "stack";
+	if (isContainerStacked) containerEl.classList.add("columns-stacked");
 	applyContainerStyle(containerEl, region.containerStyle);
 	if (depth > 0) containerEl.classList.add("columns-nested");
 	parent.appendChild(containerEl);
 
-	for (let ci = 0; ci < region.columns.length; ci++) {
-		if (ci > 0) {
-			const sep = document.createElement("div");
-			sep.className = "column-separator-visual";
-			containerEl.appendChild(sep);
+	const groups = isContainerStacked
+		? [{indices: region.columns.map((_, i) => i), isStack: true}]
+		: groupColumns(region.columns);
+
+	for (let gi = 0; gi < groups.length; gi++) {
+		const group = groups[gi]!;
+
+		if (gi > 0) {
+			const prevGroup = groups[gi - 1]!;
+			buildSeparatorElement(containerEl, region.columns[prevGroup.indices[prevGroup.indices.length - 1]!]!);
 		}
 
-		const col = region.columns[ci]!;
-		const colEl = document.createElement("div");
-		colEl.className = "column-item";
-		colEl.dataset.colIndex = String(ci);
-		applyColumnStyle(colEl, col.style);
-
-		if (col.widthPercent > 0) {
-			const sepTotal = (region.columns.length - 1) * 9;
-			const shrink = sepTotal / region.columns.length;
-			colEl.style.flex = `0 0 calc(${col.widthPercent}% - ${shrink.toFixed(1)}px)`;
+		let groupParent: HTMLElement;
+		if (group.isStack && !isContainerStacked && group.indices.length > 0) {
+			const stackGroupEl = document.createElement("div");
+			stackGroupEl.className = "columns-stack-group";
+			const maxWidth = Math.max(...group.indices.map((idx) => region.columns[idx]!.widthPercent));
+			if (maxWidth > 0) {
+				const sepTotal = (groups.length - 1) * 8;
+				const shrink = sepTotal / groups.length;
+				stackGroupEl.style.flex = `0 0 calc(${maxWidth}% - ${shrink.toFixed(1)}px)`;
+			}
+			containerEl.appendChild(stackGroupEl);
+			groupParent = stackGroupEl;
+		} else {
+			groupParent = containerEl;
 		}
 
-		const previewEl = document.createElement("div");
-		previewEl.className = "column-preview";
-		colEl.appendChild(previewEl);
-		containerEl.appendChild(colEl);
+		for (let gi2 = 0; gi2 < group.indices.length; gi2++) {
+			const ci = group.indices[gi2]!;
+			const col = region.columns[ci]!;
 
-		if (col.content.trim().length > 0) {
-			await renderColumnContent(
-				plugin, component, previewEl, col.content, sourcePath, depth + 1,
-			);
+			if (gi2 > 0 && group.isStack) {
+				buildSeparatorElement(groupParent, region.columns[group.indices[gi2 - 1]!]!);
+			}
+
+			const colEl = document.createElement("div");
+			colEl.className = "column-item";
+			colEl.dataset.colIndex = String(ci);
+			applyColumnStyle(colEl, col.style);
+
+			if (group.isStack) {
+				// Stacked: full width via CSS
+			} else if (!isContainerStacked && col.widthPercent > 0) {
+				const sepTotal = (groups.length - 1) * 8;
+				const shrink = sepTotal / groups.length;
+				colEl.style.flex = `0 0 calc(${col.widthPercent}% - ${shrink.toFixed(1)}px)`;
+			}
+
+			const previewEl = document.createElement("div");
+			previewEl.className = "column-preview";
+			colEl.appendChild(previewEl);
+			groupParent.appendChild(colEl);
+
+			if (col.content.trim().length > 0) {
+				await renderColumnContent(
+					plugin, component, previewEl, col.content, sourcePath, depth + 1,
+				);
+			}
 		}
 	}
 }
@@ -303,12 +362,14 @@ async function buildWrapper(
 	return wrapper;
 }
 
-export function registerReadingView(plugin: ColumnsPlugin): void {
+export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const states = new WeakMap<HTMLElement, RenderState>();
 	const timers = new WeakMap<HTMLElement, number>();
 	const renderTokens = new WeakMap<HTMLElement, number>();
 	const sourceReads = new Map<string, Promise<string | null>>();
 	const sourceHints = new WeakMap<HTMLElement, string>();
+	const retryCounts = new WeakMap<HTMLElement, number>();
+	const activeSizers = new Set<HTMLElement>();
 	let renderIdSeq = 0;
 
 	const sizerSnapshot = (sizer: HTMLElement, state?: RenderState) => {
@@ -374,6 +435,13 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		if (!state.host.hasChildNodes()) {
 			state.host.remove();
 		}
+
+		const retries = retryCounts.get(sizer) ?? 0;
+		if (retries >= 5) {
+			rvError("max retries reached, giving up", {reason, retries});
+			return;
+		}
+		retryCounts.set(sizer, retries + 1);
 		scheduleRender(sizer, state.sourcePath, `recover:${reason}`);
 	}
 
@@ -386,8 +454,20 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		state.wrapperObserver?.disconnect();
 		state.sizerObserver?.disconnect();
 
-		// Watch sizer for .mod-footer being (re-)added by Obsidian on scroll
-		const sizerObserver = new MutationObserver(() => {
+		// Watch sizer for newly added children (scroll virtualization, mode switch)
+		// and hide el-* / pusher elements that Obsidian adds after our initial render.
+		const sizerObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				for (const node of Array.from(mutation.addedNodes)) {
+					if (!(node instanceof HTMLElement)) continue;
+					const cls = node.className;
+					const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
+					const isPusher = node.classList.contains("markdown-preview-pusher");
+					if (isElDiv || isPusher) {
+						node.classList.add(RV_HIDDEN_CLASS);
+					}
+				}
+			}
 			const footer = sizer.querySelector(":scope > .mod-footer");
 			if (footer instanceof HTMLElement) {
 				relocateFooter(sizer, state.previewEl, state.host);
@@ -505,9 +585,15 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 			}
 		})();
 
-		sourceReads.set(sourcePath, read);
+		// Race with a 10s timeout to prevent hanging promises
+		const withTimeout = Promise.race([
+			read,
+			new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+		]);
+
+		sourceReads.set(sourcePath, withTimeout);
 		try {
-			const text = await read;
+			const text = await withTimeout;
 			return text ?? fallbackText;
 		} finally {
 			sourceReads.delete(sourcePath);
@@ -518,6 +604,7 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		sizer: HTMLElement,
 		reason: string,
 	): Promise<void> {
+		activeSizers.add(sizer);
 		const token = (renderTokens.get(sizer) ?? 0) + 1;
 		renderTokens.set(sizer, token);
 
@@ -544,13 +631,23 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		}
 
 		const view = resolveViewForSizer(sizer, plugin);
-		if (!view) {
-			rvWarn("render skipped: no markdown view for sizer", {token});
+		const sourcePath = sourceHints.get(sizer) || view?.file?.path || "";
+
+		if (!view && !sourcePath) {
+			// No view and no source hint — retry after a short delay
+			// (workspace may not be fully initialized on first load)
+			const retries = retryCounts.get(sizer) ?? 0;
+			if (retries < 5) {
+				retryCounts.set(sizer, retries + 1);
+				rvWarn("render deferred: no view or source path, retrying", {token, retries});
+				scheduleRender(sizer, "", `retry-no-view:${retries}`);
+			} else {
+				rvWarn("render skipped: no view or source path after retries", {token});
+			}
 			return;
 		}
 
-		const sourcePath = sourceHints.get(sizer) || view.file?.path || "";
-		const fallbackText = view.getViewData();
+		const fallbackText = view?.getViewData() ?? "";
 		const text = await readSource(sourcePath, fallbackText);
 
 		if (!sizer.isConnected || renderTokens.get(sizer) !== token) {
@@ -564,8 +661,17 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 
 		const regions = findColumnRegions(text);
 		if (regions.length === 0) {
-			rvWarn("render found no marker regions", {sourcePath});
-			teardownSizer(sizer, states, "no regions");
+			// On first load the vault/view may not be ready yet, yielding empty text.
+			// Retry a few times before giving up.
+			const retries = retryCounts.get(sizer) ?? 0;
+			if (retries < 5 && sourcePath) {
+				retryCounts.set(sizer, retries + 1);
+				rvWarn("render found no regions, retrying", {sourcePath, retries});
+				scheduleRender(sizer, sourcePath, `retry-no-regions:${retries}`);
+			} else {
+				rvWarn("render found no marker regions", {sourcePath});
+				teardownSizer(sizer, states, "no regions");
+			}
 			return;
 		}
 
@@ -585,6 +691,7 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 				});
 			}
 			existing.previewEl.classList.add(RV_ACTIVE_CLASS);
+			hideSizerContent(sizer);
 			rvWarn("render reused existing wrapper", sizerSnapshot(sizer, existing));
 			return;
 		}
@@ -602,11 +709,37 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 		component.load();
 		const renderId = ++renderIdSeq;
 
+		// Hide sizer content early and install a temporary observer to catch
+		// elements Obsidian adds during the async wrapper build (mode switch,
+		// scroll virtualization). This prevents flat content from flashing.
+		previewEl.classList.add(RV_ACTIVE_CLASS);
+		hideSizerContent(sizer);
+
+		const earlySizerObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				for (const node of Array.from(mutation.addedNodes)) {
+					if (!(node instanceof HTMLElement)) continue;
+					const cls = node.className;
+					const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
+					const isPusher = node.classList.contains("markdown-preview-pusher");
+					if (isElDiv || isPusher) {
+						node.classList.add(RV_HIDDEN_CLASS);
+					}
+				}
+			}
+		});
+		earlySizerObserver.observe(sizer, {childList: true});
+
 		try {
 			const wrapper = await buildWrapper(plugin, sourcePath, text, regions, component);
 
+			// Disconnect the early observer; the full lifecycle observer replaces it
+			earlySizerObserver.disconnect();
+
 			if (!sizer.isConnected || renderTokens.get(sizer) !== token) {
 				component.unload();
+				previewEl.classList.remove(RV_ACTIVE_CLASS);
+				restoreSizerContent(sizer);
 				rvWarn("render result dropped: stale after async build", {
 					renderId,
 					token,
@@ -620,7 +753,8 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 			}
 			wrapper.dataset.columnsRenderId = String(renderId);
 			host.appendChild(wrapper);
-			previewEl.classList.add(RV_ACTIVE_CLASS);
+			// Re-hide in case anything was added between observer batches
+			hideSizerContent(sizer);
 			relocateFooter(sizer, previewEl, host);
 			const state: RenderState = {
 				sourcePath,
@@ -633,6 +767,7 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 				createdAt: Date.now(),
 			};
 			states.set(sizer, state);
+			retryCounts.delete(sizer);
 			installLifecycleObservers(sizer, state);
 			rvWarn("rendered wrapper", {
 				renderId,
@@ -642,7 +777,10 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 				sizerChildren: sizer.children.length,
 			});
 		} catch (error) {
+			earlySizerObserver.disconnect();
 			component.unload();
+			previewEl.classList.remove(RV_ACTIVE_CLASS);
+			restoreSizerContent(sizer);
 			rvError("render failed", {
 				renderId,
 				sourcePath,
@@ -678,4 +816,18 @@ export function registerReadingView(plugin: ColumnsPlugin): void {
 			scheduleRender(sizer, ctx.sourcePath ?? "", "postprocessor");
 		},
 	);
+
+	// Return cleanup function for plugin onunload
+	return () => {
+		for (const sizer of activeSizers) {
+			teardownSizer(sizer, states, "plugin-unload");
+			const timer = timers.get(sizer);
+			if (timer !== undefined) {
+				window.clearTimeout(timer);
+				timers.delete(sizer);
+			}
+		}
+		activeSizers.clear();
+		sourceReads.clear();
+	};
 }

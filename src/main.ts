@@ -1,13 +1,14 @@
-import {Editor, Menu, Plugin} from "obsidian";
+import {Editor, Menu, MenuItem, Plugin} from "obsidian";
 import {ColumnsPluginSettings, ColumnsSettingTab, DEFAULT_SETTINGS} from "./settings";
-import {setPluginInstance} from "./column/plugin-ref";
+import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
-import {columnDecorations} from "./column/state-field";
+import {columnDecorations} from "./column/cm/state-field";
 import {buildRuntimeStyles} from "./column/runtime-styles";
 
 export default class ColumnsPlugin extends Plugin {
 	settings: ColumnsPluginSettings;
 	private runtimeStyleSheet: CSSStyleSheet | null = null;
+	private cleanupReadingView: (() => void) | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -18,7 +19,7 @@ export default class ColumnsPlugin extends Plugin {
 		this.registerEditorExtension(columnDecorations);
 
 		// Reading view processor (code block fallback)
-		registerReadingView(this);
+		this.cleanupReadingView = registerReadingView(this);
 
 		// ── Commands ──────────────────────────────────────────────
 
@@ -75,18 +76,32 @@ export default class ColumnsPlugin extends Plugin {
 						.setIcon("columns-3")
 						.onClick(() => this.insertColumns(editor, 3)),
 				);
-				menu.addItem((item) =>
+				menu.addItem((item) => {
 					item
 						.setSection("insert")
-						.setTitle("Insert nested columns")
-						.setIcon("git-merge")
-						.onClick(() => this.insertNestedTemplate(editor)),
-				);
+						.setTitle("Insert layout")
+						.setIcon("layout-grid");
+					const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
+					sub.addItem((s: MenuItem) => s.setTitle("Nested columns").setIcon("git-merge")
+						.onClick(() => this.insertNestedTemplate(editor)));
+					sub.addItem((s: MenuItem) => s.setTitle("Sidebar + content").setIcon("panel-left")
+						.onClick(() => this.insertSidebarLayout(editor)));
+					sub.addItem((s: MenuItem) => s.setTitle("Stacked + wide").setIcon("rows-3")
+						.onClick(() => this.insertStackedLayout(editor)));
+					sub.addItem((s: MenuItem) => s.setTitle("Cornell notes").setIcon("notebook-pen")
+						.onClick(() => this.insertCornellTemplate(editor)));
+					sub.addItem((s: MenuItem) => s.setTitle("Kanban board").setIcon("kanban")
+						.onClick(() => this.insertKanbanTemplate(editor)));
+					sub.addItem((s: MenuItem) => s.setTitle("Info card").setIcon("id-card")
+						.onClick(() => this.insertInfoCardTemplate(editor)));
+				});
 			}),
 		);
 	}
 
 	onunload() {
+		this.cleanupReadingView?.();
+		this.cleanupReadingView = null;
 		setPluginInstance(null);
 		this.detachRuntimeStyleSheet();
 	}
@@ -105,20 +120,100 @@ export default class ColumnsPlugin extends Plugin {
 		this.insertTemplate(editor, [
 			"%% col-start %%",
 			"%% col-break:40 %%",
-			"# Column 1",
 			"Top-level content.",
 			"%% col-break:60 %%",
-			"# Parent column",
 			"This column contains nested columns.",
 			"",
 			"%% col-start %%",
 			"%% col-break %%",
-			"## Child column 1",
-			"Nested content.",
+			"Child column 1",
 			"%% col-break %%",
-			"## Child column 2",
-			"Nested content.",
+			"Child column 2",
 			"%% col-end %%",
+			"%% col-end %%",
+		]);
+	}
+
+	private insertSidebarLayout(editor: Editor): void {
+		this.insertTemplate(editor, [
+			"%% col-start %%",
+			"%% col-break:30 %%",
+			"Sidebar",
+			"%% col-break:70 %%",
+			"Main content",
+			"%% col-end %%",
+		]);
+	}
+
+	private insertStackedLayout(editor: Editor): void {
+		this.insertTemplate(editor, [
+			"%% col-start %%",
+			"%% col-break:40,stk:1 %%",
+			"Stacked row 1",
+			"%% col-break:stk:1 %%",
+			"Stacked row 2",
+			"%% col-break:stk:1 %%",
+			"Stacked row 3",
+			"%% col-break:60 %%",
+			"Wide column",
+			"%% col-end %%",
+		]);
+	}
+
+	private insertCornellTemplate(editor: Editor): void {
+		this.insertTemplate(editor, [
+			"%% col-start %%",
+			"%% col-break:stk:1 %%",
+			"**Topic / Title**",
+			"%% col-break:30,stk:1 %%",
+			"**Cues / Questions**",
+			"",
+			"- Key term 1",
+			"- Key question",
+			"- Concept",
+			"%% col-break:70 %%",
+			"**Notes**",
+			"",
+			"Main lecture or reading notes go here.",
+			"%% col-end %%",
+		]);
+	}
+
+	private insertKanbanTemplate(editor: Editor): void {
+		this.insertTemplate(editor, [
+			"%% col-start:sb:1,bc:muted %%",
+			"%% col-break:b:alt,sb:1,bc:gray %%",
+			"### Backlog",
+			"- [ ] Task 1",
+			"- [ ] Task 2",
+			"%% col-break:b:cyan-soft,sb:1,bc:cyan %%",
+			"### In Progress",
+			"- [ ] Task 3",
+			"%% col-break:b:yellow-soft,sb:1,bc:yellow %%",
+			"### Review",
+			"- [ ] Task 4",
+			"%% col-break:b:green-soft,sb:1,bc:green %%",
+			"### Done",
+			"- [x] Task 5",
+			"%% col-end %%",
+		]);
+	}
+
+	private insertInfoCardTemplate(editor: Editor): void {
+		this.insertTemplate(editor, [
+			"%% col-start:sb:1,bc:muted %%",
+			"%% col-break:35,b:accent-soft,sb:1,bc:accent,sep:1,sc:accent %%",
+			"### Subject Name",
+			"",
+			"| | |",
+			"| --- | --- |",
+			"| **Field** | Value |",
+			"| **Category** | Type |",
+			"| **Date** | 2025-01 |",
+			"%% col-break:65 %%",
+			"### Details",
+			"",
+			"Main content and description.",
 			"%% col-end %%",
 		]);
 	}
@@ -133,6 +228,30 @@ export default class ColumnsPlugin extends Plugin {
 			DEFAULT_SETTINGS,
 			(await this.loadData()) as Partial<ColumnsPluginSettings>,
 		);
+		this.validateSettings();
+	}
+
+	private validateSettings(): void {
+		const s = this.settings;
+		// Type-check numeric fields
+		if (typeof s.defaultColumnCount !== "number" || !Number.isFinite(s.defaultColumnCount)) {
+			s.defaultColumnCount = DEFAULT_SETTINGS.defaultColumnCount;
+		}
+		if (typeof s.minColumnWidthPercent !== "number" || !Number.isFinite(s.minColumnWidthPercent)) {
+			s.minColumnWidthPercent = DEFAULT_SETTINGS.minColumnWidthPercent;
+		}
+		// Ensure minColumnWidthPercent * defaultColumnCount <= 100%
+		if (s.minColumnWidthPercent * s.defaultColumnCount > 100) {
+			s.minColumnWidthPercent = Math.floor(100 / s.defaultColumnCount);
+		}
+		// Clamp ranges
+		s.defaultColumnCount = Math.max(2, Math.min(6, Math.round(s.defaultColumnCount)));
+		s.minColumnWidthPercent = Math.max(5, Math.min(30, s.minColumnWidthPercent));
+		// Type-check boolean fields
+		if (typeof s.showDragHandles !== "boolean") s.showDragHandles = DEFAULT_SETTINGS.showDragHandles;
+		if (typeof s.enableLivePreview !== "boolean") s.enableLivePreview = DEFAULT_SETTINGS.enableLivePreview;
+		if (typeof s.enableReadingView !== "boolean") s.enableReadingView = DEFAULT_SETTINGS.enableReadingView;
+		if (typeof s.showContainerBorder !== "boolean") s.showContainerBorder = DEFAULT_SETTINGS.showContainerBorder;
 	}
 
 	async saveSettings() {

@@ -1,4 +1,6 @@
-import type {ColumnBackgroundOption, StyleColorOption} from "../settings";
+import type {ColumnBackgroundOption, StyleColorOption} from "../../settings";
+
+export type SeparatorLineStyle = "solid" | "dashed" | "dotted" | "double" | "custom";
 
 export interface ColumnStyleData {
 	background?: ColumnBackgroundOption;
@@ -6,13 +8,21 @@ export interface ColumnStyleData {
 	textColor?: StyleColorOption;
 	showBorder?: boolean;
 	horizontalDividers?: boolean;
+	separator?: boolean;
+	separatorColor?: StyleColorOption;
+	separatorStyle?: SeparatorLineStyle;
+	separatorWidth?: number;
+	separatorCustomChar?: string;
 }
 
 export interface ColumnData {
 	content: string;
 	widthPercent: number; // 0 means auto/equal
 	style?: ColumnStyleData;
+	stacked?: boolean;
 }
+
+export type ColumnLayout = "row" | "stack";
 
 export interface ColumnRegion {
 	/** Document char offset of the first char of `%% col-start %%` */
@@ -23,6 +33,8 @@ export interface ColumnRegion {
 	columns: ColumnData[];
 	/** Optional style for the whole column block container */
 	containerStyle?: ColumnStyleData;
+	/** Layout direction: "row" (side-by-side, default) or "stack" (top-to-bottom) */
+	layout?: ColumnLayout;
 	/** Line number (0-based) of the `%% col-start %%` line */
 	lineStart: number;
 	/** Line number (0-based) of the `%% col-end %%` line */

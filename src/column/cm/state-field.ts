@@ -1,10 +1,10 @@
 import {EditorState, StateField, Transaction, Range} from "@codemirror/state";
 import {Decoration, DecorationSet, EditorView} from "@codemirror/view";
 import {editorLivePreviewField} from "obsidian";
-import {findColumnRegions} from "./parser";
-import {getPluginInstance} from "./plugin-ref";
+import {findColumnRegions} from "../core/parser";
+import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnWidget} from "./widget";
-import type {ColumnRegion} from "./types";
+import type {ColumnRegion} from "../core/types";
 
 /**
  * Scan the document text for %% col-start %% / %% col-end %% markers

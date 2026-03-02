@@ -5,661 +5,739 @@ For legacy callout syntax (`[!col]` / `[!col-md-*]`), see [legacy-usage.md](./le
 
 ---
 
-## 1. Simple Two-Column
+# Part 1 — Basic Layouts
 
-A basic left/right split.
+These examples cover the core building blocks: simple columns, custom widths, nested (parent/child) columns, and styled columns.
+
+---
+
+## 1. Simple Two-Column (Plain)
+
+Two equal columns with basic markdown — headings, lists, and a blockquote.
 
 
 %% col-start %%
 %% col-break %%
-### About Me
-I'm a software developer passionate about open-source tools and knowledge management.
+### Pros
+- Lightweight and fast
+- Easy to learn
+- Works offline
+- Great community support
+
+> "Simplicity is the ultimate sophistication."
 %% col-break %%
-### Contact
-- GitHub: @username
-- Twitter: @handle
-- Email: hello@example.com
+### Cons
+- Limited formatting options
+- No real-time collaboration
+- Steep learning curve for plugins
+- Manual backups required
 %% col-end %%
 
 
 ---
 
-## 2. Three Equal Columns
+## 2. Three Columns with Custom Widths
 
-Three columns with equal width for comparison layouts.
-
-
-%% col-start %%
-%% col-break %%
-### Plan A
-- 5 GB storage
-- 1 user
-- Email support
-- **$9/month**
-%% col-break %%
-### Plan B
-- 50 GB storage
-- 5 users
-- Priority support
-- **$29/month**
-%% col-break %%
-### Plan C
-- Unlimited storage
-- Unlimited users
-- 24/7 support
-- **$99/month**
-%% col-end %%
-
-
----
-
-## 3. Asymmetric Sidebar (70/30)
-
-A wide main content area with a narrow sidebar.
+An asymmetric layout — wider center column flanked by narrow sidebars.
 
 
 %% col-start %%
-%% col-break:70 %%
-## Project Overview
-
-This project aims to build a cross-platform note-taking application with real-time collaboration features. The architecture follows a modular design pattern with clear separation of concerns.
-
-Key decisions:
-1. Use markdown as the primary format
-2. Implement CRDT for real-time sync
-3. Support offline-first operation
-
-> "The best tool is the one that gets out of your way." — Unknown
-%% col-break:30 %%
-### Quick Links
-- [[Architecture]]
-- [[API Reference]]
-- [[Changelog]]
-- [[Contributing]]
-
-### Status
-**Phase:** Beta
-**Version:** 0.8.2
-**Last updated:** 2025-01-15
-%% col-end %%
-
-
----
-
-## 4. Four-Column Dashboard
-
-Four narrow columns for a dashboard overview.
-
-
-%% col-start %%
-%% col-break %%
-### Inbox
-- [ ] Review PR #42
-- [ ] Reply to Sarah
-- [ ] Read RFC draft
-%% col-break %%
-### Today
-- [ ] Ship v1.0 release
-- [ ] Update docs
-- [x] Fix scroll bug
-%% col-break %%
-### This Week
-- [ ] Write blog post
-- [ ] Plan sprint 12
-- [ ] Team retrospective
-%% col-break %%
-### Done
-- [x] Merge feature branch
-- [x] Deploy staging
-- [x] QA sign-off
-%% col-end %%
-
-
----
-
-## 5. Nested Columns
-
-A parent column containing its own child columns.
-
-
-%% col-start %%
-%% col-break:40 %%
-## Navigation
-
+%% col-break:20 %%
+#### Links
 - [[Home]]
 - [[Projects]]
 - [[Archive]]
-- [[Settings]]
-
-This sidebar stays fixed while the right side has its own sub-layout.
+- [[Tags]]
 %% col-break:60 %%
+#### Main Content
+
+Markdown supports **bold**, *italic*, ~~strikethrough~~, and `inline code`. You can also create:
+
+1. Ordered lists
+2. With nested items
+   - Like this one
+   - And this
+
+```python
+print("Hello, columns!")
+```
+%% col-break:20 %%
+#### Notes
+> [!tip] Tip
+> Use the 20/60/20 split for classic sidebar layouts.
+
+**Status:** Draft
+**Updated:** 2025-01-20
+%% col-end %%
+
+
+---
+
+## 3. Nested Columns (Parent / Child)
+
+A parent two-column layout where the right column contains its own child columns.
+
+
+%% col-start %%
+%% col-break:35 %%
+## Sidebar
+
+This is the outer left column. It stays as a single block while the right side has its own sub-layout.
+
+- [[Dashboard]]
+- [[Settings]]
+- [[Help]]
+
+| Key | Value |
+| --- | ----- |
+| Version | 2.1.0 |
+| License | MIT |
+%% col-break:65 %%
 ## Content Area
 
-This column contains a nested two-column layout below:
+Below is a **nested** two-column block inside this column:
 
 %% col-start %%
 %% col-break %%
-### Recent Notes
+### Recent
 1. Meeting notes — Jan 20
 2. Research log — Jan 18
-3. Book review — Jan 15
+3. Design review — Jan 15
 %% col-break %%
 ### Pinned
-1. [[Yearly Goals]]
+1. [[Quarterly Goals]]
 2. [[Reading List]]
 3. [[Workout Plan]]
 %% col-end %%
+
+Text after the nested block still belongs to the outer right column.
 %% col-end %%
 
 
 ---
 
-## 6. Styled Columns
+## 4. Styled Columns — Colors, Borders & Separators
 
-Using inline style tokens for color and borders.
-
-
-%% col-start:b:secondary,sb:1,bc:accent %%
-%% col-break:50,b:blue-soft,bc:blue,t:text,sb:1 %%
-### Blue Section
-This column has a blue tint background with a blue border. Useful for highlighting informational content.
-
-- Tip 1: Use color to group related items
-- Tip 2: Keep it subtle — tints work best
-%% col-break:50,b:green-soft,bc:green,t:text,sb:1 %%
-### Green Section
-This column has a green tint background with a green border. Great for success states or positive notes.
-
-- Result: Tests passing
-- Status: All clear
-- Next: Deploy to production
-%% col-end %%
-
-
----
-
-## 7. Mixed Content Types
-
-Headings, paragraphs, lists, blockquotes, and code in columns.
-
-`
-%% col-start %%
-%% col-break %%
-## Writing
-
-Markdown is a lightweight markup language. Here's a sample:
-
-> "Writing is thinking. To write well is to think clearly."
-> — William Zinsser
-
-Key principles:
-1. Clarity over cleverness
-2. Short paragraphs
-3. Active voice
-%% col-break %%
-## Code
-
-A quick sorting example:
-
-python
-def quicksort(arr):
-    if len(arr) <= 1:
-        return arr
-    pivot = arr[0]
-    left = [x for x in arr[1:] if x < pivot]
-    right = [x for x in arr[1:] if x >= pivot]
-    return quicksort(left) + [pivot] + quicksort(right)
-
-
-**Time complexity:** O(n log n) average
-%% col-break %%
-## Reference
-
-| Symbol | Meaning     |
-| ------ | ----------- |
-| O(1)   | Constant    |
-| O(n)   | Linear      |
-| O(n²)  | Quadratic   |
-| O(2ⁿ)  | Exponential |
-
----
-
-See also: [[Algorithms]], [[Data Structures]]
-%% col-end %%
-`
-
----
-
-## 8. Complex Dashboard with Nested + Styles
-
-A three-column layout with one column containing a styled nested block.
-
-
-%% col-start:b:primary,sb:1,bc:gray %%
-%% col-break:25,b:alt %%
-### Metrics
-**Users:** 12,847
-**Revenue:** $48.2k
-**Churn:** 2.1%
-**NPS:** 72
-
----
-
-Last 30 days
-%% col-break:50 %%
-### Activity Feed
-
-Latest updates from across the team:
-
-%% col-start:b:secondary,sb:1,bc:muted %%
-%% col-break %%
-**Engineering**
-- Shipped v2.3.1
-- Fixed 14 bugs
-- 3 PRs in review
-%% col-break %%
-**Design**
-- New onboarding flow
-- Icon refresh done
-- A/B test results in
-%% col-end %%
-
-Overall progress: 78% of Q1 goals complete.
-%% col-break:25,b:alt %%
-### Quick Actions
-- [ ] Review analytics
-- [ ] Approve budget
-- [ ] Schedule 1:1s
-- [ ] Update roadmap
-
----
-
-**Next milestone:** Feb 28
-%% col-end %%
-
-
----
-
-## 9. Kanban-Style Task Board
-
-Four styled columns mimicking a kanban board.
-
-
-%% col-start:sb:1,bc:muted %%
-%% col-break:25,b:alt,sb:1,bc:gray %%
-### Backlog
-- [ ] User authentication
-- [ ] Dark mode toggle
-- [ ] Export to PDF
-- [ ] Notification system
-- [ ] Search improvements
-%% col-break:25,b:cyan-soft,sb:1,bc:cyan %%
-### In Progress
-- [ ] Dashboard redesign
-- [ ] API rate limiting
-- [ ] Mobile responsive fix
-%% col-break:25,b:yellow-soft,sb:1,bc:yellow %%
-### Review
-- [ ] Payment integration
-- [ ] Email templates
-%% col-break:25,b:green-soft,sb:1,bc:green %%
-### Done
-- [x] User registration
-- [x] Database migration
-- [x] CI/CD pipeline
-- [x] Landing page
-- [x] SSL setup
-%% col-end %%
-
-
----
-
-## 10. Notes + Callout Sidebar (Simple)
-
-A basic content + sidebar layout where the sidebar is a callout.
-
-
-%% col-start %%
-%% col-break:70 %%
-## Weekly reflection
-
-This week I focused on improving review quality and reducing context switching.
-
-Wins:
-- Closed 5 long-running tasks
-- Reduced bug count in backlog
-- Wrote release documentation
-
-Next week focus:
-- Stabilize drag-and-drop interactions
-- Add more usage examples
-%% col-break:30 %%
-> [!tip] Quick recap
-> - **Energy:** High
-> - **Bottleneck:** Meetings
-> - **Priority:** Finish docs
-> - **Risk:** Overcommitting
-%% col-end %%
-
-
----
-
-## 11. Side-by-Side Comparison Tables
-
-Two tables in parallel for easy before/after review.
-
-
-%% col-start %%
-%% col-break:50 %%
-### Current process
-
-| Step | Owner | Avg time |
-| ---- | ----- | -------- |
-| Triage | Support | 2h |
-| Reproduce | QA | 6h |
-| Fix | Engineering | 1.5d |
-| Verify | QA | 4h |
-
-%% col-break:50 %%
-### Proposed process
-
-| Step | Owner | Avg time |
-| ---- | ----- | -------- |
-| Triage + classify | Support | 1h |
-| Reproduce + logs | QA | 3h |
-| Fix + tests | Engineering | 1d |
-| Verify + release note | QA | 2h |
-
-%% col-end %%
-
-
----
-
-## 12. Three-Column Study Board
-
-Simple three-column board for a learning session.
-
-
-%% col-start %%
-%% col-break %%
-### Read
-- [[Distributed systems notes]]
-- [[CAP theorem]]
-- [[Raft paper summary]]
-%% col-break %%
-### Practice
-- Implement leader election
-- Simulate node failure
-- Write 3 test cases
-%% col-break %%
-### Capture
-> [!note] Key takeaway
-> Consistency and availability trade off under partition.
-
-- Add notes to [[Knowledge Base]]
-- Create follow-up questions
-%% col-end %%
-
-
----
-
-## 13. Incident Response Panel (Callouts + Nested)
-
-Operations layout with nested status cards.
-
-
-%% col-start %%
-%% col-break:25 %%
-### Commander
-- [ ] Confirm severity
-- [ ] Assign owners
-- [ ] Open timeline
-- [ ] Post status update
-
-> [!warning] Rule
-> Keep timeline updates every 15 minutes.
-%% col-break:50 %%
-### Live status
-
-%% col-start:sb:1,bc:muted,b:secondary %%
-%% col-break:b:red-soft,bc:red,sb:1 %%
-> [!failure] API
-> Error rate: **8.2%**
-> Owner: Backend
-%% col-break:b:yellow-soft,bc:yellow,sb:1 %%
-> [!warning] Queue
-> Lag: **4m 12s**
-> Owner: Platform
-%% col-break:b:green-soft,bc:green,sb:1 %%
-> [!success] Web
-> Healthy
-> Owner: Frontend
-%% col-end %%
-
-### Timeline
-- 10:02 - Alert fired
-- 10:07 - Incident declared
-- 10:18 - Mitigation deployed
-%% col-break:25 %%
-### Runbooks
-- [[Rollback procedure]]
-- [[Traffic shaping]]
-- [[Database failover]]
-
-| Channel | Link |
-| ------- | ---- |
-| Slack | #incident-sev2 |
-| Zoom | bridge-ops |
-%% col-end %%
-
-
----
-
-## 14. Product Roadmap (Tables + Nested Quarters)
-
-Roadmap summary with nested quarter plan.
-
-
-%% col-start %%
-%% col-break:40 %%
-### Theme goals
-
-| Theme | Objective | KPI |
-| ----- | --------- | --- |
-| Reliability | Fewer regressions | -40% P1 bugs |
-| Onboarding | Faster first value | +25% activation |
-| Performance | Quicker load times | <1.5s FCP |
-
-%% col-break:60 %%
-### Quarter plan
-
-%% col-start:b:secondary,sb:1,bc:gray %%
-%% col-break:33 %%
-#### Q1
-- Auth cleanup
-- Onboarding revamp
-- Search indexing
-%% col-break:33 %%
-#### Q2
-- Mobile polish
-- Sync conflict tools
-- API hardening
-%% col-break:34 %%
-#### Q3
-- Enterprise SSO
-- Audit logs
-- Usage analytics
-%% col-end %%
-%% col-end %%
-
-
----
-
-## 15. Knowledge Hub (Nested + Callouts + Table)
-
-A knowledge landing page with nested cards.
-
-
-%% col-start %%
-%% col-break:30 %%
-### Navigation
-- [[Playbooks]]
-- [[Architecture]]
-- [[Decision records]]
-- [[Postmortems]]
-%% col-break:70 %%
-## Highlights
-
-%% col-start %%
-%% col-break:60 %%
-> [!abstract] New this week
-> - Added deployment checklist v3
-> - Updated onboarding flow diagram
-> - Added pager duty handoff template
-%% col-break:40 %%
-| Doc | Owner |
-| --- | ----- |
-| Deploy checklist | DevOps |
-| Incident template | SRE |
-| API style guide | Platform |
-%% col-end %%
-
-### Notes
-Keep this page lightweight. Link out to deep docs from each card.
-%% col-end %%
-
-
----
-
-## 16. Personal Finance Snapshot (Styled + Tables)
-
-Monthly overview with styled budget blocks.
+Demonstrates background tints, border colors, separators, and container-level styling.
 
 
 %% col-start:sb:1,bc:gray,b:primary %%
-%% col-break:35,b:blue-soft,bc:blue,sb:1 %%
-### Income
+%% col-break:b:blue-soft,bc:blue,sb:1,t:text,sep:1,sc:blue,ss:dashed %%
+### Blue Card
+This column has a **blue tint** background, blue border, and a dashed blue separator on its right edge.
 
-| Source | Amount |
-| ------ | ------ |
-| Salary | $5,800 |
-| Freelance | $1,200 |
-| Other | $150 |
+- Info item one
+- Info item two
+- Info item three
+%% col-break:b:green-soft,bc:green,sb:1,t:text,sep:1,sc:green %%
+### Green Card
+This column has a **green tint** background with a green border and a solid green separator.
 
-**Total:** $7,150
-%% col-break:35,b:orange-soft,bc:orange,sb:1 %%
-### Expenses
+- Status: All clear
+- Tests: Passing
+- Build: Stable
+%% col-break:b:orange-soft,bc:orange,sb:1,t:text %%
+### Orange Card
+This column has an **orange tint** background with an orange border. No separator on the last column.
 
-| Category | Amount |
-| -------- | ------ |
-| Rent | $1,900 |
-| Food | $620 |
-| Transport | $180 |
-| Utilities | $240 |
-
-**Total:** $2,940
-%% col-break:30,b:green-soft,bc:green,sb:1 %%
-### Outcome
-> [!success] Net
-> $4,210 remaining
-
-Planned allocation:
-- 60% savings
-- 20% investments
-- 20% fun
+- Warning: High CPU
+- Disk: 78% used
+- Memory: 4.2 GB free
 %% col-end %%
+
+
+**Style token reference used above:**
+- `b:blue-soft` — background tint
+- `bc:blue` — border color
+- `sb:1` — show border
+- `t:text` — text color
+- `sep:1` — show separator
+- `sc:blue` — separator color
+- `ss:dashed` — separator line style
 
 
 ---
 
-## 17. Project Workspace (Nested Board + Action Rail)
+# Part 2 — Stacked Columns
 
-A project page with a nested board and right-side action rail.
+Stacked columns let you place multiple columns vertically within the same horizontal slot. Use the `stk:1` token on consecutive `col-break` markers to group them into a stack. The stack group shares a single width and the columns within it are rendered top-to-bottom.
+
+---
+
+## 5. Basic Stacked Layout
+
+Three stacked rows on the left, one tall column on the right.
 
 
 %% col-start %%
-%% col-break:20 %%
-### Context
-- [[Scope]]
-- [[Stakeholders]]
-- [[Risks]]
-- [[Timeline]]
+%% col-break:40,stk:1 %%
+### Row 1
+First stacked row — occupies the top of the left slot.
+%% col-break:stk:1 %%
+### Row 2
+Second stacked row — appears below Row 1.
+%% col-break:stk:1 %%
+### Row 3
+Third stacked row — appears at the bottom of the left slot.
 %% col-break:60 %%
-### Work board
+### Wide Column
+This column takes 60% of the width and spans the full height alongside the three stacked rows.
+%% col-end %%
+
+
+**Syntax breakdown:**
+- `stk:1` — marks the column as stacked; consecutive stacked columns form a group
+- The group's width is set by the first column in the stack (here `40`)
+- Non-stacked columns (here `60`) flow normally beside the stack group
+
+---
+
+## 6. Cornell Note-Taking System
+
+A classic study layout: title across the top, cues on the left, notes on the right.
+
 
 %% col-start %%
-%% col-break %%
-#### Doing
-- Implement drag target rules
-- Write usage examples
-%% col-break %%
-#### Blocked
-- Waiting on API key
-- Pending design review
-%% col-break %%
-#### Next
-- Add keyboard shortcut docs
-- Add migration notes
+%% col-break:stk:1 %%
+**Topic / Title**
+%% col-break:30,stk:1 %%
+**Cues / Questions**
+
+- Key term 1
+- Key question
+- Concept
+%% col-break:70 %%
+**Notes**
+
+Main lecture or reading notes go here. The cues column on the left is stacked below the title, while this notes area spans the full height.
 %% col-end %%
-%% col-break:20 %%
-### Actions
-> [!todo] Today
-> - [ ] Review open bugs
-> - [ ] Update release note
-> - [ ] Check mobile layout
+
+
+**How it works:**
+- The title and cues columns share the `stk:1` flag, so they stack vertically in the left 30% slot
+- The notes column occupies the remaining 70% at full height
+
+---
+
+## 7. Sidebar + Content
+
+A simple 30/70 split for navigation or metadata sidebars.
+
+
+%% col-start %%
+%% col-break:30 %%
+### Sidebar
+
+- [[Dashboard]]
+- [[Settings]]
+- [[Archive]]
+- [[Help]]
+%% col-break:70 %%
+### Main Content
+
+Your primary content goes here. This layout works well for documentation, wiki pages, or any note that benefits from a persistent navigation sidebar.
 %% col-end %%
 
 
 ---
 
-## 18. Multi-Level Operating Review (Advanced)
+## 8. Styled Stacked Layout
 
-A deeper nested layout for executive weekly review.
+Combines stacking with visual styles for dashboards and status panels.
 
 
 %% col-start:sb:1,bc:muted %%
-%% col-break:25,b:alt %%
-### Leadership notes
-- Objectives for week 8
-- Key risks
-- Escalations
+%% col-break:35,stk:1,b:blue-soft,sb:1,bc:blue %%
+### Status
+- Build: Passing
+- Tests: 42/42
+- Coverage: 87%
+%% col-break:stk:1,b:green-soft,sb:1,bc:green %%
+### Uptime
+- API: 99.97%
+- Web: 99.95%
+- DB: 99.99%
+%% col-break:stk:1,b:orange-soft,sb:1,bc:orange %%
+### Alerts
+- High CPU on worker-3
+- Disk 78% on db-primary
+%% col-break:65 %%
+### Activity Log
 
-> [!warning] Watch item
-> Churn trend rising in SMB segment.
-%% col-break:75 %%
-### Weekly operating review
+| Time | Event |
+| ---- | ----- |
+| 09:15 | Deployment v2.4.1 |
+| 09:22 | Health check passed |
+| 10:01 | Cache cleared |
+| 11:30 | Backup completed |
+| 14:45 | SSL cert renewed |
+%% col-end %%
 
-%% col-start:b:secondary,sb:1,bc:gray %%
-%% col-break:50 %%
-#### Delivery
 
-| Team | Planned | Done | Delta |
-| ---- | ------- | ---- | ----- |
-| Platform | 12 | 11 | -1 |
-| Product | 9 | 9 | 0 |
-| Growth | 7 | 8 | +1 |
+---
+
+# Part 3 — Real-World Examples
+
+Practical layouts modeled after real note-taking scenarios.
+
+---
+
+## 9. Machine Learning Study Notes
+
+A study layout covering a neural network topic with theory, code, and reference.
+
+
+%% col-start:sb:1,bc:muted,b:secondary %%
+%% col-break:40,sep:1,sc:gray,ss:dotted %%
+### Theory: Gradient Descent
+
+Gradient descent minimizes a loss function $L(\theta)$ by iteratively updating parameters:
+
+$$\theta_{t+1} = \theta_t - \eta \nabla L(\theta_t)$$
+
+**Variants:**
+- **Batch GD** — uses full dataset per step
+- **Stochastic GD** — uses one sample per step
+- **Mini-batch GD** — uses a subset (most common)
+
+> [!note] Key Insight
+> Learning rate $\eta$ controls step size. Too large = divergence. Too small = slow convergence.
+
+**Convergence conditions:**
+1. Convex loss → guaranteed global minimum
+2. Non-convex loss → converges to local minimum
+3. With momentum → escapes shallow local minima
+%% col-break:30,sep:1,sc:gray,ss:dotted %%
+### Code: PyTorch
+
+```python
+import torch
+import torch.nn as nn
+
+model = nn.Sequential(
+    nn.Linear(784, 256),
+    nn.ReLU(),
+    nn.Dropout(0.2),
+    nn.Linear(256, 10)
+)
+
+optimizer = torch.optim.Adam(
+    model.parameters(),
+    lr=0.001
+)
+criterion = nn.CrossEntropyLoss()
+
+for epoch in range(20):
+    for X, y in dataloader:
+        pred = model(X)
+        loss = criterion(pred, y)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+```
+%% col-break:30 %%
+### Quick Reference
+
+| Optimizer | Best For |
+| --------- | -------- |
+| SGD | Simple models |
+| Adam | General purpose |
+| AdaGrad | Sparse data |
+| RMSProp | RNNs |
+| LBFGS | Small datasets |
+
+**Hyperparameters:**
+- Learning rate: `1e-3`
+- Batch size: `32` or `64`
+- Epochs: `10–100`
+- Weight decay: `1e-5`
+
+**Common pitfalls:**
+- [ ] Forgetting to zero gradients
+- [ ] Wrong input dimensions
+- [ ] Not normalizing data
+- [ ] Training on test set
+%% col-end %%
+
+
+---
+
+## 10. History Notes — The Fall of the Roman Empire
+
+A history study page with timeline, causes, and key figures laid out side by side.
+
 
 %% col-start %%
-%% col-break %%
-##### Risks
-- API latency
-- Hiring delay
-%% col-break %%
-##### Mitigation
-- Cache hot paths
-- Use contractor support
-%% col-end %%
-%% col-break:50 %%
-#### Business
+%% col-break:45,sep:1,sc:muted %%
+### Timeline of Decline
 
-| Metric | Last week | This week |
-| ------ | --------- | --------- |
-| Revenue | $92k | $95k |
-| Churn | 2.4% | 2.8% |
-| NPS | 66 | 68 |
+| Year | Event |
+| ---- | ----- |
+| 235–284 | Crisis of the Third Century |
+| 285 | Diocletian splits the Empire |
+| 313 | Edict of Milan — Christianity legalized |
+| 376 | Visigoths cross the Danube |
+| 410 | Sack of Rome by Alaric |
+| 455 | Vandal sack of Rome |
+| 476 | Romulus Augustulus deposed — **Western Empire falls** |
 
-> [!info] Commentary
-> Revenue improved despite churn increase.
-> Investigate churn by segment before next review.
+### Causes of the Fall
+
+1. **Military overspending** — constant frontier defense drained the treasury
+2. **Political instability** — 50+ emperors in 50 years during the Crisis
+3. **Economic decline** — debasement of currency, heavy taxation
+4. **Barbarian migrations** — Goths, Vandals, Huns pressed the borders
+5. **Administrative bloat** — bureaucracy slowed decision-making
+%% col-break:30,sep:1,sc:muted %%
+### Key Figures
+
+**Diocletian** (r. 284–305)
+Split the empire into East and West. Introduced the Tetrarchy — four co-emperors ruling simultaneously.
+
+**Constantine I** (r. 306–337)
+Founded Constantinople. First emperor to convert to Christianity. Reunified the empire briefly.
+
+**Theodosius I** (r. 379–395)
+Last emperor to rule both halves. Made Christianity the state religion in 380.
+
+**Alaric I** (Visigoth king)
+Led the first sack of Rome in 800 years. Demanded land and recognition for his people.
+
+**Odoacer** (Germanic chieftain)
+Deposed the last Western emperor in 476. Became King of Italy.
+%% col-break:25 %%
+### Study Questions
+
+> [!question] For review
+> 1. Why did Diocletian split the empire?
+> 2. How did Christianity change Roman governance?
+> 3. Compare the Eastern and Western empire's fate.
+> 4. Was the "fall" a sudden collapse or gradual transformation?
+
+### Further Reading
+- [[Gibbon — Decline and Fall]]
+- [[Peter Heather — Fall of the Roman Empire]]
+- [[Bryan Ward-Perkins — The Fall of Rome]]
+- [[Late Antiquity Overview]]
 %% col-end %%
+
+
+---
+
+## 11. Wikipedia-Style Article — The Great Barrier Reef
+
+An encyclopedia-style layout with an info card sidebar and main article body.
+
+
+%% col-start %%
+%% col-break:65,sep:1,sc:gray %%
+## The Great Barrier Reef
+
+The **Great Barrier Reef** is the world's largest coral reef system, composed of over 2,900 individual reefs and 900 islands stretching over 2,300 kilometres along the northeast coast of Australia. It is visible from space and is the world's biggest single structure made by living organisms.
+
+### Geography
+
+The reef is located in the Coral Sea, off the coast of Queensland. It begins near the tip of Cape York Peninsula in the north and extends south to Bundaberg. The reef structure is composed of billions of tiny organisms known as *coral polyps*, held together by calcium carbonate.
+
+### Biodiversity
+
+The reef supports an extraordinary diversity of life:
+
+- **1,500+** species of fish
+- **400+** types of coral
+- **4,000+** species of mollusk
+- **240** species of birds
+- **6** species of sea turtle breed there
+
+> [!info] UNESCO Status
+> The Great Barrier Reef was designated a **World Heritage Site** in 1981. It is managed by the Great Barrier Reef Marine Park Authority.
+
+### Threats
+
+| Threat | Impact | Severity |
+| ------ | ------ | -------- |
+| Climate change | Mass coral bleaching | Critical |
+| Ocean acidification | Weakens coral structure | High |
+| Cyclones | Physical reef damage | High |
+| Agricultural runoff | Nutrient pollution | Moderate |
+| Crown-of-thorns starfish | Coral predation | Moderate |
+
+The reef experienced major bleaching events in 2016, 2017, 2020, and 2022, driven primarily by rising sea temperatures.
+%% col-break:35,b:secondary,sb:1,bc:gray %%
+### Quick Facts
+
+| | |
+| --- | --- |
+| **Location** | Coral Sea, Queensland, Australia |
+| **Length** | 2,300 km (1,430 mi) |
+| **Area** | 344,400 km² |
+| **Type** | Coral reef system |
+| **Established** | ~20,000 years ago |
+| **UNESCO** | 1981 |
+| **Coordinates** | 18°17′S 147°42′E |
+
+### Classification
+
+- **Kingdom:** Animalia
+- **Phylum:** Cnidaria
+- **Class:** Anthozoa
+- **Order:** Scleractinia
+
+### See Also
+- [[Coral Bleaching]]
+- [[Marine Biology]]
+- [[UNESCO World Heritage Sites]]
+- [[Climate Change Effects on Oceans]]
+- [[Great Barrier Reef Marine Park]]
+
+### Did You Know?
+> The reef generates **$6.4 billion** annually for the Australian economy through tourism, fishing, and scientific research. Over **2 million** tourists visit each year.
 %% col-end %%
+
+
+---
+
+## 12. Cover / Information Card — Leonardo da Vinci
+
+A profile-style layout inspired by book covers and biographical reference cards.
+
+
+%% col-start:sb:1,bc:muted,b:primary %%
+%% col-break:35,b:accent-soft,sb:1,bc:accent,sep:1,sc:accent,ss:solid,sw:2 %%
+### Leonardo da Vinci
+*1452 – 1519*
+
+**Born:** Anchiano, Republic of Florence
+**Died:** Amboise, Kingdom of France
+**Fields:** Painting, sculpture, architecture, science, engineering, anatomy, geology, cartography
+
+> "Learning never exhausts the mind."
+
+---
+
+**Known for:**
+- Mona Lisa
+- The Last Supper
+- Vitruvian Man
+- Flying machine designs
+- Anatomical drawings
+
+**Patrons:**
+- Ludovico Sforza
+- Cesare Borgia
+- Pope Leo X
+- Francis I of France
+%% col-break:65 %%
+### Biography
+
+Leonardo di ser Piero da Vinci was an Italian polymath of the High Renaissance. He is widely considered one of the most diversely talented individuals ever to have lived.
+
+#### Early Life
+Born out of wedlock in Vinci, Tuscany, Leonardo was educated in the studio of the renowned Florentine painter Andrea del Verrocchio. His earliest known work is a drawing of the Arno valley, dated 1473.
+
+#### Major Works
+
+| Work | Year | Type | Location |
+| ---- | ---- | ---- | -------- |
+| Annunciation | 1472–1475 | Painting | Uffizi, Florence |
+| Lady with an Ermine | 1489–1490 | Painting | National Museum, Kraków |
+| The Last Supper | 1495–1498 | Mural | Santa Maria delle Grazie, Milan |
+| Mona Lisa | 1503–1519 | Painting | Louvre, Paris |
+| Vitruvian Man | c. 1490 | Drawing | Gallerie dell'Accademia, Venice |
+
+#### Scientific Contributions
+
+Leonardo's notebooks contain over **13,000 pages** of notes and drawings combining art and science. He studied:
+
+1. **Anatomy** — dissected 30+ human corpses, mapping muscles and organs
+2. **Hydraulics** — designed canals, locks, and water-lifting machines
+3. **Aeronautics** — sketched ornithopters, parachutes, and helicopter screws
+4. **Optics** — studied light, shadow, and the camera obscura
+
+> [!abstract] Legacy
+> Leonardo is often cited as the archetype of the "Renaissance man." His work influenced art for centuries and anticipated scientific discoveries by hundreds of years.
+%% col-end %%
+
+
+---
+
+## 13. Kanban Board — Product Launch
+
+A four-lane kanban board with color-coded status columns and realistic tasks.
+
+
+%% col-start:sb:1,bc:muted %%
+%% col-break:25,b:alt,sb:1,bc:gray,sep:1,sc:gray,ss:dashed %%
+### Backlog
+- [ ] Write press release
+- [ ] Design launch email template
+- [ ] Create social media assets
+- [ ] Record product demo video
+- [ ] Prepare FAQ document
+- [ ] Set up analytics tracking
+- [ ] Write App Store description
+
+**6 items**
+%% col-break:25,b:cyan-soft,sb:1,bc:cyan,sep:1,sc:cyan,ss:dashed %%
+### In Progress
+- [ ] Build landing page — *@Sarah*
+- [ ] Finalize pricing tiers — *@Mike*
+- [ ] Integration testing — *@Dev team*
+- [ ] Write documentation — *@Alex*
+
+> [!warning] Blocked
+> Landing page waiting on final copy from marketing.
+
+**4 items**
+%% col-break:25,b:yellow-soft,sb:1,bc:yellow,sep:1,sc:yellow,ss:dashed %%
+### Review
+- [ ] Onboarding flow redesign — *needs QA*
+- [ ] Payment integration — *needs security review*
+- [ ] Terms of service update — *legal review*
+
+---
+
+**Deadline:** March 15
+**Reviewer:** @Jordan
+
+**3 items**
+%% col-break:25,b:green-soft,sb:1,bc:green %%
+### Done
+- [x] Brand guidelines finalized
+- [x] Domain purchased & DNS configured
+- [x] SSL certificates installed
+- [x] CI/CD pipeline set up
+- [x] Staging environment deployed
+- [x] Beta user feedback collected
+- [x] Accessibility audit passed
+
+**7 items**
+%% col-end %%
+
+
+---
+
+## 14. Comparative Analysis — Programming Paradigms
+
+A side-by-side comparison layout for studying contrasting concepts.
+
+
+%% col-start:sb:1,bc:gray %%
+%% col-break:50,b:blue-soft,sb:1,bc:blue,sep:1,sc:accent,sw:2 %%
+### Object-Oriented Programming
+
+**Core Principles:**
+1. **Encapsulation** — bundle data and methods together
+2. **Inheritance** — derive new classes from existing ones
+3. **Polymorphism** — same interface, different implementations
+4. **Abstraction** — hide complexity behind simple interfaces
+
+**Example (Python):**
+```python
+class Animal:
+    def __init__(self, name):
+        self.name = name
+
+    def speak(self):
+        raise NotImplementedError
+
+class Dog(Animal):
+    def speak(self):
+        return f"{self.name} says Woof!"
+
+class Cat(Animal):
+    def speak(self):
+        return f"{self.name} says Meow!"
+```
+
+**Best for:**
+- Large codebases with many developers
+- GUI applications and game engines
+- Systems modeling real-world entities
+- Enterprise software with complex business logic
+
+**Languages:** Java, C#, Python, C++, Ruby
+%% col-break:50,b:green-soft,sb:1,bc:green %%
+### Functional Programming
+
+**Core Principles:**
+1. **Pure functions** — no side effects, same input = same output
+2. **Immutability** — data never changes after creation
+3. **First-class functions** — functions are values
+4. **Composition** — build complex behavior from simple functions
+
+**Example (Haskell):**
+```haskell
+-- Pure function
+double :: [Int] -> [Int]
+double = map (*2)
+
+-- Function composition
+processData :: [Int] -> [Int]
+processData = filter (>10) . map (*2) . sort
+
+-- Pattern matching
+factorial :: Int -> Int
+factorial 0 = 1
+factorial n = n * factorial (n - 1)
+```
+
+**Best for:**
+- Data transformation pipelines
+- Concurrent and parallel processing
+- Mathematical and scientific computing
+- Compiler and language tool development
+
+**Languages:** Haskell, Elixir, Clojure, F#, Scala
+%% col-end %%
+
+
+---
+
+## 15. Weekly Meal Planner
+
+A practical daily planner layout that anyone can relate to.
+
+
+%% col-start:sb:1,bc:muted %%
+%% col-break:b:alt,sep:1,sc:gray,ss:dotted %%
+### Monday
+**Breakfast:** Oatmeal with berries & honey
+**Lunch:** Grilled chicken salad
+**Dinner:** Pasta with marinara sauce
+- [ ] Prep chicken marinade
+%% col-break:b:alt,sep:1,sc:gray,ss:dotted %%
+### Tuesday
+**Breakfast:** Scrambled eggs & toast
+**Lunch:** Turkey wrap with avocado
+**Dinner:** Stir-fry with tofu & vegetables
+- [ ] Buy tofu and bok choy
+%% col-break:b:alt,sep:1,sc:gray,ss:dotted %%
+### Wednesday
+**Breakfast:** Greek yogurt & granola
+**Lunch:** Leftover stir-fry
+**Dinner:** Salmon with roasted asparagus
+- [ ] Thaw salmon overnight
+%% col-break:b:alt,sep:1,sc:gray,ss:dotted %%
+### Thursday
+**Breakfast:** Smoothie (banana, spinach, protein)
+**Lunch:** Soup & bread
+**Dinner:** Tacos with ground beef
+- [ ] Buy tortillas and salsa
+%% col-break:b:alt %%
+### Friday
+**Breakfast:** Pancakes with maple syrup
+**Lunch:** BLT sandwich
+**Dinner:** Homemade pizza night
+- [ ] Make pizza dough in morning
+%% col-end %%
+
+
+---
+
+Copy any of these examples into your Obsidian vault to see them render. Right-click any column in Live Preview to customize styles, borders, separators, and colors through the context menu. Use the **Insert layout** submenu in the editor context menu to quickly insert pre-built templates like Cornell Notes, Kanban Board, and Info Card layouts.
+
+**Stacked column token reference:**
+- `stk:1` — marks a column as stacked; consecutive stacked columns form a vertical group
+- Stack groups share a single width slot (set by the first column in the group)
+- Combine with any style tokens (`b:`, `bc:`, `sb:`, `sep:`, etc.) for styled stacks
