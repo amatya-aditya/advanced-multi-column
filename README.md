@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/amatya-aditya/obsidian-rss-dashboard" target="_blank">
-    <img src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/leonardo_4.png" alt="AMC Logo" width="50%" />
+    <img src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/amclogo.png" alt="AMC Logo" width="50%" />
   </a>
 </div>
 
@@ -13,7 +13,7 @@ Create interactive, nested multi-column layouts — without losing sibling colum
 </div>
 
 <p align="center">
-  <img  src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/img1.png">
+  <img  src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/leonardo_4.png">
 </p>
 
 
