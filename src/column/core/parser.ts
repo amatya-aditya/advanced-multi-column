@@ -53,7 +53,7 @@ type ColumnData = {
 	content: string;
 	widthPercent: number;
 	style?: ColumnStyleData;
-	stacked?: boolean;
+	stacked?: number;
 };
 
 type ColumnLayout = "row" | "stack";
@@ -166,7 +166,7 @@ function parseStyleTokens(
 function parseBreakPayload(payload: string | undefined): {
 	width: number;
 	style?: ColumnStyleData;
-	stacked?: boolean;
+	stacked?: number;
 } {
 	if (!payload) return {width: 0};
 	const tokens = payload
@@ -176,7 +176,7 @@ function parseBreakPayload(payload: string | undefined): {
 	if (tokens.length === 0) return {width: 0};
 
 	let width = 0;
-	let stacked: boolean | undefined;
+	let stacked: number | undefined;
 	let firstTokenHandled = false;
 	const styleTokens: string[] = [];
 
@@ -196,17 +196,27 @@ function parseBreakPayload(payload: string | undefined): {
 			}
 		}
 		if (token.startsWith("stk:")) {
-			const val = parseBoolean(token.slice(4));
-			if (val !== null) stacked = val;
+			const raw = token.slice(4);
+			// Support boolean values for backward compatibility
+			const boolVal = parseBoolean(raw);
+			if (boolVal !== null) {
+				stacked = boolVal ? 1 : 0;
+			} else {
+				// Numeric stack group ID
+				const numVal = parseInt(raw, 10);
+				if (Number.isFinite(numVal) && numVal >= 0) {
+					stacked = numVal;
+				}
+			}
 			continue;
 		}
 		styleTokens.push(token);
 	}
 
 	const style = parseStyleTokens(styleTokens);
-	const result: {width: number; style?: ColumnStyleData; stacked?: boolean} = {width};
+	const result: {width: number; style?: ColumnStyleData; stacked?: number} = {width};
 	if (style) result.style = style;
-	if (stacked) result.stacked = stacked;
+	if (stacked && stacked > 0) result.stacked = stacked;
 	return result;
 }
 
@@ -263,8 +273,8 @@ function serializeBreakPayload(column: ColumnData): string {
 	if (column.widthPercent > 0) {
 		tokens.push(String(Math.round(column.widthPercent)));
 	}
-	if (column.stacked) {
-		tokens.push("stk:1");
+	if (column.stacked && column.stacked > 0) {
+		tokens.push(`stk:${column.stacked}`);
 	}
 	tokens.push(...serializeStyleTokens(column.style));
 	return tokens.length > 0 ? `:${tokens.join(",")}` : "";
@@ -299,11 +309,11 @@ export function findColumnRegions(doc: string): ColumnRegion[] {
 	let regionStartOffset = -1;
 	let regionStartLine = -1;
 	let seenFirstBreak = false;
-	let columns: {lines: string[]; width: number; style?: ColumnStyleData; stacked?: boolean; lineStart: number}[] = [];
+	let columns: {lines: string[]; width: number; style?: ColumnStyleData; stacked?: number; lineStart: number}[] = [];
 	let curLines: string[] = [];
 	let curWidth = 0;
 	let curStyle: ColumnStyleData | undefined;
-	let curStacked: boolean | undefined;
+	let curStacked: number | undefined;
 	let curLineStart = -1;
 	let nestedDepth = 0;
 	let containerStyle: ColumnStyleData | undefined;
@@ -389,7 +399,7 @@ export function findColumnRegions(doc: string): ColumnRegion[] {
 								content: column.lines.join("\n").trim(),
 								widthPercent: column.width,
 								style: column.style,
-								...(column.stacked ? {stacked: true} : {}),
+								...(column.stacked && column.stacked > 0 ? {stacked: column.stacked} : {}),
 							})),
 							containerStyle,
 							layout: regionLayout,

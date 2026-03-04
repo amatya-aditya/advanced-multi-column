@@ -10,6 +10,7 @@ export class ColumnInteractionState {
 	activeDragState: ActiveDragState | null = null;
 	activeDragPoint: {x: number; y: number} | null = null;
 	cleanupActiveDragTracking: (() => void) | null = null;
+	cleanupSelectionClickTracking: (() => void) | null = null;
 	cursorDropIndicator: HTMLElement | null = null;
 	resolvedDropPos: number | null = null;
 	selectedColumns: Set<number> = new Set();

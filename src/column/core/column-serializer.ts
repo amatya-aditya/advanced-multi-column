@@ -5,11 +5,11 @@ import type {ContainerPath} from "./widget-types";
 
 export function insertColumnAfter(columns: ColumnData[], index: number): ColumnData[] {
 	const neighbor = columns[index];
-	if (neighbor?.stacked) {
+	if (neighbor?.stacked && neighbor.stacked > 0) {
 		// Adding inside a stack group: keep all widths intact, new column
-		// inherits the stacked flag and gets width 0 (group width is max).
+		// inherits the stacked group ID and gets width 0 (group width is max).
 		const result = [...columns];
-		result.splice(index + 1, 0, {content: "", widthPercent: 0, stacked: true});
+		result.splice(index + 1, 0, {content: "", widthPercent: 0, stacked: neighbor.stacked});
 		return result;
 	}
 	// Adding a non-stacked column: reset all widths to equal distribution.
@@ -20,6 +20,49 @@ export function insertColumnAfter(columns: ColumnData[], index: number): ColumnD
 
 export function normalizeColumnWidths(columns: ColumnData[]): ColumnData[] {
 	return columns.map((col) => ({...col, widthPercent: 0}));
+}
+
+/**
+ * Remove a column while preserving widths of unrelated columns.
+ * Only resets widths within the same stack group as the removed column,
+ * or resets all widths if a non-stacked column is removed.
+ */
+export function removeColumnPreservingWidths(
+	columns: ColumnData[],
+	removeIndex: number,
+): ColumnData[] {
+	const removedCol = columns[removeIndex];
+	const filtered = columns.filter((_, idx) => idx !== removeIndex);
+	const removedStackId = removedCol?.stacked;
+	if (!removedStackId || removedStackId <= 0) {
+		// Removing a non-stacked column: reset all widths (group count changed)
+		return filtered.map((col) => ({...col, widthPercent: 0}));
+	}
+	// Removing a stacked column: find its stack group siblings (same group ID)
+	// and clear their widths (the group width is max of members).
+	// Other columns keep their widths.
+	const groupIndices = new Set<number>();
+	// Walk backward from removeIndex to find start of stack group
+	for (let j = removeIndex - 1; j >= 0 && columns[j]!.stacked === removedStackId; j--) {
+		groupIndices.add(j);
+	}
+	// Walk forward from removeIndex to find end of stack group
+	for (let j = removeIndex + 1; j < columns.length && columns[j]!.stacked === removedStackId; j++) {
+		groupIndices.add(j);
+	}
+	// If the stack group is now empty (removed the only member), just return filtered
+	if (groupIndices.size === 0) {
+		return filtered;
+	}
+	// Reset widths only for the remaining members of the same stack group
+	return filtered.map((col, newIdx) => {
+		// Map new index back to original index
+		const origIdx = newIdx >= removeIndex ? newIdx + 1 : newIdx;
+		if (groupIndices.has(origIdx)) {
+			return {...col, widthPercent: 0};
+		}
+		return col;
+	});
 }
 
 export function addChildColumnToContent(content: string): string {
@@ -53,12 +96,11 @@ export function removeColumnAtPath(
 		if (removeIndex < 0 || removeIndex >= columns.length) {
 			return {nextColumns: columns, removed: false};
 		}
-		const filtered = columns.filter((_, idx) => idx !== removeIndex);
-		if (filtered.length === 0) {
+		if (columns.length <= 1) {
 			return {nextColumns: null, removed: true};
 		}
 		return {
-			nextColumns: normalizeColumnWidths(filtered),
+			nextColumns: removeColumnPreservingWidths(columns, removeIndex),
 			removed: true,
 		};
 	}
@@ -170,11 +212,21 @@ export function dispatchUpdate(
 ): void {
 	const effectiveStyle = containerStyle !== undefined ? containerStyle : region.containerStyle;
 	const effectiveLayout = layout !== undefined ? layout : region.layout;
+
+	// Save scroll position to prevent jump when columns change
+	const scrollDOM = view.scrollDOM;
+	const savedScrollTop = scrollDOM.scrollTop;
+
 	view.dispatch({
 		changes: {
 			from: region.from,
 			to: region.to,
 			insert: serializeColumns(columns, effectiveStyle, effectiveLayout),
 		},
+	});
+
+	// Restore scroll position after dispatch to prevent jumping to end of file
+	requestAnimationFrame(() => {
+		scrollDOM.scrollTop = savedScrollTop;
 	});
 }

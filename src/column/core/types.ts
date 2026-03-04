@@ -19,7 +19,8 @@ export interface ColumnData {
 	content: string;
 	widthPercent: number; // 0 means auto/equal
 	style?: ColumnStyleData;
-	stacked?: boolean;
+	/** Stack group ID: 0/undefined = not stacked, positive number = stack group */
+	stacked?: number;
 }
 
 export type ColumnLayout = "row" | "stack";

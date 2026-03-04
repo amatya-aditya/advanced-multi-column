@@ -70,7 +70,7 @@ export interface EditWireConfig {
 	previewEl: HTMLElement;
 	textarea: HTMLTextAreaElement;
 	suggest: ColumnEditorSuggest;
-	slashSuggest: SlashCommandSuggest;
+	slashSuggest: Pick<SlashCommandSuggest, "active" | "handleKeydown" | "handleInput">;
 	getContent: () => string;
 	onCommit: (nextContent: string) => void;
 	/** Called when entering edit mode, before focus. For top-level columns. */

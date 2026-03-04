@@ -31,7 +31,7 @@ export class ColumnWidget extends WidgetType {
 			const a = this.region.columns[i]!;
 			const b = other.region.columns[i]!;
 			if (a.content !== b.content || a.widthPercent !== b.widthPercent) return false;
-			if ((a.stacked ?? false) !== (b.stacked ?? false)) return false;
+			if ((a.stacked ?? 0) !== (b.stacked ?? 0)) return false;
 			if (!isSameStyle(a.style, b.style)) return false;
 		}
 		return true;

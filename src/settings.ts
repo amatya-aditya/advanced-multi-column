@@ -42,6 +42,7 @@ export interface ColumnsPluginSettings {
 	showDragHandles: boolean;
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
+	enableSlashSuggest: boolean;
 	styleTargetMode: StyleTargetMode;
 	styleTargetColumnIndex: number;
 	containerBackground: ColumnBackgroundOption;
@@ -61,6 +62,7 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	showDragHandles: true,
 	enableLivePreview: true,
 	enableReadingView: true,
+	enableSlashSuggest: true,
 	styleTargetMode: "all",
 	styleTargetColumnIndex: 1,
 	containerBackground: "primary",
@@ -201,6 +203,18 @@ export class ColumnsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.enableReadingView)
 					.onChange(async (value) => {
 						this.plugin.settings.enableReadingView = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(panelEl)
+			.setName("Enable slash suggest")
+			.setDesc("Show plugin slash command suggestions in column editors.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.enableSlashSuggest)
+					.onChange(async (value) => {
+						this.plugin.settings.enableSlashSuggest = value;
 						await this.plugin.saveSettings();
 					}),
 			);

@@ -1,6 +1,7 @@
 import type {ColumnBackgroundOption, StyleColorOption} from "../../settings";
 import type {ColumnData, ColumnLayout, ColumnStyleData, SeparatorLineStyle} from "../core/types";
 import {applyColumnStyle, applyContainerStyle} from "../core/column-style";
+import {serializeColumns} from "../core/parser";
 import {getColumnElements} from "./column-renderer";
 
 interface SelectOption<T extends string> {
@@ -705,6 +706,88 @@ function getTargetIndices(menuData: ColumnStyleContextMenuData): Set<number> {
 	return new Set([menuData.columnIndex]);
 }
 
+function appendNestedColumnsToContent(
+	content: string,
+	nestedColumns: ReadonlyArray<ColumnData>,
+): string {
+	const trailingWhitespace = content.match(/\s*$/)?.[0] ?? "";
+	const withoutTrailing = content.slice(0, content.length - trailingWhitespace.length);
+	const separator = withoutTrailing.length > 0 ? "\n\n" : "";
+	const nestedBlock = serializeColumns(nestedColumns);
+	return `${withoutTrailing}${separator}${nestedBlock}${trailingWhitespace}`;
+}
+
+/**
+ * Special-case "unstack subset" behavior:
+ * If selected stacked columns are a contiguous run that has an immediate
+ * stacked sibling on the left, move the selected columns into that left
+ * sibling as a nested row block.
+ *
+ * Example:
+ *   1 | (2,3,4 stacked) + unstack(3,4)
+ * becomes
+ *   1 | 2(with nested row: 3,4)
+ */
+function moveSelectedStackedColumnsToNestedRow(
+	columns: ColumnData[],
+	indices: Set<number>,
+): ColumnData[] | null {
+	if (indices.size < 2) return null;
+
+	const selected = [...indices].sort((a, b) => a - b);
+	for (let i = 1; i < selected.length; i++) {
+		if (selected[i]! !== selected[i - 1]! + 1) return null;
+	}
+
+	const first = selected[0]!;
+	const last = selected[selected.length - 1]!;
+	if (first <= 0 || last >= columns.length) return null;
+
+	const stackId = columns[first]?.stacked;
+	if (!stackId || stackId <= 0) return null;
+
+	for (const idx of selected) {
+		if (columns[idx]?.stacked !== stackId) return null;
+	}
+
+	const hostIndex = first - 1;
+	const host = columns[hostIndex];
+	if (!host || host.stacked !== stackId || indices.has(hostIndex)) return null;
+
+	// Ensure host + selected range are one contiguous stack run segment.
+	for (let i = hostIndex; i <= last; i++) {
+		if (columns[i]?.stacked !== stackId) return null;
+	}
+
+	const movedSet = new Set(selected);
+	const nestedChildren = selected.map((idx) => {
+		const col = columns[idx]!;
+		return {
+			...col,
+			widthPercent: 0,
+			stacked: undefined,
+		};
+	});
+
+	const nextColumns: ColumnData[] = [];
+	for (let i = 0; i < columns.length; i++) {
+		if (movedSet.has(i)) continue;
+		const col = columns[i]!;
+		if (i === hostIndex) {
+			nextColumns.push({
+				...col,
+				// Host becomes a regular column that contains a nested row.
+				stacked: undefined,
+				content: appendNestedColumnsToContent(col.content, nestedChildren),
+			});
+			continue;
+		}
+		nextColumns.push(col);
+	}
+
+	return nextColumns;
+}
+
 function applyStylePatch(
 	columns: ColumnData[],
 	indices: Set<number>,
@@ -947,17 +1030,41 @@ function renderPopoverContent(
 		actionLabel: "Reset",
 		onAction: () => patchStylesAndRerender(menuData, state, CLEAR_STYLE_PATCH),
 		render: (body) => {
-			const allStacked = [...indices].every((i) => state.columns[i]?.stacked);
+			const allStacked = [...indices].every((i) => {
+				const s = state.columns[i]?.stacked;
+				return s !== undefined && s > 0;
+			});
 			createActionRow(body, {
 				label: "Stacked",
 				checked: allStacked,
 				onClick: () => {
-					const nextStacked = !allStacked;
-					state.columns = state.columns.map((col, idx) =>
-						indices.has(idx)
-							? {...col, stacked: nextStacked || undefined}
-							: col,
-					);
+					if (allStacked) {
+						const nestedRows = moveSelectedStackedColumnsToNestedRow(state.columns, indices);
+						if (nestedRows) {
+							state.columns = nestedRows;
+						} else {
+							// Un-stack: clear stacked flag
+							state.columns = state.columns.map((col, idx) =>
+								indices.has(idx)
+									? {...col, stacked: undefined}
+									: col,
+							);
+						}
+					} else {
+						// Stack: find next available group ID
+						const usedIds = new Set(
+							state.columns
+								.filter((col) => col.stacked && col.stacked > 0)
+								.map((col) => col.stacked!),
+						);
+						let nextId = 1;
+						while (usedIds.has(nextId)) nextId++;
+						state.columns = state.columns.map((col, idx) =>
+							indices.has(idx)
+								? {...col, stacked: nextId}
+								: col,
+						);
+					}
 					if (pendingFlush) {
 						pendingFlush();
 						pendingFlush = null;

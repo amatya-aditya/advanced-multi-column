@@ -14,7 +14,7 @@ import {buildResizeHandle} from "./column-resizer";
 import {wireDragItem} from "./column-drag";
 import {
 	insertColumnAfter,
-	normalizeColumnWidths,
+	removeColumnPreservingWidths,
 	addChildColumnToContent,
 	dispatchUpdate,
 } from "../core/column-serializer";
@@ -28,6 +28,22 @@ export interface RenderContext {
 	suggests: ColumnEditorSuggest[];
 }
 
+type SlashSuggestController = Pick<SlashCommandSuggest, "active" | "handleKeydown" | "handleInput">;
+
+const DISABLED_SLASH_SUGGEST: SlashSuggestController = {
+	active: false,
+	handleKeydown: () => false,
+	handleInput: () => {},
+};
+
+function createSlashSuggest(textarea: HTMLTextAreaElement): SlashSuggestController {
+	const plugin = getPluginInstance();
+	if (!plugin.settings.enableSlashSuggest) {
+		return DISABLED_SLASH_SUGGEST;
+	}
+	return new SlashCommandSuggest(textarea);
+}
+
 // ── Column Grouping ─────────────────────────────────────────
 
 export interface ColumnGroup {
@@ -38,16 +54,18 @@ export interface ColumnGroup {
 }
 
 /**
- * Group consecutive stacked columns together.
+ * Group consecutive columns with the same stack group ID together.
  * Non-stacked columns form single-element groups.
+ * Different stack group IDs (stk:1, stk:2, etc.) form separate groups.
  */
 export function groupColumns(columns: ReadonlyArray<ColumnData>): ColumnGroup[] {
 	const groups: ColumnGroup[] = [];
 	let i = 0;
 	while (i < columns.length) {
-		if (columns[i]!.stacked) {
+		const stackId = columns[i]!.stacked;
+		if (stackId && stackId > 0) {
 			const start = i;
-			while (i < columns.length && columns[i]!.stacked) i++;
+			while (i < columns.length && columns[i]!.stacked === stackId) i++;
 			groups.push({indices: Array.from({length: i - start}, (_, k) => start + k), isStack: true});
 		} else {
 			groups.push({indices: [i], isStack: false});
@@ -168,6 +186,31 @@ function clearColumnSelection(view: EditorView): void {
 	iState.selectionContainerEl = null;
 }
 
+function ensureSelectionClearOnNormalClick(view: EditorView): void {
+	const iState = getInteractionState(view);
+	if (iState.cleanupSelectionClickTracking) return;
+
+	const clearOnClick = (e: MouseEvent) => {
+		// Primary-button plain click clears selection anywhere (inside or outside columns).
+		if (e.button !== 0) return;
+		if (e.ctrlKey || e.metaKey) return;
+
+		const nextState = getInteractionState(view);
+		if (!view.dom.isConnected) {
+			nextState.cleanupSelectionClickTracking?.();
+			nextState.cleanupSelectionClickTracking = null;
+			return;
+		}
+		if (nextState.selectedColumns.size === 0) return;
+		clearColumnSelection(view);
+	};
+
+	document.addEventListener("click", clearOnClick, true);
+	iState.cleanupSelectionClickTracking = () => {
+		document.removeEventListener("click", clearOnClick, true);
+	};
+}
+
 function wireColumnSelection(
 	item: HTMLElement,
 	index: number,
@@ -175,7 +218,11 @@ function wireColumnSelection(
 	view: EditorView,
 ): void {
 	item.addEventListener("click", (e: MouseEvent) => {
-		if (!e.ctrlKey && !e.metaKey) return;
+		if (!e.ctrlKey && !e.metaKey) {
+			const iState = getInteractionState(view);
+			if (iState.selectedColumns.size > 0) clearColumnSelection(view);
+			return;
+		}
 		e.preventDefault();
 		e.stopPropagation();
 
@@ -259,7 +306,7 @@ function wireTopLevelEditToggle(
 	textarea: HTMLTextAreaElement,
 	index: number,
 	suggest: ColumnEditorSuggest,
-	slashSuggest: SlashCommandSuggest,
+	slashSuggest: SlashSuggestController,
 	ctx: RenderContext,
 ): void {
 	wireEditCore({
@@ -339,7 +386,7 @@ function wireNestedEditToggle(
 ): void {
 	const plugin = getPluginInstance();
 	const suggest = new ColumnEditorSuggest(textarea, plugin.app);
-	const slashSuggest = new SlashCommandSuggest(textarea);
+	const slashSuggest = createSlashSuggest(textarea);
 	ctx.suggests.push(suggest);
 
 	wireEditCore({
@@ -373,7 +420,7 @@ function renderEditableTextSegment(
 	parent.appendChild(block);
 
 	const preview = document.createElement("div");
-	preview.className = "column-inline-edit-preview";
+	preview.className = "column-inline-edit-preview markdown-rendered";
 	applyCompactPreviewSpacing(preview);
 	block.appendChild(preview);
 
@@ -399,7 +446,7 @@ function renderEditableTextSegment(
 
 	const plugin = getPluginInstance();
 	const suggest = new ColumnEditorSuggest(textarea, plugin.app);
-	const slashSuggest = new SlashCommandSuggest(textarea);
+	const slashSuggest = createSlashSuggest(textarea);
 	ctx.suggests.push(suggest);
 
 	let currentText = initialText;
@@ -567,8 +614,10 @@ function renderNestedRegion(
 			buildSeparatorElement(container, region.columns[prevGroup.indices[prevGroup.indices.length - 1]!]!);
 		}
 
+		// A single-column stack group renders as a normal column (no wrapper needed)
+		const useStackWrapper = group.isStack && !isContainerStacked && group.indices.length > 1;
 		let groupParent: HTMLElement;
-		if (group.isStack && !isContainerStacked && group.indices.length > 0) {
+		if (useStackWrapper) {
 			const stackGroupEl = document.createElement("div");
 			stackGroupEl.className = "columns-stack-group";
 			const maxWidth = Math.max(...group.indices.map((idx) => region.columns[idx]!.widthPercent));
@@ -594,7 +643,7 @@ function renderNestedRegion(
 			const colEl = document.createElement("div");
 			colEl.className = "column-item";
 			colEl.dataset.colIndex = String(i);
-			if (group.isStack) {
+			if (useStackWrapper) {
 				// Stacked: full width via CSS
 			} else if (!isContainerStacked && col.widthPercent > 0) {
 				const handleTotal = (groups.length - 1) * 8;
@@ -634,9 +683,7 @@ function renderNestedRegion(
 					onRemoveRegion();
 					return;
 				}
-				const updated = normalizeColumnWidths(
-					region.columns.filter((_, idx) => idx !== i),
-				);
+				const updated = removeColumnPreservingWidths(region.columns, i);
 				onRegionChange(updated, region.containerStyle);
 			});
 
@@ -682,7 +729,7 @@ function renderNestedRegion(
 			);
 
 			const previewEl = document.createElement("div");
-			previewEl.className = "column-preview";
+			previewEl.className = "column-preview markdown-rendered";
 			applyCompactPreviewSpacing(previewEl);
 			colEl.appendChild(previewEl);
 			const hasNestedRegions = findColumnRegions(col.content).length > 0;
@@ -746,6 +793,23 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 	const activeFile = plugin.app.workspace.getActiveFile();
 	const sourcePath = activeFile?.path ?? "";
 
+	// Clear any stale selection state when the container is rebuilt
+	// (updateDOM reuses the same DOM element but empties its children,
+	// so previous selections are no longer valid)
+	const iStateInit = getInteractionState(ctx.view);
+	if (iStateInit.selectionContainerEl === container) {
+		iStateInit.selectedColumns.clear();
+		iStateInit.selectionContainerEl = null;
+	}
+	ensureSelectionClearOnNormalClick(ctx.view);
+
+	// Clear column selection on regular (non-Ctrl/Meta) clicks anywhere in the container
+	container.addEventListener("click", (e: MouseEvent) => {
+		if (!e.ctrlKey && !e.metaKey) {
+			clearColumnSelection(ctx.view);
+		}
+	});
+
 	const groups = isContainerStacked ? [{indices: columns.map((_, i) => i), isStack: true}] : groupColumns(columns);
 
 	for (let gi = 0; gi < groups.length; gi++) {
@@ -766,9 +830,10 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 			buildSeparatorElement(container, columns[prevGroup.indices[prevGroup.indices.length - 1]!]!);
 		}
 
-		// Create stack group wrapper if needed
+		// Create stack group wrapper if needed (skip for single-column groups)
+		const useStackWrapper = group.isStack && !isContainerStacked && group.indices.length > 1;
 		let groupParent: HTMLElement;
-		if (group.isStack && !isContainerStacked && group.indices.length > 0) {
+		if (useStackWrapper) {
 			const stackGroupEl = document.createElement("div");
 			stackGroupEl.className = "columns-stack-group";
 			const maxWidth = Math.max(...group.indices.map((idx) => columns[idx]!.widthPercent));
@@ -794,7 +859,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 
 			const colEl = document.createElement("div");
 			colEl.className = "column-item";
-			if (group.isStack) {
+			if (useStackWrapper) {
 				// Stacked columns: full width via CSS
 			} else if (!isContainerStacked && col.widthPercent > 0) {
 				const handleTotal = (groups.length - 1) * 8;
@@ -835,9 +900,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					e.preventDefault();
 					e.stopPropagation();
 					if (columns.length <= 1) return;
-					const updated = normalizeColumnWidths(
-						columns.filter((_, idx) => idx !== i),
-					);
+					const updated = removeColumnPreservingWidths(columns, i);
 					dispatchUpdate(ctx.region, updated, ctx.view);
 				});
 
@@ -851,7 +914,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				colEl.appendChild(header);
 
 				const previewEl = document.createElement("div");
-				previewEl.className = "column-preview";
+				previewEl.className = "column-preview markdown-rendered";
 				applyCompactPreviewSpacing(previewEl);
 				colEl.appendChild(previewEl);
 
@@ -884,7 +947,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					colEl.appendChild(textarea);
 
 					const suggest = new ColumnEditorSuggest(textarea, plugin.app);
-					const slashSuggest = new SlashCommandSuggest(textarea);
+					const slashSuggest = createSlashSuggest(textarea);
 					ctx.suggests.push(suggest);
 					wireTopLevelEditToggle(container, previewEl, textarea, i, suggest, slashSuggest, ctx);
 

@@ -16,14 +16,18 @@ import {
 import type {ColumnData} from "../core/types";
 
 /**
- * Resolve the `stacked` flag for a column being inserted at `insertAt`
- * based on its neighbors. If neighbors are stacked, the inserted column
- * should join the stack group; otherwise clear the flag.
+ * Resolve the stack group ID for a column being inserted at `insertAt`
+ * based on its neighbors. If both neighbors share the same stack group,
+ * the inserted column joins that group. If only one neighbor is stacked,
+ * inherit that group. Otherwise return 0 (not stacked).
  */
-function resolveStackedForInsert(target: ColumnData[], insertAt: number): boolean {
-	const prev = target[insertAt - 1];
-	const next = target[insertAt];
-	return !!(prev?.stacked || next?.stacked);
+function resolveStackedForInsert(target: ColumnData[], insertAt: number): number {
+	const prev = target[insertAt - 1]?.stacked;
+	const next = target[insertAt]?.stacked;
+	if (prev && prev > 0 && next && next > 0 && prev === next) return prev;
+	if (prev && prev > 0) return prev;
+	if (next && next > 0) return next;
+	return 0;
 }
 
 export function moveColumnBetweenContainers(
@@ -57,7 +61,7 @@ export function moveColumnBetweenContainers(
 		const [removed] = reordered.splice(sourceIndex, 1);
 		if (!removed) return;
 		const shouldStack = resolveStackedForInsert(reordered, adjustedIndex);
-		reordered.splice(adjustedIndex, 0, {...removed, stacked: shouldStack || undefined});
+		reordered.splice(adjustedIndex, 0, {...removed, stacked: shouldStack > 0 ? shouldStack : undefined});
 		const nextRoot = updateColumnsAtPath(rootColumns, sourcePath, () => reordered);
 		dispatchUpdate(region, nextRoot, view);
 		return;
@@ -71,7 +75,7 @@ export function moveColumnBetweenContainers(
 		const insertAt = Math.max(0, Math.min(destinationIndex, target.length));
 		const shouldStack = resolveStackedForInsert(target, insertAt);
 		const inserted = [...target];
-		inserted.splice(insertAt, 0, {...moving, widthPercent: 0, stacked: shouldStack || undefined});
+		inserted.splice(insertAt, 0, {...moving, widthPercent: 0, stacked: shouldStack > 0 ? shouldStack : undefined});
 		return normalizeColumnWidths(inserted);
 	});
 
@@ -126,7 +130,7 @@ export function moveColumnBetweenBlocks(
 			const insertAt = Math.max(0, Math.min(destinationIndex, target.length));
 			const shouldStack = resolveStackedForInsert(target, insertAt);
 			const inserted = [...target];
-			inserted.splice(insertAt, 0, {...moving, widthPercent: 0, stacked: shouldStack || undefined});
+			inserted.splice(insertAt, 0, {...moving, widthPercent: 0, stacked: shouldStack > 0 ? shouldStack : undefined});
 			return normalizeColumnWidths(inserted);
 		},
 	);

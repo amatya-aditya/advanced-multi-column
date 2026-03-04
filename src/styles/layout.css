@@ -836,6 +836,7 @@
 	flex: 1 1 0%;
 	min-width: 0;
 	align-items: stretch;
+	gap: 4px;
 }
 
 .columns-container .columns-stack-group > .column-item {

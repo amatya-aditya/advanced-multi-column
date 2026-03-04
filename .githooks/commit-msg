@@ -1,0 +1,45 @@
+#!/bin/sh
+
+if [ "$SKIP_GIT_HOOKS" = "1" ]; then
+  echo "[commit-msg] SKIP_GIT_HOOKS=1 set, skipping."
+  exit 0
+fi
+
+MSG_FILE="$1"
+if [ -z "$MSG_FILE" ] || [ ! -f "$MSG_FILE" ]; then
+  echo "[commit-msg] Missing commit message file argument."
+  exit 1
+fi
+
+# First non-empty, non-comment line
+FIRST_LINE="$(sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$MSG_FILE" | head -n 1)"
+
+# Allow Git-generated merge and revert messages
+case "$FIRST_LINE" in
+  Merge\ *|Revert\ *)
+    exit 0
+    ;;
+esac
+
+# Conventional Commits (subject line)
+PATTERN='^(feat|fix|docs|chore|refactor|test|perf|style|ci|build|revert)(\([a-z0-9._/-]+\))?(!)?: .+'
+
+if echo "$FIRST_LINE" | grep -Eq "$PATTERN"; then
+  exit 0
+fi
+
+echo "[commit-msg] Invalid commit message:"
+echo "  $FIRST_LINE"
+echo ""
+echo "Use Conventional Commits:"
+echo "  <type>(optional-scope): <subject>"
+echo ""
+echo "Allowed types:"
+echo "  feat, fix, docs, chore, refactor, test, perf, style, ci, build, revert"
+echo ""
+echo "Examples:"
+echo "  feat(columns): add nested row unstack behavior"
+echo "  fix(drag): prevent stale drop indicator"
+echo "  docs(wiki): add setup and syntax guide"
+exit 1
+

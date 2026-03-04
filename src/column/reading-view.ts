@@ -30,6 +30,14 @@ interface RenderState {
 	sizerObserver?: MutationObserver;
 }
 
+interface ScrollSnapshot {
+	el: HTMLElement;
+	top: number;
+	left: number;
+}
+
+type ScrollRestoreGuard = () => boolean;
+
 function rvWarn(...args: unknown[]): void {
 	if (!RV_DEBUG) return;
 	console.warn("[AMC RV]", ...args);
@@ -103,6 +111,62 @@ function ensureWrapperHost(
 		previewEl.appendChild(host);
 	}
 	return host;
+}
+
+function isScrollableElement(el: HTMLElement): boolean {
+	const style = window.getComputedStyle(el);
+	const overflowY = style.overflowY;
+	const overflowX = style.overflowX;
+	const canScrollY = (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay")
+		&& el.scrollHeight > el.clientHeight + 1;
+	const canScrollX = (overflowX === "auto" || overflowX === "scroll" || overflowX === "overlay")
+		&& el.scrollWidth > el.clientWidth + 1;
+	return canScrollY || canScrollX;
+}
+
+function captureScrollSnapshot(fromEl: HTMLElement): ScrollSnapshot[] {
+	const snapshots: ScrollSnapshot[] = [];
+	const leafContent = fromEl.closest(".workspace-leaf-content");
+	const stopAt = leafContent instanceof HTMLElement ? leafContent : null;
+	let current: HTMLElement | null = fromEl;
+	while (current) {
+		if (isScrollableElement(current)) {
+			snapshots.push({
+				el: current,
+				top: current.scrollTop,
+				left: current.scrollLeft,
+			});
+		}
+		if (current === stopAt) break;
+		current = current.parentElement;
+	}
+	return snapshots;
+}
+
+function restoreScrollSnapshot(
+	snapshots: ScrollSnapshot[],
+	shouldRestore: ScrollRestoreGuard,
+): void {
+	if (!shouldRestore()) return;
+	for (const snap of snapshots) {
+		if (!shouldRestore()) break;
+		if (!snap.el.isConnected) continue;
+		snap.el.scrollTop = snap.top;
+		snap.el.scrollLeft = snap.left;
+	}
+}
+
+function restoreScrollSnapshotStable(
+	snapshots: ScrollSnapshot[],
+	shouldRestore: ScrollRestoreGuard,
+): void {
+	restoreScrollSnapshot(snapshots, shouldRestore);
+	requestAnimationFrame(() => {
+		restoreScrollSnapshot(snapshots, shouldRestore);
+		requestAnimationFrame(() => {
+			restoreScrollSnapshot(snapshots, shouldRestore);
+		});
+	});
 }
 
 /** Move .mod-footer from sizer into previewEl (after host) so backlinks appear below columns. */
@@ -270,7 +334,7 @@ async function renderColumnsRegion(
 			}
 
 			const previewEl = document.createElement("div");
-			previewEl.className = "column-preview";
+			previewEl.className = "column-preview markdown-rendered";
 			colEl.appendChild(previewEl);
 			groupParent.appendChild(colEl);
 
@@ -371,6 +435,11 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const retryCounts = new WeakMap<HTMLElement, number>();
 	const activeSizers = new Set<HTMLElement>();
 	let renderIdSeq = 0;
+
+	const invalidateRenderToken = (sizer: HTMLElement): void => {
+		const current = renderTokens.get(sizer) ?? 0;
+		renderTokens.set(sizer, current + 1);
+	};
 
 	const sizerSnapshot = (sizer: HTMLElement, state?: RenderState) => {
 		const previewEl = state?.previewEl ?? resolvePreviewElementForSizer(sizer);
@@ -625,12 +694,27 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			rvWarn("render skipped: no preview element for sizer", {token});
 			return;
 		}
+		if (!previewEl.closest(".markdown-reading-view")) {
+			invalidateRenderToken(sizer);
+			teardownSizer(sizer, states, "render skipped: not in reading view");
+			return;
+		}
+		const view = resolveViewForSizer(sizer, plugin);
+		const scrollSnapshot = captureScrollSnapshot(previewEl);
+		const shouldRestoreScroll = (): boolean => {
+			if (!plugin.settings.enableReadingView) return false;
+			if (!sizer.isConnected) return false;
+			if (renderTokens.get(sizer) !== token) return false;
+			if (!previewEl.isConnected) return false;
+			if (!previewEl.closest(".markdown-reading-view")) return false;
+			return true;
+		};
 		if (!plugin.settings.enableReadingView) {
+			invalidateRenderToken(sizer);
 			teardownSizer(sizer, states, "settings disabled");
 			return;
 		}
 
-		const view = resolveViewForSizer(sizer, plugin);
 		const sourcePath = sourceHints.get(sizer) || view?.file?.path || "";
 
 		if (!view && !sourcePath) {
@@ -692,6 +776,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			existing.previewEl.classList.add(RV_ACTIVE_CLASS);
 			hideSizerContent(sizer);
+			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			rvWarn("render reused existing wrapper", sizerSnapshot(sizer, existing));
 			return;
 		}
@@ -756,6 +841,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
 			relocateFooter(sizer, previewEl, host);
+			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			const state: RenderState = {
 				sourcePath,
 				fingerprint,
@@ -781,6 +867,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			component.unload();
 			previewEl.classList.remove(RV_ACTIVE_CLASS);
 			restoreSizerContent(sizer);
+			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			rvError("render failed", {
 				renderId,
 				sourcePath,
