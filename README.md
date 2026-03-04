@@ -13,7 +13,7 @@ Create interactive, nested multi-column layouts — without losing sibling colum
 </div>
 
 <p align="center">
-  <img  src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/leonardo_4.png">
+  <img  src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/leonardo_3.png">
 </p>
 
 
