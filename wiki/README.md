@@ -4,15 +4,15 @@ This wiki is split by complexity so you can learn fast and only read what you ne
 
 ## Start here
 
-1. [01 - Quick start](./01-quick-start.md)
-2. [02 - Syntax reference](./02-syntax-reference.md)
-3. [03 - Editing and interaction](./03-editing-and-interaction.md)
-4. [04 - Layouts, stacking, and nesting](./04-layouts-stacking-and-nesting.md)
-5. [05 - Resize, drag, and structure operations](./05-resize-drag-and-structure-ops.md)
-6. [06 - Styling and context menu](./06-styling-and-context-menu.md)
-7. [07 - Commands and templates](./07-commands-and-templates.md)
-8. [08 - Settings guide](./08-settings-guide.md)
-9. [09 - Troubleshooting and FAQ](./09-troubleshooting-and-faq.md)
+1. [01 - Quick start](https://github.com/amatya-aditya/advanced-multi-column/wiki/01-quick-start)
+2. [02 - Syntax reference](https://github.com/amatya-aditya/advanced-multi-column/wiki/02-syntax-reference)
+3. [03 - Editing and interaction](https://github.com/amatya-aditya/advanced-multi-column/wiki/03-editing-and-interaction)
+4. [04 - Layouts, stacking, and nesting](https://github.com/amatya-aditya/advanced-multi-column/wiki/04-layouts-stacking-and-nesting)
+5. [05 - Resize, drag, and structure operations](https://github.com/amatya-aditya/advanced-multi-column/wiki/05-resize-drag-and-structure-ops)
+6. [06 - Styling and context menu](https://github.com/amatya-aditya/advanced-multi-column/wiki/06-styling-and-context-menu)
+7. [07 - Commands and templates](https://github.com/amatya-aditya/advanced-multi-column/wiki/07-commands-and-templates)
+8. [08 - Settings guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/08-settings-guide)
+9. [09 - Troubleshooting and FAQ](https://github.com/amatya-aditya/advanced-multi-column/wiki/09-troubleshooting-and-faq)
 
 ## Suggested learning path
 
@@ -20,3 +20,5 @@ This wiki is split by complexity so you can learn fast and only read what you ne
 2. Power users: `04` -> `05` -> `06`
 3. Configuration and maintenance: `07` -> `08` -> `09`
 
+https://github.com/amatya-aditya/advanced-multi-column/wiki/01-quick-start
+https://raw.githubusercontent.com/wiki/amatya-aditya/advanced-multi-column/01-quick-start.md
