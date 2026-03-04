@@ -24,3 +24,6 @@ data.json
 .claude/
 AGENTS.md
 test
+
+# Local clone of GitHub Wiki repo (do not track in main repo)
+advanced-multi-column.wiki/

@@ -1,0 +1,81 @@
+name: Sync Wiki
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - "wiki/**"
+      - ".github/workflows/wiki-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync wiki folder to GitHub Wiki
+        shell: bash
+        env:
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -d "wiki" ]; then
+            echo "No wiki/ folder found. Skipping."
+            exit 0
+          fi
+
+          token="${WIKI_TOKEN:-}"
+          if [ -z "$token" ]; then
+            token="${GITHUB_TOKEN}"
+          fi
+
+          wiki_url="https://x-access-token:${token}@github.com/${REPOSITORY}.wiki.git"
+          workdir="$(mktemp -d)"
+
+          if ! git clone "${wiki_url}" "${workdir}/wiki-repo"; then
+            echo "::error::Could not clone ${REPOSITORY}.wiki.git. Ensure Wiki is enabled in repository settings."
+            exit 1
+          fi
+
+          find "${workdir}/wiki-repo" -mindepth 1 -maxdepth 1 ! -name ".git" -exec rm -rf {} +
+          cp -a wiki/. "${workdir}/wiki-repo/"
+          if [ ! -f "${workdir}/wiki-repo/Home.md" ]; then
+            if [ -f "${workdir}/wiki-repo/README.md" ]; then
+              cp "${workdir}/wiki-repo/README.md" "${workdir}/wiki-repo/Home.md"
+            elif [ -f "${workdir}/wiki-repo/index.md" ]; then
+              cp "${workdir}/wiki-repo/index.md" "${workdir}/wiki-repo/Home.md"
+            fi
+          fi
+
+          cd "${workdir}/wiki-repo"
+          branch="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')"
+          if [ -z "${branch}" ]; then
+            branch="master"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No wiki changes to sync."
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "docs(wiki): sync from wiki folder (${SHA:0:7})"
+          git push origin "HEAD:${branch}"
