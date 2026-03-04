@@ -19,6 +19,3 @@ This wiki is split by complexity so you can learn fast and only read what you ne
 1. New users: `01` -> `02` -> `03`
 2. Power users: `04` -> `05` -> `06`
 3. Configuration and maintenance: `07` -> `08` -> `09`
-
-https://github.com/amatya-aditya/advanced-multi-column/wiki/01-quick-start
-https://raw.githubusercontent.com/wiki/amatya-aditya/advanced-multi-column/01-quick-start.md
