@@ -30,7 +30,14 @@ Advanced behavior:
 ### Add sibling
 
 1. Click `+` in a column header.
-2. New column is inserted to the right.
+2. New column is inserted to the right (or below if stacked).
+3. Tooltip reflects context: "Add column to the right" for non-stacked, "Add stacked item below" for stacked columns.
+
+### Ctrl+Click `+` (opposite mode)
+
+1. Hold `Ctrl` (or `Cmd` on macOS) and click `+`.
+2. If the column is non-stacked, a new stacked group is created with the clicked column and the new column.
+3. If the column is stacked, a non-stacked column is inserted to the right instead.
 
 ### Add child
 

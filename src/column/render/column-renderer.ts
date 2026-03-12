@@ -14,6 +14,7 @@ import {buildResizeHandle} from "./column-resizer";
 import {wireDragItem} from "./column-drag";
 import {
 	insertColumnAfter,
+	insertColumnAfterOpposite,
 	removeColumnPreservingWidths,
 	addChildColumnToContent,
 	dispatchUpdate,
@@ -218,6 +219,10 @@ function wireColumnSelection(
 	view: EditorView,
 ): void {
 	item.addEventListener("click", (e: MouseEvent) => {
+		// Let header action buttons (add/remove) handle their own Ctrl+Click
+		const target = e.target as HTMLElement;
+		if (target.closest(".column-header-actions")) return;
+
 		if (!e.ctrlKey && !e.metaKey) {
 			const iState = getInteractionState(view);
 			if (iState.selectedColumns.size > 0) clearColumnSelection(view);
@@ -661,14 +666,17 @@ function renderNestedRegion(
 			dragHandle.textContent = "\u22EE\u22EE";
 			dragHandle.setAttribute("aria-label", "Drag to reorder");
 
+			const isStacked = !!(col.stacked && col.stacked > 0);
 			const addBtn = document.createElement("button");
 			addBtn.className = "column-add-btn";
 			addBtn.textContent = "+";
-			addBtn.setAttribute("aria-label", "Add column to the right");
+			addBtn.setAttribute("aria-label", isStacked ? "Add stacked item below" : "Add column to the right");
 			addBtn.addEventListener("click", (e) => {
 				e.preventDefault();
 				e.stopPropagation();
-				const updated = insertColumnAfter(region.columns, i);
+				const updated = e.ctrlKey || e.metaKey
+					? insertColumnAfterOpposite(region.columns, i)
+					: insertColumnAfter(region.columns, i);
 				onRegionChange(updated, region.containerStyle);
 			});
 
@@ -881,14 +889,17 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				dragHandle.textContent = "\u22EE\u22EE";
 				dragHandle.setAttribute("aria-label", "Drag to reorder");
 
+				const isStacked = !!(col.stacked && col.stacked > 0);
 				const addBtn = document.createElement("button");
 				addBtn.className = "column-add-btn";
 				addBtn.textContent = "+";
-				addBtn.setAttribute("aria-label", "Add column to the right");
+				addBtn.setAttribute("aria-label", isStacked ? "Add stacked item below" : "Add column to the right");
 				addBtn.addEventListener("click", (e) => {
 					e.preventDefault();
 					e.stopPropagation();
-					const updated = insertColumnAfter(columns, i);
+					const updated = e.ctrlKey || e.metaKey
+						? insertColumnAfterOpposite(columns, i)
+						: insertColumnAfter(columns, i);
 					dispatchUpdate(ctx.region, updated, ctx.view);
 				});
 

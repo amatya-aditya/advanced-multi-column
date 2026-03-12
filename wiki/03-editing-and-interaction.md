@@ -51,6 +51,13 @@ Built-in slash items include:
 3. Plugin saves image to current note folder.
 4. Plugin inserts embed like `![[pasted-image-...png]]`.
 
+## Add column shortcuts
+
+| Action | Result |
+|---|---|
+| Click `+` | Add sibling (respects stacked context) |
+| `Ctrl/Cmd + Click` `+` | Add opposite type (stacked → non-stacked, non-stacked → stacked) |
+
 ## Column multi-select behavior
 
 1. Hold `Ctrl` (or `Cmd` on macOS).

@@ -18,6 +18,35 @@ export function insertColumnAfter(columns: ColumnData[], index: number): ColumnD
 	return normalized;
 }
 
+/**
+ * Insert a column after the given index with the opposite stacking behavior:
+ * - If the neighbor is stacked, insert a non-stacked column.
+ * - If the neighbor is non-stacked, insert a stacked column (inheriting or
+ *   creating a stack group with the neighbor).
+ */
+export function insertColumnAfterOpposite(columns: ColumnData[], index: number): ColumnData[] {
+	const neighbor = columns[index];
+	if (neighbor?.stacked && neighbor.stacked > 0) {
+		// Neighbor is stacked → insert a non-stacked column (no stack ID).
+		const result = [...columns];
+		result.splice(index + 1, 0, {content: "", widthPercent: 0});
+		return result;
+	}
+	// Neighbor is non-stacked → create a new stack group with the neighbor.
+	// Find the highest existing stack ID to generate a new unique one.
+	let maxStackId = 0;
+	for (const col of columns) {
+		if (col.stacked && col.stacked > maxStackId) maxStackId = col.stacked;
+	}
+	const newStackId = maxStackId + 1;
+	const result = columns.map((col, i) => {
+		if (i === index) return {...col, widthPercent: 0, stacked: newStackId};
+		return {...col, widthPercent: 0};
+	});
+	result.splice(index + 1, 0, {content: "", widthPercent: 0, stacked: newStackId});
+	return result;
+}
+
 export function normalizeColumnWidths(columns: ColumnData[]): ColumnData[] {
 	return columns.map((col) => ({...col, widthPercent: 0}));
 }
