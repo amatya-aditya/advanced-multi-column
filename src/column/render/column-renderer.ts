@@ -670,7 +670,7 @@ function renderNestedRegion(
 
 			const dragHandle = document.createElement("span");
 			dragHandle.className = "column-drag-handle";
-			dragHandle.textContent = "\u22EE\u22EE";
+			dragHandle.textContent = "\u00B7\u00B7\u00B7";
 			dragHandle.setAttribute("aria-label", "Drag to reorder");
 
 			const isStacked = !!(col.stacked && col.stacked > 0);
@@ -707,8 +707,8 @@ function renderNestedRegion(
 			headerActions.appendChild(addBtn);
 			headerActions.appendChild(removeBtn);
 
-			header.appendChild(dragHandle);
 			header.appendChild(headerActions);
+			colEl.appendChild(dragHandle);
 			colEl.appendChild(header);
 
 			wireDragItem(colEl, dragHandle, containerPath, i, ctx.view, ctx.region);
@@ -893,7 +893,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 
 				const dragHandle = document.createElement("span");
 				dragHandle.className = "column-drag-handle";
-				dragHandle.textContent = "\u22EE\u22EE";
+				dragHandle.textContent = "\u00B7\u00B7\u00B7";
 				dragHandle.setAttribute("aria-label", "Drag to reorder");
 
 				const isStacked = !!(col.stacked && col.stacked > 0);
@@ -927,8 +927,8 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				headerActions.appendChild(addBtn);
 				headerActions.appendChild(removeBtn);
 
-				header.appendChild(dragHandle);
 				header.appendChild(headerActions);
+				colEl.appendChild(dragHandle);
 				colEl.appendChild(header);
 
 				const previewEl = document.createElement("div");
