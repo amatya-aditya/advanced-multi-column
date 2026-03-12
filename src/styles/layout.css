@@ -95,6 +95,7 @@
 .columns-container.columns-nested .column-header {
 	opacity: 1 !important;
 	display: flex !important;
+	pointer-events: none;
 }
 
 .columns-container.columns-nested :is(.column-drag-handle, .column-add-btn, .column-remove-btn) {
@@ -117,7 +118,7 @@
 	border: 1px solid transparent;
 	border-radius: 6px;
 	transition: border-color 0.15s ease, background-color 0.15s ease;
-	min-height: 48px;
+	/* min-height: 48px; */
 	box-sizing: border-box;
 	overflow: visible;
 }
@@ -147,6 +148,18 @@
 		--columns-col-horizontal-width,
 		var(--columns-col-border-width, 0px)
 	);
+}
+
+/* Force links/tags inside styled columns to inherit the custom text color */
+.columns-container .column-item.columns-custom-style[style*="--columns-col-text"] :is(
+	a,
+	a.internal-link,
+	a.external-link,
+	a.tag,
+	.cm-link,
+	.cm-hmd-internal-link
+) {
+	color: inherit;
 }
 
 .columns-container .column-item.columns-custom-style:hover,
@@ -188,10 +201,15 @@
 	flex-direction: row;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 4px;
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	right: 2px;
 	opacity: 0;
 	transition: opacity 0.15s ease;
 	height: 20px;
+	z-index: 5;
+	pointer-events: none;
 }
 
 .columns-container .column-header-actions {
@@ -203,6 +221,7 @@
 .columns-container .column-item:hover .column-header,
 .columns-container .column-item.is-editing .column-header {
 	opacity: 1;
+	pointer-events: auto;
 }
 
 .columns-container .column-drag-handle {
@@ -265,7 +284,7 @@
 }
 
 .columns-container .column-preview {
-	min-height: 30px;
+	/* min-height: 30px; */
 	cursor: text;
 	-webkit-user-select: text;
 	user-select: text;
@@ -950,10 +969,10 @@
 
 .columns-suggest-item {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	padding: 5px 10px;
 	cursor: pointer;
-	gap: 1px;
+	gap: 0.5rem !important;
 }
 
 .columns-suggest-item:hover,

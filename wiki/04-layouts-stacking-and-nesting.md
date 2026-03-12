@@ -70,23 +70,23 @@ More parent content
 %% col-end %%
 ```
 
-## E. Unstack subset into nested row (new behavior)
+## E. Split stacked subset into separate group
 
 Scenario:
 
-1. You have `1 | (2,3,4 stacked)`.
-2. You select `3,4`.
+1. You have `1 | (3,4,5,6,7 stacked:1)`.
+2. You select `6,7`.
 3. Toggle `Stacked` off.
 
 Result:
 
-1. `3,4` are moved into a nested row block inside `2`.
-2. `2` becomes regular (not stacked).
-3. Final shape matches `1 | 2(with nested row 3,4)`.
+1. `3,4,5` remain stacked together (group 1).
+2. `6,7` become their own separate stacked group (group 2).
+3. Final shape matches `1 | (3,4,5 stacked:1) | (6,7 stacked:2)`.
 
 Notes:
 
-1. This transform applies when selected columns are a contiguous stacked run.
-2. It requires an immediate stacked sibling on the left (host column).
-3. If conditions do not match, normal unstack is used (stack flags are cleared only).
+1. This transform applies when selected columns are a contiguous run within a larger stack group.
+2. It requires at least one non-selected column remaining in the original group.
+3. If the entire group is selected, normal unstack is used (stack flags are cleared).
 

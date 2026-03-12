@@ -43,6 +43,7 @@ export interface ColumnsPluginSettings {
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
 	enableSlashSuggest: boolean;
+	inheritStyleOnAdd: boolean;
 	styleTargetMode: StyleTargetMode;
 	styleTargetColumnIndex: number;
 	containerBackground: ColumnBackgroundOption;
@@ -63,6 +64,7 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	enableLivePreview: true,
 	enableReadingView: true,
 	enableSlashSuggest: true,
+	inheritStyleOnAdd: true,
 	styleTargetMode: "all",
 	styleTargetColumnIndex: 1,
 	containerBackground: "primary",
@@ -215,6 +217,18 @@ export class ColumnsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.enableSlashSuggest)
 					.onChange(async (value) => {
 						this.plugin.settings.enableSlashSuggest = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(panelEl)
+			.setName("Inherit style on add")
+			.setDesc("New columns inherit the style of the column they are added after.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.inheritStyleOnAdd)
+					.onChange(async (value) => {
+						this.plugin.settings.inheritStyleOnAdd = value;
 						await this.plugin.saveSettings();
 					}),
 			);

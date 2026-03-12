@@ -3,6 +3,7 @@ import {Component, MarkdownRenderer} from "obsidian";
 import {findColumnRegions, serializeColumns} from "../core/parser";
 import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnEditorSuggest, SlashCommandSuggest} from "../editor/editor-suggest";
+import {ThirdPartySuggestBridge} from "../editor/third-party-suggest";
 import {restoreEditState, wireEditCore} from "../editor/column-editor";
 import {openColumnStyleContextMenu} from "./style-context-menu";
 import {applyColumnStyle, applyContainerStyle, COLOR_CSS} from "../core/column-style";
@@ -312,6 +313,7 @@ function wireTopLevelEditToggle(
 	index: number,
 	suggest: ColumnEditorSuggest,
 	slashSuggest: SlashSuggestController,
+	thirdPartySuggest: ThirdPartySuggestBridge,
 	ctx: RenderContext,
 ): void {
 	wireEditCore({
@@ -320,6 +322,7 @@ function wireTopLevelEditToggle(
 		textarea,
 		suggest,
 		slashSuggest,
+		thirdPartySuggest,
 		getContent: () => ctx.region.columns[index]!.content,
 		onCommit: (nextContent) => commitEdit(index, nextContent, ctx),
 		onEnterEdit: () => {
@@ -392,6 +395,7 @@ function wireNestedEditToggle(
 	const plugin = getPluginInstance();
 	const suggest = new ColumnEditorSuggest(textarea, plugin.app);
 	const slashSuggest = createSlashSuggest(textarea);
+	const tpSuggest = new ThirdPartySuggestBridge(textarea, plugin.app);
 	ctx.suggests.push(suggest);
 
 	wireEditCore({
@@ -400,6 +404,7 @@ function wireNestedEditToggle(
 		textarea,
 		suggest,
 		slashSuggest,
+		thirdPartySuggest: tpSuggest,
 		getContent: getCurrentContent,
 		onCommit,
 		clickGuard: (target) => {
@@ -452,6 +457,7 @@ function renderEditableTextSegment(
 	const plugin = getPluginInstance();
 	const suggest = new ColumnEditorSuggest(textarea, plugin.app);
 	const slashSuggest = createSlashSuggest(textarea);
+	const tpSuggest = new ThirdPartySuggestBridge(textarea, plugin.app);
 	ctx.suggests.push(suggest);
 
 	let currentText = initialText;
@@ -462,6 +468,7 @@ function renderEditableTextSegment(
 		textarea,
 		suggest,
 		slashSuggest,
+		thirdPartySuggest: tpSuggest,
 		getContent: () => currentText,
 		onCommit: (nextText) => {
 			currentText = nextText;
@@ -959,8 +966,9 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 
 					const suggest = new ColumnEditorSuggest(textarea, plugin.app);
 					const slashSuggest = createSlashSuggest(textarea);
+					const tpSuggest = new ThirdPartySuggestBridge(textarea, plugin.app);
 					ctx.suggests.push(suggest);
-					wireTopLevelEditToggle(container, previewEl, textarea, i, suggest, slashSuggest, ctx);
+					wireTopLevelEditToggle(container, previewEl, textarea, i, suggest, slashSuggest, tpSuggest, ctx);
 
 					const iState = getInteractionState(ctx.view);
 					if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.columnIndex === i) {

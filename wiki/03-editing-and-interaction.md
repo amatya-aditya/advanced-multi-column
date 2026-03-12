@@ -44,6 +44,14 @@ Built-in slash items include:
 3. Quote, code block, callout
 4. Table, divider, math block, image embed
 
+## Third-party plugin autocomplete
+
+Column editors automatically bridge Obsidian's EditorSuggest API, so suggestions from third-party plugins (e.g. Iconize `:` trigger) work inside columns. The bridge:
+
+1. Detects trigger patterns registered by other plugins.
+2. Fetches and renders their suggestions in a popup.
+3. Delegates selection back to the plugin for insertion.
+
 ## Image paste
 
 1. Copy an image.

@@ -1,7 +1,6 @@
 import type {ColumnBackgroundOption, StyleColorOption} from "../../settings";
 import type {ColumnData, ColumnLayout, ColumnStyleData, SeparatorLineStyle} from "../core/types";
 import {applyColumnStyle, applyContainerStyle} from "../core/column-style";
-import {serializeColumns} from "../core/parser";
 import {getColumnElements} from "./column-renderer";
 
 interface SelectOption<T extends string> {
@@ -706,86 +705,56 @@ function getTargetIndices(menuData: ColumnStyleContextMenuData): Set<number> {
 	return new Set([menuData.columnIndex]);
 }
 
-function appendNestedColumnsToContent(
-	content: string,
-	nestedColumns: ReadonlyArray<ColumnData>,
-): string {
-	const trailingWhitespace = content.match(/\s*$/)?.[0] ?? "";
-	const withoutTrailing = content.slice(0, content.length - trailingWhitespace.length);
-	const separator = withoutTrailing.length > 0 ? "\n\n" : "";
-	const nestedBlock = serializeColumns(nestedColumns);
-	return `${withoutTrailing}${separator}${nestedBlock}${trailingWhitespace}`;
-}
-
 /**
  * Special-case "unstack subset" behavior:
- * If selected stacked columns are a contiguous run that has an immediate
- * stacked sibling on the left, move the selected columns into that left
- * sibling as a nested row block.
+ * If selected stacked columns are a contiguous run within a larger stack
+ * group, split them into their own separate stack group.
  *
  * Example:
- *   1 | (2,3,4 stacked) + unstack(3,4)
+ *   1 | (3,4,5,6,7 stacked:1) + unstack(6,7)
  * becomes
- *   1 | 2(with nested row: 3,4)
+ *   1 | (3,4,5 stacked:1) | (6,7 stacked:2)
  */
-function moveSelectedStackedColumnsToNestedRow(
+function splitStackGroup(
 	columns: ColumnData[],
 	indices: Set<number>,
 ): ColumnData[] | null {
-	if (indices.size < 2) return null;
+	if (indices.size < 1) return null;
 
 	const selected = [...indices].sort((a, b) => a - b);
+	// Must be contiguous
 	for (let i = 1; i < selected.length; i++) {
 		if (selected[i]! !== selected[i - 1]! + 1) return null;
 	}
 
 	const first = selected[0]!;
-	const last = selected[selected.length - 1]!;
-	if (first <= 0 || last >= columns.length) return null;
-
 	const stackId = columns[first]?.stacked;
 	if (!stackId || stackId <= 0) return null;
 
+	// All selected must belong to the same stack group
 	for (const idx of selected) {
 		if (columns[idx]?.stacked !== stackId) return null;
 	}
 
-	const hostIndex = first - 1;
-	const host = columns[hostIndex];
-	if (!host || host.stacked !== stackId || indices.has(hostIndex)) return null;
+	// There must be at least one non-selected column remaining in the group
+	const hasRemaining = columns.some(
+		(col, idx) => !indices.has(idx) && col.stacked === stackId,
+	);
+	if (!hasRemaining) return null;
 
-	// Ensure host + selected range are one contiguous stack run segment.
-	for (let i = hostIndex; i <= last; i++) {
-		if (columns[i]?.stacked !== stackId) return null;
+	// Find next available stack ID
+	let maxStackId = 0;
+	for (const col of columns) {
+		if (col.stacked && col.stacked > maxStackId) maxStackId = col.stacked;
 	}
+	const newStackId = maxStackId + 1;
 
-	const movedSet = new Set(selected);
-	const nestedChildren = selected.map((idx) => {
-		const col = columns[idx]!;
-		return {
-			...col,
-			widthPercent: 0,
-			stacked: undefined,
-		};
-	});
-
-	const nextColumns: ColumnData[] = [];
-	for (let i = 0; i < columns.length; i++) {
-		if (movedSet.has(i)) continue;
-		const col = columns[i]!;
-		if (i === hostIndex) {
-			nextColumns.push({
-				...col,
-				// Host becomes a regular column that contains a nested row.
-				stacked: undefined,
-				content: appendNestedColumnsToContent(col.content, nestedChildren),
-			});
-			continue;
+	return columns.map((col, idx) => {
+		if (indices.has(idx)) {
+			return {...col, stacked: newStackId, widthPercent: 0};
 		}
-		nextColumns.push(col);
-	}
-
-	return nextColumns;
+		return col;
+	});
 }
 
 function applyStylePatch(
@@ -1039,9 +1008,9 @@ function renderPopoverContent(
 				checked: allStacked,
 				onClick: () => {
 					if (allStacked) {
-						const nestedRows = moveSelectedStackedColumnsToNestedRow(state.columns, indices);
-						if (nestedRows) {
-							state.columns = nestedRows;
+						const split = splitStackGroup(state.columns, indices);
+						if (split) {
+							state.columns = split;
 						} else {
 							// Un-stack: clear stacked flag
 							state.columns = state.columns.map((col, idx) =>

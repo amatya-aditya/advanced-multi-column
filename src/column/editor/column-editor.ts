@@ -2,6 +2,7 @@ import {EditorView} from "@codemirror/view";
 import {Notice} from "obsidian";
 import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnEditorSuggest, SlashCommandSuggest, handleAutoPair, handleMarkdownShortcut} from "./editor-suggest";
+import {ThirdPartySuggestBridge} from "./third-party-suggest";
 import {getInteractionState} from "./interaction-state";
 import {
 	isInteractivePreviewTarget,
@@ -71,6 +72,7 @@ export interface EditWireConfig {
 	textarea: HTMLTextAreaElement;
 	suggest: ColumnEditorSuggest;
 	slashSuggest: Pick<SlashCommandSuggest, "active" | "handleKeydown" | "handleInput">;
+	thirdPartySuggest?: ThirdPartySuggestBridge;
 	getContent: () => string;
 	onCommit: (nextContent: string) => void;
 	/** Called when entering edit mode, before focus. For top-level columns. */
@@ -100,6 +102,7 @@ export function wireEditCore(config: EditWireConfig): void {
 		textarea,
 		suggest,
 		slashSuggest,
+		thirdPartySuggest,
 		getContent,
 		onCommit,
 		onEnterEdit,
@@ -172,6 +175,7 @@ export function wireEditCore(config: EditWireConfig): void {
 		e.stopPropagation();
 		if (suggest.handleKeydown(e)) return;
 		if (slashSuggest.handleKeydown(e)) return;
+		if (thirdPartySuggest?.handleKeydown(e)) return;
 		if (handleAutoPair(e, textarea)) return;
 		if (handleMarkdownShortcut(e, textarea)) return;
 
@@ -188,6 +192,7 @@ export function wireEditCore(config: EditWireConfig): void {
 		autoSize(textarea);
 		suggest.handleInput();
 		if (!suggest.active) slashSuggest.handleInput();
+		if (!suggest.active && !slashSuggest.active) thirdPartySuggest?.handleInput();
 	});
 
 	// Force-commit: triggered by another editor opening in the same container
@@ -204,7 +209,7 @@ export function wireEditCore(config: EditWireConfig): void {
 	// Blur: commit once focus leaves this column editor
 	textarea.addEventListener("blur", () => {
 		setTimeout(() => {
-			if (suggest.active || slashSuggest.active) return;
+			if (suggest.active || slashSuggest.active || thirdPartySuggest?.active) return;
 			const currentItem = textarea.parentElement;
 			if (currentItem?.contains(document.activeElement)) return;
 			if (textarea.parentElement?.classList.contains("is-editing")) {

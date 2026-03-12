@@ -2,19 +2,28 @@ import {EditorView} from "@codemirror/view";
 import {findColumnRegions, serializeColumns} from "./parser";
 import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "./types";
 import type {ContainerPath} from "./widget-types";
+import {getPluginInstance} from "./plugin-ref";
+
+/** Copy the neighbor's style if the "Inherit style on add" setting is on. */
+function inheritedStyle(neighbor: ColumnData): ColumnStyleData | undefined {
+	const plugin = getPluginInstance();
+	if (!plugin.settings.inheritStyleOnAdd) return undefined;
+	return neighbor.style ? {...neighbor.style} : undefined;
+}
 
 export function insertColumnAfter(columns: ColumnData[], index: number): ColumnData[] {
 	const neighbor = columns[index];
+	const style = neighbor ? inheritedStyle(neighbor) : undefined;
 	if (neighbor?.stacked && neighbor.stacked > 0) {
 		// Adding inside a stack group: keep all widths intact, new column
 		// inherits the stacked group ID and gets width 0 (group width is max).
 		const result = [...columns];
-		result.splice(index + 1, 0, {content: "", widthPercent: 0, stacked: neighbor.stacked});
+		result.splice(index + 1, 0, {content: "", widthPercent: 0, stacked: neighbor.stacked, style});
 		return result;
 	}
 	// Adding a non-stacked column: reset all widths to equal distribution.
 	const normalized = columns.map((col) => ({...col, widthPercent: 0}));
-	normalized.splice(index + 1, 0, {content: "", widthPercent: 0});
+	normalized.splice(index + 1, 0, {content: "", widthPercent: 0, style});
 	return normalized;
 }
 
@@ -26,10 +35,11 @@ export function insertColumnAfter(columns: ColumnData[], index: number): ColumnD
  */
 export function insertColumnAfterOpposite(columns: ColumnData[], index: number): ColumnData[] {
 	const neighbor = columns[index];
+	const style = neighbor ? inheritedStyle(neighbor) : undefined;
 	if (neighbor?.stacked && neighbor.stacked > 0) {
 		// Neighbor is stacked → insert a non-stacked column (no stack ID).
 		const result = [...columns];
-		result.splice(index + 1, 0, {content: "", widthPercent: 0});
+		result.splice(index + 1, 0, {content: "", widthPercent: 0, style});
 		return result;
 	}
 	// Neighbor is non-stacked → create a new stack group with the neighbor.
@@ -43,7 +53,7 @@ export function insertColumnAfterOpposite(columns: ColumnData[], index: number):
 		if (i === index) return {...col, widthPercent: 0, stacked: newStackId};
 		return {...col, widthPercent: 0};
 	});
-	result.splice(index + 1, 0, {content: "", widthPercent: 0, stacked: newStackId});
+	result.splice(index + 1, 0, {content: "", widthPercent: 0, stacked: newStackId, style});
 	return result;
 }
 

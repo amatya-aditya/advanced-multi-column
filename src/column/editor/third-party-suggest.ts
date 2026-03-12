@@ -1,4 +1,4 @@
-import type {App, Editor, EditorPosition, EditorRange, EditorSelection, EditorSelectionOrCaret, EditorSuggest, EditorSuggestContext, EditorSuggestTriggerInfo, EditorTransaction, TFile} from "obsidian";
+import type {App, Editor, EditorPosition, EditorRange, EditorSelection, EditorSelectionOrCaret, EditorSuggest, EditorSuggestContext, EditorSuggestTriggerInfo, EditorTransaction} from "obsidian";
 
 // ── Textarea → Editor adapter ───────────────────────────────
 
@@ -262,9 +262,9 @@ export class ThirdPartySuggestBridge {
 
 	private getRegisteredSuggests(): EditorSuggest<unknown>[] {
 		// Obsidian stores registered EditorSuggest instances internally
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const mgr = (this.app.workspace as any).editorSuggest;
-		return (mgr?.suggests as EditorSuggest<unknown>[]) ?? [];
+		const ws = this.app.workspace as unknown as Record<string, Record<string, unknown>>;
+		const suggests = ws["editorSuggest"]?.["suggests"];
+		return (Array.isArray(suggests) ? suggests : []) as EditorSuggest<unknown>[];
 	}
 
 	private showItems(items: unknown[]): void {
@@ -304,7 +304,7 @@ export class ThirdPartySuggestBridge {
 			try {
 				this.activeSuggest!.renderSuggestion(item, div);
 			} catch {
-				div.textContent = String(item);
+				div.textContent = "Suggestion";
 			}
 
 			div.addEventListener("mousedown", (e) => {

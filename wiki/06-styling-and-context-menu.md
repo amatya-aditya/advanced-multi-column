@@ -18,7 +18,7 @@ All styling actions are available from the right-click popover.
 1. `Stacked` toggle.
 2. `Border` toggle + color.
 3. `Background`.
-4. `Text color`.
+4. `Text color` — also applies to links (internal, external, tags) within the column.
 
 ## Separator options
 

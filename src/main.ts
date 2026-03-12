@@ -109,7 +109,7 @@ export default class ColumnsPlugin extends Plugin {
 	private insertColumns(editor: Editor, count: number): void {
 		const parts: string[] = ["%% col-start %%"];
 		for (let i = 0; i < count; i++) {
-			parts.push("%% col-break %%");
+			parts.push("%% col-break:b:secondary %%");
 			parts.push(`Column ${i + 1}`);
 		}
 		parts.push("%% col-end %%");
@@ -119,15 +119,15 @@ export default class ColumnsPlugin extends Plugin {
 	private insertNestedTemplate(editor: Editor): void {
 		this.insertTemplate(editor, [
 			"%% col-start %%",
-			"%% col-break:40 %%",
+			"%% col-break:40,b:secondary %%",
 			"Top-level content.",
-			"%% col-break:60 %%",
+			"%% col-break:60,b:secondary %%",
 			"This column contains nested columns.",
 			"",
 			"%% col-start %%",
-			"%% col-break %%",
+			"%% col-break:b:secondary %%",
 			"Child column 1",
-			"%% col-break %%",
+			"%% col-break:b:secondary %%",
 			"Child column 2",
 			"%% col-end %%",
 			"%% col-end %%",
@@ -137,9 +137,9 @@ export default class ColumnsPlugin extends Plugin {
 	private insertSidebarLayout(editor: Editor): void {
 		this.insertTemplate(editor, [
 			"%% col-start %%",
-			"%% col-break:30 %%",
+			"%% col-break:30,b:secondary %%",
 			"Sidebar",
-			"%% col-break:70 %%",
+			"%% col-break:70,b:secondary %%",
 			"Main content",
 			"%% col-end %%",
 		]);
@@ -148,13 +148,13 @@ export default class ColumnsPlugin extends Plugin {
 	private insertStackedLayout(editor: Editor): void {
 		this.insertTemplate(editor, [
 			"%% col-start %%",
-			"%% col-break:40,stk:1 %%",
+			"%% col-break:40,stk:1,b:secondary %%",
 			"Stacked row 1",
-			"%% col-break:stk:1 %%",
+			"%% col-break:stk:1,b:secondary %%",
 			"Stacked row 2",
-			"%% col-break:stk:1 %%",
+			"%% col-break:stk:1,b:secondary %%",
 			"Stacked row 3",
-			"%% col-break:60 %%",
+			"%% col-break:60,b:secondary %%",
 			"Wide column",
 			"%% col-end %%",
 		]);
@@ -163,15 +163,15 @@ export default class ColumnsPlugin extends Plugin {
 	private insertCornellTemplate(editor: Editor): void {
 		this.insertTemplate(editor, [
 			"%% col-start %%",
-			"%% col-break:stk:1 %%",
+			"%% col-break:stk:1,b:secondary %%",
 			"**Topic / Title**",
-			"%% col-break:30,stk:1 %%",
+			"%% col-break:30,stk:1,b:secondary %%",
 			"**Cues / Questions**",
 			"",
 			"- Key term 1",
 			"- Key question",
 			"- Concept",
-			"%% col-break:70 %%",
+			"%% col-break:70,b:secondary %%",
 			"**Notes**",
 			"",
 			"Main lecture or reading notes go here.",
@@ -252,6 +252,7 @@ export default class ColumnsPlugin extends Plugin {
 		if (typeof s.enableLivePreview !== "boolean") s.enableLivePreview = DEFAULT_SETTINGS.enableLivePreview;
 		if (typeof s.enableReadingView !== "boolean") s.enableReadingView = DEFAULT_SETTINGS.enableReadingView;
 		if (typeof s.enableSlashSuggest !== "boolean") s.enableSlashSuggest = DEFAULT_SETTINGS.enableSlashSuggest;
+		if (typeof s.inheritStyleOnAdd !== "boolean") s.inheritStyleOnAdd = DEFAULT_SETTINGS.inheritStyleOnAdd;
 		if (typeof s.showContainerBorder !== "boolean") s.showContainerBorder = DEFAULT_SETTINGS.showContainerBorder;
 	}
 

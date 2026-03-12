@@ -30,6 +30,18 @@ Open `Settings -> Community Plugins -> Advanced multi column`.
 1. Turns header grip visibility on/off.
 2. You can still use `Alt+drag` on column body.
 
+### Inherit style on add
+
+1. When enabled, a newly added column inherits the style (background, border, text color, etc.) of its neighbor column.
+2. When disabled, new columns are inserted with no style.
+3. Default: **On**.
+
+### Show container border
+
+1. Shows a subtle border around the entire column container.
+2. Useful for visually distinguishing column blocks from surrounding content.
+3. Default: **On**.
+
 ## Appearance tab
 
 Sections in UI:

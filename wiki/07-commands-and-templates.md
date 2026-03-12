@@ -31,13 +31,13 @@ Templates:
 
 ```md
 %% col-start %%
-%% col-break:40,stk:1 %%
+%% col-break:40,stk:1,b:secondary %%
 Stacked row 1
-%% col-break:stk:1 %%
+%% col-break:stk:1,b:secondary %%
 Stacked row 2
-%% col-break:stk:1 %%
+%% col-break:stk:1,b:secondary %%
 Stacked row 3
-%% col-break:60 %%
+%% col-break:60,b:secondary %%
 Wide column
 %% col-end %%
 ```
@@ -46,9 +46,9 @@ Wide column
 
 ```md
 %% col-start %%
-%% col-break:30 %%
+%% col-break:30,b:secondary %%
 Sidebar
-%% col-break:70 %%
+%% col-break:70,b:secondary %%
 Main content
 %% col-end %%
 ```
@@ -57,15 +57,15 @@ Main content
 
 ```md
 %% col-start %%
-%% col-break:40 %%
+%% col-break:40,b:secondary %%
 Top-level content.
-%% col-break:60 %%
+%% col-break:60,b:secondary %%
 This column contains nested columns.
 
 %% col-start %%
-%% col-break %%
+%% col-break:b:secondary %%
 Child column 1
-%% col-break %%
+%% col-break:b:secondary %%
 Child column 2
 %% col-end %%
 %% col-end %%
