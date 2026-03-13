@@ -800,7 +800,7 @@
 
 .columns-container.columns-reading .column-item:hover {
 	border: none;
-	background: none;
+	background: var(--background-modifier-active-hover)!important;
 }
 
 .columns-container.columns-reading .column-header {
@@ -871,6 +871,7 @@
 	min-width: 0;
 	align-items: stretch;
 	gap: 4px;
+	padding:0 4px;
 }
 
 .columns-container .columns-stack-group > .column-item {
