@@ -1,5 +1,5 @@
 import {EditorView} from "@codemirror/view";
-import {Component, MarkdownRenderer, Scope} from "obsidian";
+import {Component, MarkdownRenderer, Scope, setIcon} from "obsidian";
 import {findColumnRegions, serializeColumns} from "../core/parser";
 import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnEditorSuggest, SlashCommandSuggest} from "../editor/editor-suggest";
@@ -372,9 +372,9 @@ function wireColumnSelection(
 	view: EditorView,
 ): void {
 	item.addEventListener("click", (e: MouseEvent) => {
-		// Let header action buttons (add/remove) handle their own Ctrl+Click
+		// Let toolbar action buttons (add/drag) handle their own Ctrl+Click
 		const target = e.target as HTMLElement;
-		if (target.closest(".column-header-actions")) return;
+		if (target.closest(".column-toolbar-actions")) return;
 
 		if (!e.ctrlKey && !e.metaKey) {
 			const iState = getInteractionState(view);
@@ -927,19 +927,19 @@ function renderNestedRegion(
 			applyColumnStyle(colEl, col.style);
 			groupParent.appendChild(colEl);
 
-			const header = document.createElement("div");
-			header.className = "column-header";
+			const toolbar = document.createElement("div");
+			toolbar.className = "column-toolbar";
 
 			const dragHandle = document.createElement("span");
 			dragHandle.className = "column-drag-handle";
-			dragHandle.textContent = "\u00B7\u00B7\u00B7";
 			dragHandle.setAttribute("aria-label", "Drag to reorder");
+			setIcon(dragHandle, "grip-vertical");
 
 			const isStacked = !!(col.stacked && col.stacked > 0);
 			const addBtn = document.createElement("button");
 			addBtn.className = "column-add-btn";
-			addBtn.textContent = "+";
 			addBtn.setAttribute("aria-label", isStacked ? "Add stacked item below" : "Add column to the right");
+			setIcon(addBtn, "plus");
 			addBtn.addEventListener("click", (e) => {
 				e.preventDefault();
 				e.stopPropagation();
@@ -949,29 +949,13 @@ function renderNestedRegion(
 				onRegionChange(updated, region.containerStyle);
 			});
 
-			const removeBtn = document.createElement("button");
-			removeBtn.className = "column-remove-btn";
-			removeBtn.textContent = "\u00D7";
-			removeBtn.setAttribute("aria-label", "Remove column");
-			removeBtn.addEventListener("click", (e) => {
-				e.preventDefault();
-				e.stopPropagation();
-				if (region.columns.length <= 1) {
-					onRemoveRegion();
-					return;
-				}
-				const updated = removeColumnPreservingWidths(region.columns, i);
-				onRegionChange(updated, region.containerStyle);
-			});
+			const toolbarActions = document.createElement("div");
+			toolbarActions.className = "column-toolbar-actions";
+			toolbarActions.appendChild(addBtn);
+			toolbarActions.appendChild(dragHandle);
 
-			const headerActions = document.createElement("div");
-			headerActions.className = "column-header-actions";
-			headerActions.appendChild(addBtn);
-			headerActions.appendChild(removeBtn);
-
-			header.appendChild(headerActions);
-			colEl.appendChild(dragHandle);
-			colEl.appendChild(header);
+			toolbar.appendChild(toolbarActions);
+			colEl.appendChild(toolbar);
 
 			wireDragItem(colEl, dragHandle, containerPath, i, ctx.view, ctx.region);
 			wireColumnSelection(colEl, i, container, ctx.view);
@@ -993,6 +977,14 @@ function renderNestedRegion(
 						const updated = region.columns.map((c, idx) =>
 							idx === i ? {...c, content: nextChildContent} : c,
 						);
+						onRegionChange(updated, region.containerStyle);
+					},
+					deleteColumn: () => {
+						if (region.columns.length <= 1) {
+							onRemoveRegion();
+							return;
+						}
+						const updated = removeColumnPreservingWidths(region.columns, i);
 						onRegionChange(updated, region.containerStyle);
 					},
 				},
@@ -1150,19 +1142,19 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 			try {
 				const hasNestedRegions = findColumnRegions(col.content).length > 0;
 
-				const header = document.createElement("div");
-				header.className = "column-header";
+				const toolbar = document.createElement("div");
+				toolbar.className = "column-toolbar";
 
 				const dragHandle = document.createElement("span");
 				dragHandle.className = "column-drag-handle";
-				dragHandle.textContent = "\u00B7\u00B7\u00B7";
 				dragHandle.setAttribute("aria-label", "Drag to reorder");
+				setIcon(dragHandle, "grip-vertical");
 
 				const isStacked = !!(col.stacked && col.stacked > 0);
 				const addBtn = document.createElement("button");
 				addBtn.className = "column-add-btn";
-				addBtn.textContent = "+";
 				addBtn.setAttribute("aria-label", isStacked ? "Add stacked item below" : "Add column to the right");
+				setIcon(addBtn, "plus");
 				addBtn.addEventListener("click", (e) => {
 					e.preventDefault();
 					e.stopPropagation();
@@ -1172,26 +1164,13 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					dispatchUpdate(ctx.region, updated, ctx.view);
 				});
 
-				const removeBtn = document.createElement("button");
-				removeBtn.className = "column-remove-btn";
-				removeBtn.textContent = "\u00D7";
-				removeBtn.setAttribute("aria-label", "Remove column");
-				removeBtn.addEventListener("click", (e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					if (columns.length <= 1) return;
-					const updated = removeColumnPreservingWidths(columns, i);
-					dispatchUpdate(ctx.region, updated, ctx.view);
-				});
+				const toolbarActions = document.createElement("div");
+				toolbarActions.className = "column-toolbar-actions";
+				toolbarActions.appendChild(addBtn);
+				toolbarActions.appendChild(dragHandle);
 
-				const headerActions = document.createElement("div");
-				headerActions.className = "column-header-actions";
-				headerActions.appendChild(addBtn);
-				headerActions.appendChild(removeBtn);
-
-				header.appendChild(headerActions);
-				colEl.appendChild(dragHandle);
-				colEl.appendChild(header);
+				toolbar.appendChild(toolbarActions);
+				colEl.appendChild(toolbar);
 
 				const previewEl = document.createElement("div");
 				previewEl.className = "column-preview markdown-rendered";
@@ -1256,6 +1235,11 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						addChild: () => {
 							const nextContent = addChildColumnToContent(col.content);
 							commitEdit(i, nextContent, ctx);
+						},
+						deleteColumn: () => {
+							if (columns.length <= 1) return;
+							const updated = removeColumnPreservingWidths(columns, i);
+							dispatchUpdate(ctx.region, updated, ctx.view);
 						},
 					},
 					undefined,

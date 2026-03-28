@@ -126,10 +126,28 @@
 	color: var(--text-normal);
 	font-size: var(--font-ui-small);
 	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.columns-style-popover-inline-btn .svg-icon {
+	width: 16px;
+	height: 16px;
 }
 
 .columns-style-popover-inline-btn:hover {
 	background: var(--background-modifier-hover);
+}
+
+.columns-style-popover-inline-btn-danger {
+	color: var(--text-error);
+	border-color: var(--text-error);
+}
+
+.columns-style-popover-inline-btn-danger:hover {
+	background: var(--text-error);
+	color: var(--text-on-accent);
 }
 
 .columns-style-popover-select-row {

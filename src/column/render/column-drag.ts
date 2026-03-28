@@ -45,7 +45,7 @@ export function moveColumnBetweenContainers(
 	const destinationColumns = getColumnsAtPath(rootColumns, destinationPath);
 	if (!sourceColumns || !destinationColumns) return;
 	if (sourceIndex < 0 || sourceIndex >= sourceColumns.length) return;
-	if (destinationIndex < 0 || destinationIndex >= destinationColumns.length) return;
+	if (destinationIndex < 0 || destinationIndex > destinationColumns.length) return;
 
 	const sameContainer = isSameContainerPath(sourcePath, destinationPath);
 
@@ -111,7 +111,7 @@ export function moveColumnBetweenBlocks(
 	const destinationColumns = getColumnsAtPath(destinationRegion.columns, destinationPath);
 	if (!sourceColumns || !destinationColumns) return;
 	if (sourceDrag.sourceIndex < 0 || sourceDrag.sourceIndex >= sourceColumns.length) return;
-	if (destinationIndex < 0 || destinationIndex >= destinationColumns.length) return;
+	if (destinationIndex < 0 || destinationIndex > destinationColumns.length) return;
 
 	const moving = sourceColumns[sourceDrag.sourceIndex];
 	if (!moving) return;

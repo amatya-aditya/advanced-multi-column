@@ -3,6 +3,7 @@ import type {ColumnData} from "./types";
 export interface ColumnContextActions {
 	addColumn?: () => void;
 	addChild?: () => void;
+	deleteColumn?: () => void;
 }
 
 export interface ContainerPathEntry {

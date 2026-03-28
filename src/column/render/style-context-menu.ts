@@ -1,3 +1,4 @@
+import {setIcon} from "obsidian";
 import type {ColumnBackgroundOption, StyleColorOption} from "../../settings";
 import type {ColumnData, ColumnLayout, ColumnStyleData, SeparatorLineStyle} from "../core/types";
 import {applyColumnStyle, applyContainerStyle} from "../core/column-style";
@@ -28,6 +29,7 @@ const CLEAR_STYLE_PATCH: StylePatch = {
 export interface ColumnContextActions {
 	addColumn?: () => void;
 	addChild?: () => void;
+	deleteColumn?: () => void;
 }
 
 export interface ColumnStyleContextMenuData {
@@ -247,6 +249,8 @@ function createInlineCommandButtons(
 	parent: HTMLElement,
 	items: ReadonlyArray<{
 		label: string;
+		icon?: string;
+		className?: string;
 		onClick: () => void;
 	}>,
 ): void {
@@ -258,8 +262,14 @@ function createInlineCommandButtons(
 	for (const item of items) {
 		const button = document.createElement("button");
 		button.type = "button";
-		button.className = "columns-style-popover-inline-btn";
-		button.textContent = item.label;
+		button.className = "columns-style-popover-inline-btn" + (item.className ? ` ${item.className}` : "");
+		button.title = item.label;
+		if (item.icon) {
+			setIcon(button, item.icon);
+			button.setAttribute("aria-label", item.label);
+		} else {
+			button.textContent = item.label;
+		}
 		button.addEventListener("click", (evt) => {
 			evt.preventDefault();
 			evt.stopPropagation();
@@ -979,14 +989,17 @@ function renderPopoverContent(
 		onAction: () => clearAllStylesAndRerender(menuData, state),
 	});
 
-	if (menuData.actions?.addColumn || menuData.actions?.addChild) {
+	if (menuData.actions?.addColumn || menuData.actions?.addChild || menuData.actions?.deleteColumn) {
 		createDivider(popover);
 		createInlineCommandButtons(popover, [
 			...(menuData.actions.addColumn
-				? [{label: "Add column", onClick: menuData.actions.addColumn}]
+				? [{label: "Add column", icon: "plus", onClick: menuData.actions.addColumn}]
 				: []),
 			...(menuData.actions.addChild
-				? [{label: "Add child column", onClick: menuData.actions.addChild}]
+				? [{label: "Add child column", icon: "git-branch-plus", onClick: menuData.actions.addChild}]
+				: []),
+			...(menuData.actions.deleteColumn
+				? [{label: "Delete column", icon: "trash-2", className: "columns-style-popover-inline-btn-danger", onClick: menuData.actions.deleteColumn}]
 				: []),
 		]);
 	}
