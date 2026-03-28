@@ -346,13 +346,9 @@
 	--list-spacing: 0.2rem;
 	--p-spacing: 0.35rem;
 	--heading-spacing: 0.2rem;
-	--line-height-normal: 1.24;
 	--line-height-tight: 1.18;
-	line-height: var(--line-height-normal) !important;
-}
-
-.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered {
-	line-height: var(--line-height-normal) !important;
+	line-height: 1.24 !important;
+	white-space: normal !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) > :first-child {
@@ -373,13 +369,12 @@
 ) {
 	margin-top: 0.35rem !important;
 	margin-bottom: 0.2rem !important;
-	line-height: 1.22 !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(p, blockquote, pre, table, hr) {
 	margin-top: 0.2rem !important;
 	margin-bottom: 0.2rem !important;
-	line-height: 1.24 !important;
+	line-height: 1.4 !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(blockquote) {
@@ -407,37 +402,45 @@
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(ul, ol) {
 	margin-top: 0.08rem !important;
 	margin-bottom: 0.08rem !important;
-	padding-inline-start: 1.25em !important;
+	margin-block-start: 0.08rem !important;
+	margin-block-end: 0.08rem !important;
+	padding-inline-start: 2em !important;
 	display: block !important;
-	
-}
-
-.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) a {
-	line-height: 1.22 !important;
+	white-space: normal !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) li {
-	margin-top: 0 !important;
-	margin-bottom: 0 !important;
+	margin-top: 0.25em !important;
+	margin-bottom: 0.25em !important;
+	margin-block-start: 0.25em !important;
+	margin-block-end: 0.25em !important;
 	padding: 0 !important;
+	white-space: normal !important;
+	line-height: 1.4em !important;
+}
+
+/* Blank line gap between list items (added dynamically via JS) */
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) li.amc-list-gap {
+	margin-top: 1.5em !important;
+	margin-block-start: 1.5em !important;
+}
+
+/* Blank line gap between top-level block elements (added dynamically via JS) */
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) > .amc-block-gap {
+	margin-top: 1em !important;
+	margin-block-start: 1em !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) ul > li.task-list-item {
 	list-style: none;
-	line-height: 1.18 !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(ul, ol) :is(ul, ol) {
-	margin-top: 0.02rem !important;
-	margin-bottom: 0.02rem !important;
-	padding-inline-start: 1.15em !important;
-	line-height: 1.22 !important;
-}
-
-.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) li > :is(p, div) {
 	margin-top: 0 !important;
 	margin-bottom: 0 !important;
-	line-height: 1.22 !important;
+	margin-block-start: 0 !important;
+	margin-block-end: 0 !important;
+	padding-inline-start: 1.15em !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li:last-child > :is(ul, ol) {
@@ -453,7 +456,7 @@
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered p:has(> a:only-child) {
 	margin-block-start: 0 !important;
 	margin-block-end: 0 !important;
-	line-height: 1.2 !important;
+	line-height: 1.2rem !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered :is(ul, ol).contains-task-list {
@@ -478,7 +481,7 @@
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered ul > li.task-list-item {
-	line-height: 1.18 !important;
+	line-height: 1.18rem !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item::marker {
@@ -498,7 +501,7 @@
 	margin-bottom: 0 !important;
 	padding-top: 0 !important;
 	padding-bottom: 0 !important;
-	line-height: 1.18 !important;
+	line-height: 1.18rem !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item > :is(ul, ol) {
@@ -522,9 +525,6 @@
 	.el-h4,
 	.el-h5,
 	.el-h6,
-	.el-ul,
-	.el-ol,
-	.el-li,
 	.el-blockquote,
 	.el-pre,
 	.el-table,
@@ -532,7 +532,18 @@
 ) {
 	margin-top: 0.1rem !important;
 	margin-bottom: 0.1rem !important;
-	line-height: 1.24 !important;
+	line-height: 1.24rem !important;
+}
+
+/* List wrapper blocks: tighter spacing */
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(
+	.el-ul,
+	.el-ol,
+	.el-li
+) {
+	margin-top: 0 !important;
+	margin-bottom: 0 !important;
+	line-height: inherit !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(
@@ -545,7 +556,7 @@
 ) {
 	margin-top: 0.3rem !important;
 	margin-bottom: 0.16rem !important;
-	line-height: 1.22 !important;
+	line-height: 0.8rem !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered :is(
@@ -558,14 +569,11 @@
 ) {
 	margin-block-start: 0.3rem !important;
 	margin-block-end: 0.16rem !important;
-	line-height: 1.22 !important;
+	line-height: 0.8rem !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered :is(
 	p,
-	ul,
-	ol,
-	li,
 	blockquote,
 	pre,
 	table,
@@ -573,7 +581,7 @@
 ) {
 	margin-block-start: 0.08rem !important;
 	margin-block-end: 0.08rem !important;
-	line-height: 1.24 !important;
+	line-height: 1.24rem !important;
 }
 
 
@@ -710,7 +718,7 @@
 	text-orientation: mixed;
 	color: var(--sep-color, var(--text-faint));
 	font-size: calc(var(--sep-width, 1px) * 6 + 6px);
-	line-height: 1;
+	line-height: 1rem;
 	letter-spacing: 0.15em;
 	opacity: 0.7;
 	overflow: hidden;
@@ -942,7 +950,7 @@
 	text-orientation: mixed;
 	color: var(--sep-color, var(--text-faint));
 	font-size: var(--sep-size, 12px);
-	line-height: 1;
+	line-height: 1rem;
 	margin: 4px 2px;
 	overflow: hidden;
 	-webkit-user-select: none;

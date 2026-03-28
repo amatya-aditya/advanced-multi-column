@@ -1,5 +1,5 @@
 import {EditorView} from "@codemirror/view";
-import {Component, MarkdownRenderer} from "obsidian";
+import {Component, MarkdownRenderer, Scope} from "obsidian";
 import {findColumnRegions, serializeColumns} from "../core/parser";
 import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnEditorSuggest, SlashCommandSuggest} from "../editor/editor-suggest";
@@ -160,18 +160,170 @@ export function renderMarkdown(
 	content: string,
 	sourcePath: string,
 	ctx: RenderContext,
+	onContentChange?: (nextContent: string) => void,
 ): void {
 	try {
 		const plugin = getPluginInstance();
 		const component = new Component();
 		component.load();
 		ctx.components.push(component);
-		void MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component);
+		void MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component).then(() => {
+			// Unwrap <p> inside <li> (loose lists) so parent items render
+			// identically to child items without block-level spacing artifacts.
+			unwrapLooseListParagraphs(parent);
+			// Mark list items that follow a blank line in the source with a gap class
+			markListGaps(parent, content);
+			if (onContentChange) {
+				wireTaskCheckboxes(parent, content, onContentChange);
+			}
+		});
 	} catch {
 		const errEl = document.createElement("div");
 		errEl.className = "column-render-error";
 		errEl.textContent = "Failed to render content";
 		parent.appendChild(errEl);
+	}
+}
+
+/**
+ * Unwrap <p> elements inside <li> (produced by loose lists with blank lines).
+ * Moves the <p>'s children directly into the <li> and removes surrounding
+ * whitespace-only text nodes so the DOM matches tight-list structure.
+ */
+function unwrapLooseListParagraphs(parent: HTMLElement): void {
+	const ps = parent.querySelectorAll<HTMLElement>("li > p");
+	ps.forEach((p) => {
+		const li = p.parentElement!;
+		while (p.firstChild) li.insertBefore(p.firstChild, p);
+		p.remove();
+		while (li.firstChild?.nodeType === 3 && !li.firstChild.textContent?.trim()) {
+			li.firstChild.remove();
+		}
+		while (li.lastChild?.nodeType === 3 && !li.lastChild.textContent?.trim()) {
+			li.lastChild.remove();
+		}
+	});
+}
+
+/**
+ * Wire click handlers on task checkboxes in rendered markdown.
+ * Clicking a checkbox toggles the character inside `[x]`/`[ ]`/`[/]` etc.
+ */
+function wireTaskCheckboxes(
+	parent: HTMLElement,
+	content: string,
+	onContentChange: (nextContent: string) => void,
+): void {
+	const checkboxes = parent.querySelectorAll<HTMLInputElement>(
+		"li.task-list-item > input[type='checkbox'], li.task-list-item > .task-list-item-checkbox",
+	);
+	if (checkboxes.length === 0) return;
+
+	// Find all task lines in the content: lines matching `- [.] ` or `* [.] ` etc.
+	const lines = content.split("\n");
+	const taskLineIndices: number[] = [];
+	for (let i = 0; i < lines.length; i++) {
+		if (/^\s*[-*+] \[.\] /.test(lines[i]!)) {
+			taskLineIndices.push(i);
+		}
+	}
+
+	checkboxes.forEach((checkbox, idx) => {
+		if (idx >= taskLineIndices.length) return;
+		const lineIdx = taskLineIndices[idx]!;
+
+		checkbox.addEventListener("click", (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const line = lines[lineIdx]!;
+			const match = line.match(/^(\s*[-*+] \[)(.)(\] )/);
+			if (!match) return;
+
+			const currentStatus = match[2]!;
+			// Toggle: unchecked → checked, anything else → unchecked
+			const newStatus = currentStatus === " " ? "x" : " ";
+			lines[lineIdx] = line.replace(/^(\s*[-*+] \[).\]/, `$1${newStatus}]`);
+			onContentChange(lines.join("\n"));
+		});
+	});
+}
+
+/**
+ * Detect blank lines between list items in the source and add a gap class
+ * to the corresponding rendered <li> elements.
+ */
+function markListGaps(parent: HTMLElement, content: string): void {
+	const lines = content.split("\n");
+	const listPattern = /^(\s*)([-*+]( \[.\])?|\d+\.)\s/;
+
+	// Find list item line indices and whether each is preceded by a blank line
+	const listItems: {lineIdx: number; hasGapBefore: boolean}[] = [];
+	for (let i = 0; i < lines.length; i++) {
+		if (listPattern.test(lines[i]!)) {
+			const hasGapBefore = i > 0 && lines[i - 1]!.trim() === "" && listItems.length > 0;
+			listItems.push({lineIdx: i, hasGapBefore});
+		}
+	}
+
+	// Match rendered <li> elements at the same depth level
+	const renderedLists = parent.querySelectorAll<HTMLElement>(":scope > ul, :scope > ol");
+	let itemIdx = 0;
+	renderedLists.forEach((list) => {
+		const items = list.querySelectorAll<HTMLElement>(":scope li");
+		items.forEach((li) => {
+			if (itemIdx < listItems.length && listItems[itemIdx]!.hasGapBefore) {
+				li.classList.add("amc-list-gap");
+			}
+			itemIdx++;
+		});
+	});
+
+	// Mark blank-line gaps between top-level block elements (p, headings, lists, etc.)
+	markBlockGaps(parent, content);
+}
+
+/**
+ * Detect blank lines between top-level blocks in markdown source and add
+ * an `amc-block-gap` class to the rendered element that follows the gap.
+ *
+ * Strategy: split content into top-level "chunks" separated by blank lines.
+ * Each chunk produces one or more rendered top-level children. We count
+ * rendered children per chunk and mark the first child of each chunk
+ * (after the first) with the gap class.
+ */
+function markBlockGaps(parent: HTMLElement, content: string): void {
+	// Split into groups of non-blank lines separated by blank lines
+	const groups: string[][] = [];
+	let current: string[] = [];
+	for (const line of content.split("\n")) {
+		if (line.trim() === "") {
+			if (current.length > 0) {
+				groups.push(current);
+				current = [];
+			}
+		} else {
+			current.push(line);
+		}
+	}
+	if (current.length > 0) groups.push(current);
+
+	// If only one group or none, no gaps to mark
+	if (groups.length <= 1) return;
+
+	// Count how many top-level rendered children each group produces.
+	// Each group of contiguous non-blank lines maps to one rendered block element
+	// (a <p>, <ul>, <h1>, <blockquote>, etc.) — except list items which stay in
+	// one <ul>/<ol> until interrupted by a blank line.
+	const children = Array.from(parent.querySelectorAll<HTMLElement>(":scope > *"));
+	// With blank-line separation, markdown typically produces one top-level element
+	// per group. Mark child elements starting from the second group.
+	let childIdx = 0;
+	for (let g = 0; g < groups.length; g++) {
+		if (childIdx >= children.length) break;
+		if (g > 0) {
+			children[childIdx]!.classList.add("amc-block-gap");
+		}
+		childIdx++;
 	}
 }
 
@@ -316,6 +468,41 @@ function wireTopLevelEditToggle(
 	thirdPartySuggest: ThirdPartySuggestBridge,
 	ctx: RenderContext,
 ): void {
+	// Scope to intercept Obsidian hotkeys (e.g. Ctrl+L) while editing
+	const plugin = getPluginInstance();
+	const editScope = new Scope(plugin.app.scope);
+	editScope.register(["Mod"], "l", (evt) => {
+		if (!textarea.parentElement?.classList.contains("is-editing")) return;
+		evt.preventDefault();
+		const cursor = textarea.selectionStart;
+		const val = textarea.value;
+		const lineStart = val.lastIndexOf("\n", cursor - 1) + 1;
+		const lineEnd = val.indexOf("\n", cursor);
+		const line = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+		const lineLen = line.length;
+
+		let newLine: string;
+		if (/^\s*- \[ \] /.test(line)) {
+			// Unchecked → checked
+			newLine = line.replace(/^(\s*)- \[ \] /, "$1- [x] ");
+		} else if (/^\s*- \[.\] /.test(line)) {
+			// Checked → unchecked
+			newLine = line.replace(/^(\s*)- \[.\] /, "$1- [ ] ");
+		} else if (/^\s*[-*+] /.test(line)) {
+			newLine = line.replace(/^(\s*)([-*+]) /, "$1- [ ] ");
+		} else if (/^\s*\d+\. /.test(line)) {
+			newLine = line.replace(/^(\s*)\d+\. /, "$1- [ ] ");
+		} else {
+			newLine = line.replace(/^(\s*)/, "$1- [ ] ");
+		}
+
+		const cursorShift = newLine.length - lineLen;
+		textarea.value = val.substring(0, lineStart) + newLine + val.substring(lineStart + lineLen);
+		textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, cursor + cursorShift);
+		textarea.dispatchEvent(new Event("input", {bubbles: true}));
+		return false;
+	});
+
 	wireEditCore({
 		container,
 		previewEl,
@@ -326,6 +513,7 @@ function wireTopLevelEditToggle(
 		getContent: () => ctx.region.columns[index]!.content,
 		onCommit: (nextContent) => commitEdit(index, nextContent, ctx),
 		onEnterEdit: () => {
+			plugin.app.keymap.pushScope(editScope);
 			getInteractionState(ctx.view).activeEdit = {
 				regionFrom: ctx.region.from,
 				columnIndex: index,
@@ -336,15 +524,89 @@ function wireTopLevelEditToggle(
 			};
 		},
 		onCommitClose: () => {
+			plugin.app.keymap.popScope(editScope);
 			getInteractionState(ctx.view).activeEdit = null;
 		},
 		clickGuard: (target) => !!target.closest(".columns-nested"),
 		blurDelay: 200,
 		onKeydown: (e) => {
+			const listPattern = /^(\s*)([-*+]( \[.\])?|\d+\.)\s/;
+
+			// ── Enter: auto-continue lists ──
+			if (e.key === "Enter" && !e.shiftKey) {
+				const cursor = textarea.selectionStart;
+				const val = textarea.value;
+				const lineStart = val.lastIndexOf("\n", cursor - 1) + 1;
+				const line = val.substring(lineStart, cursor);
+				const match = line.match(listPattern);
+				if (match) {
+					const indent = match[1]!;
+					const marker = match[2]!;
+					const afterMarker = line.substring(match[0].length);
+					// If the line is just a bare marker with nothing after, remove it (exit list)
+					if (afterMarker.trim() === "") {
+						e.preventDefault();
+						textarea.value = val.substring(0, lineStart) + val.substring(cursor);
+						textarea.selectionStart = textarea.selectionEnd = lineStart;
+						textarea.dispatchEvent(new Event("input", {bubbles: true}));
+						return true;
+					}
+					// Auto-continue: insert newline + same indent + marker
+					e.preventDefault();
+					// For numbered lists, increment the number
+					let nextMarker = marker;
+					const numMatch = marker.match(/^(\d+)\./);
+					if (numMatch) {
+						nextMarker = (parseInt(numMatch[1]!) + 1) + ".";
+					}
+					// For task lists, reset checkbox to unchecked
+					if (/\[.\]/.test(marker)) {
+						nextMarker = marker.replace(/\[.\]/, "[ ]");
+					}
+					const insertion = "\n" + indent + nextMarker + " ";
+					const before = val.substring(0, cursor);
+					const after = val.substring(cursor);
+					textarea.value = before + insertion + after;
+					textarea.selectionStart = textarea.selectionEnd = cursor + insertion.length;
+					textarea.dispatchEvent(new Event("input", {bubbles: true}));
+					return true;
+				}
+			}
+
+			// ── Tab: indent list items or navigate columns ──
 			if (e.key === "Tab") {
+				const cursor = textarea.selectionStart;
+				const val = textarea.value;
+				const lineStart = val.lastIndexOf("\n", cursor - 1) + 1;
+				const lineEnd = val.indexOf("\n", cursor);
+				const line = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+
+				if (listPattern.test(line)) {
+					e.preventDefault();
+					if (e.shiftKey) {
+						// Unindent: remove one tab or up to 4 leading spaces
+						const stripped = line.replace(/^\t/, "").length < line.length
+							? val.substring(0, lineStart) + line.replace(/^\t/, "") + val.substring(lineStart + line.length)
+							: val.substring(0, lineStart) + line.replace(/^ {1,4}/, "") + val.substring(lineStart + line.length);
+						const removed = val.length - stripped.length;
+						textarea.value = stripped;
+						textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, cursor - removed);
+					} else {
+						// Indent: insert a tab at start of line; reset numbered list to 1
+						const indented = line.replace(/^(\s*)\d+\./, "$11.");
+						textarea.value = val.substring(0, lineStart) + "\t" + indented + val.substring(lineStart + line.length);
+						const shift = 1 + indented.length - line.length;
+						textarea.selectionStart = textarea.selectionEnd = cursor + shift;
+					}
+					textarea.dispatchEvent(new Event("input", {bubbles: true}));
+					return true;
+				}
+
+				// Not a list line — navigate columns
 				e.preventDefault();
 				textarea.parentElement!.classList.remove("is-editing");
 				const newContent = textarea.value;
+				plugin.app.keymap.popScope(editScope);
 				getInteractionState(ctx.view).activeEdit = null;
 				if (newContent !== ctx.region.columns[index]!.content) {
 					commitEdit(index, newContent, ctx);
@@ -443,7 +705,7 @@ function renderEditableTextSegment(
 			preview.appendChild(ph);
 			return;
 		}
-		renderMarkdown(preview, text, sourcePath, ctx);
+		renderMarkdown(preview, text, sourcePath, ctx, onCommit);
 	};
 	renderPreview(initialText);
 
@@ -491,13 +753,13 @@ function renderColumnContent(
 	ctx: RenderContext,
 ): void {
 	if (depth > 8) {
-		renderMarkdown(parent, content, sourcePath, ctx);
+		renderMarkdown(parent, content, sourcePath, ctx, onContentChange);
 		return;
 	}
 
 	const regions = findColumnRegions(content);
 	if (regions.length === 0) {
-		renderMarkdown(parent, content, sourcePath, ctx);
+		renderMarkdown(parent, content, sourcePath, ctx, onContentChange);
 		return;
 	}
 

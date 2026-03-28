@@ -16,10 +16,12 @@ This page covers daily editing behavior in Live Preview.
 | Shortcut | Action |
 |---|---|
 | `Esc` | Commit and close editor |
-| `Tab` | Commit and move to next column |
-| `Shift+Tab` | Commit and move to previous column |
+| `Enter` | Auto-continue list (bullet, numbered, task). Empty marker line exits list |
+| `Tab` | Indent list item (when cursor is on a list line), otherwise commit and move to next column |
+| `Shift+Tab` | Unindent list item (when cursor is on a list line), otherwise commit and move to previous column |
 | `Ctrl/Cmd + B` | Toggle bold markdown |
 | `Ctrl/Cmd + I` | Toggle italic markdown |
+| `Ctrl/Cmd + L` | Toggle checkbox on current line |
 
 ## Wikilink autocomplete (`[[`)
 

@@ -163,7 +163,7 @@ Nested content.
 ## Editing
 
 - **Click** preview content to enter edit mode
-- **Tab** / **Shift+Tab** — cycle through columns
+- **Tab** / **Shift+Tab** — indent/unindent list items, or cycle through columns
 - **Esc** — commit and exit edit mode
 - **`[[`** — wikilink suggestions
 - **Ctrl/Cmd+B** — bold, **Ctrl/Cmd+I** — italic

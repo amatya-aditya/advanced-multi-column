@@ -635,6 +635,7 @@ export function handleAutoPair(e: KeyboardEvent, textarea: HTMLTextAreaElement):
 
 /**
  * Handle Ctrl+B (bold), Ctrl+I (italic) markdown shortcuts.
+ * Ctrl+L (toggle checkbox) is handled via Obsidian Scope in column-renderer.
  * Returns true if the event was consumed.
  */
 export function handleMarkdownShortcut(e: KeyboardEvent, textarea: HTMLTextAreaElement): boolean {
