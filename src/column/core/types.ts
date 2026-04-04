@@ -7,6 +7,8 @@ export interface ColumnStyleData {
 	borderColor?: StyleColorOption;
 	textColor?: StyleColorOption;
 	showBorder?: boolean;
+	/** Show only left border (callout-style) instead of full border */
+	leftBorder?: boolean;
 	horizontalDividers?: boolean;
 	separator?: boolean;
 	separatorColor?: StyleColorOption;

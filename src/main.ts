@@ -6,7 +6,7 @@ import {columnDecorations} from "./column/cm/state-field";
 import {buildRuntimeStyles} from "./column/runtime-styles";
 
 export default class ColumnsPlugin extends Plugin {
-	settings: ColumnsPluginSettings;
+	settings!: ColumnsPluginSettings;
 	private runtimeStyleSheet: CSSStyleSheet | null = null;
 	private cleanupReadingView: (() => void) | null = null;
 

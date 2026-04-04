@@ -1,4 +1,4 @@
-const BACKGROUND_CSS = {
+export const BACKGROUND_CSS = {
 	transparent: "transparent",
 	primary: "var(--background-primary)",
 	secondary: "var(--background-secondary)",
@@ -12,6 +12,22 @@ const BACKGROUND_CSS = {
 	"blue-soft": "rgba(59, 130, 246, 0.14)",
 	"pink-soft": "rgba(236, 72, 153, 0.14)",
 } as const;
+
+/** Solid/opaque colors that correspond to each soft background – used for
+ *  the left-border accent stripe so it reads like an Obsidian callout. */
+export const HEADER_BORDER_CSS: Record<string, string> = {
+	"accent-soft": "var(--interactive-accent)",
+	"red-soft": "#ef4444",
+	"orange-soft": "#f59e0b",
+	"yellow-soft": "#eab308",
+	"green-soft": "#22c55e",
+	"cyan-soft": "#06b6d4",
+	"blue-soft": "#3b82f6",
+	"pink-soft": "#ec4899",
+	secondary: "var(--background-modifier-border)",
+	alt: "var(--background-modifier-border)",
+	primary: "var(--background-modifier-border)",
+};
 
 export const COLOR_CSS = {
 	gray: "var(--background-modifier-border)",
@@ -39,6 +55,7 @@ type ColumnStyleData = {
 	borderColor?: StyleColorOption;
 	textColor?: StyleColorOption;
 	showBorder?: boolean;
+	leftBorder?: boolean;
 	horizontalDividers?: boolean;
 	separator?: boolean;
 	separatorColor?: StyleColorOption;
@@ -121,6 +138,10 @@ function toStyleData(style: unknown): ColumnStyleData | null {
 	const separatorCustomChar = record.separatorCustomChar;
 	if (typeof separatorCustomChar === "string" && separatorCustomChar.length > 0 && separatorCustomChar.length <= 3) {
 		parsed.separatorCustomChar = separatorCustomChar;
+	}
+
+	if (typeof record.leftBorder === "boolean") {
+		parsed.leftBorder = record.leftBorder;
 	}
 
 	return Object.keys(parsed).length > 0 ? parsed : null;
@@ -216,6 +237,8 @@ function applyStyleVars(
 
 export function applyColumnStyle(element: HTMLElement, style: unknown): void {
 	applyStyleVars(element, style, COLUMN_STYLE_VAR_KEYS, buildColumnCssProps);
+	const parsed = toStyleData(style);
+	element.classList.toggle("columns-left-border", !!parsed?.leftBorder);
 }
 
 export function applyContainerStyle(element: HTMLElement, style: unknown): void {

@@ -131,3 +131,122 @@
 	letter-spacing: 0.04em;
 	margin-bottom: 8px;
 }
+
+/* ── Header types list ── */
+
+.columns-header-types-list {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.columns-header-type-row {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	overflow: hidden;
+	display: grid;
+	align-items: stretch;
+}
+
+.columns-header-type-preview {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	line-height: 1.4;
+	height: 100%;
+}
+
+.columns-header-type-preview-icon {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.columns-header-type-preview-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.columns-header-type-preview-id {
+	font-weight: inherit;
+}
+
+.columns-header-type-preview-badge {
+	margin-left: auto;
+	font-size: 0.72em;
+	font-weight: 500;
+	opacity: 0.6;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.columns-header-type-delete-btn {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	opacity: 0.5;
+	margin-left: 6px;
+	color: var(--text-error);
+}
+
+.columns-header-type-delete-btn:hover {
+	opacity: 1;
+}
+
+.columns-header-type-delete-btn .svg-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.columns-header-type-controls {
+	padding: 8px 12px;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 0 16px;
+}
+
+.columns-header-type-controls .setting-item.columns-header-type-setting {
+	border: none;
+	background: none;
+	border-radius: 0;
+	padding: 6px 0;
+	margin-bottom: 0;
+	min-width: 0;
+}
+
+.columns-header-type-controls .setting-item.columns-header-type-setting .setting-item-info,
+.columns-header-type-controls .setting-item.columns-header-type-setting .setting-item-control {
+	min-width: 0;
+}
+
+.columns-header-type-controls .columns-settings-number-input {
+	width: 96px;
+	text-align: left;
+}
+
+@media (max-width: 900px) {
+	.columns-header-type-row {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ── Icon suggest dropdown ── */
+
+.columns-icon-suggest-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 2px 0;
+}
+
+.columns-icon-suggest-icon {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.columns-icon-suggest-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}

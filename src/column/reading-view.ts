@@ -7,7 +7,7 @@ import {
 	TFile,
 } from "obsidian";
 import {findColumnRegions} from "./core/parser";
-import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS} from "./core/column-style";
+import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "./core/column-style";
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
 import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
@@ -377,6 +377,13 @@ async function renderColumnsRegion(
 						}
 
 						colEl.appendChild(headerEl);
+
+						// Set left-border accent color from header background
+						const borderColor = HEADER_BORDER_CSS[config.background];
+						if (borderColor) {
+							colEl.style.setProperty("--columns-left-border-color", borderColor);
+						}
+
 						colContent = headerParsed.restContent;
 					}
 				}

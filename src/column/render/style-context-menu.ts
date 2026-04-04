@@ -18,6 +18,7 @@ const CLEAR_STYLE_PATCH: StylePatch = {
 	borderColor: undefined,
 	textColor: undefined,
 	showBorder: undefined,
+	leftBorder: undefined,
 	horizontalDividers: undefined,
 	separator: undefined,
 	separatorColor: undefined,
@@ -59,6 +60,7 @@ const DEFAULT_STYLE: Required<ColumnStyleData> = {
 	borderColor: "gray",
 	textColor: "text",
 	showBorder: true,
+	leftBorder: false,
 	horizontalDividers: false,
 	separator: false,
 	separatorColor: "gray",
@@ -607,6 +609,7 @@ function normalizeStyle(style: ColumnStyleData | undefined): ColumnStyleData | u
 		next.textColor = style.textColor;
 	}
 	if (style.showBorder !== undefined) next.showBorder = style.showBorder;
+	if (style.leftBorder !== undefined) next.leftBorder = style.leftBorder;
 	if (style.horizontalDividers !== undefined) {
 		next.horizontalDividers = style.horizontalDividers;
 	}
@@ -690,6 +693,11 @@ function patchStyleData(currentStyle: ColumnStyleData | undefined, patch: StyleP
 			case "separatorCustomChar":
 				if (style.separatorCustomChar === nextValue) break;
 				style.separatorCustomChar = nextValue as string;
+				changed = true;
+				break;
+			case "leftBorder":
+				if (style.leftBorder === nextValue) break;
+				style.leftBorder = nextValue as boolean;
 				changed = true;
 				break;
 		}
@@ -836,6 +844,7 @@ function patchStylesAndRerender(
 		renderPopoverContent(activePopover, menuData, state);
 	}
 }
+
 
 function patchContainerStyleAndRerender(
 	menuData: ColumnStyleContextMenuData,
@@ -1068,6 +1077,14 @@ function renderPopoverContent(
 					patchStylesAndRerender(menuData, state, {
 						borderColor: value === DEFAULT_STYLE.borderColor ? undefined : value,
 					});
+				},
+			});
+			createActionRow(body, {
+				label: "Left border",
+				checked: readStyleValue(selectedColumn, "leftBorder", false),
+				onClick: () => {
+					const current = readStyleValue(selectedColumn, "leftBorder", false);
+					patchStylesAndRerender(menuData, state, {leftBorder: !current});
 				},
 			});
 			createSelectRow<ColumnBackgroundOption>(body, {

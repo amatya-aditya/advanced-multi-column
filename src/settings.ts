@@ -539,7 +539,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 				const iconSpan = preview.createSpan({cls: "columns-header-type-preview-icon"});
 				setIcon(iconSpan, ht.icon);
 				preview.createSpan({
-					text: `!${ht.id}`,
+					text: `${ht.id}`,
 					cls: "columns-header-type-preview-id",
 				});
 				preview.createSpan({
@@ -566,7 +566,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 			const controls = row.createDiv({cls: "columns-header-type-controls"});
 
 			const nameRow = new Setting(controls)
-				.setName("Header name")
+				.setName("Name")
 				.addText((text) => {
 					// eslint-disable-next-line obsidianmd/ui/sentence-case
 					text.setPlaceholder("header-name").setValue(ht.id);

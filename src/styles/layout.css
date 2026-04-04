@@ -69,7 +69,7 @@
 	width: 100%;
 	margin: 12px 0;
 	/* min-height: 60px; */
-	border: 1px solid var(--background-modifier-border);
+	/* border: 1px solid var(--background-modifier-border); */
 	border-radius: 8px;
 	padding: 4px;
 	background: var(--background-primary);
@@ -196,6 +196,51 @@
 	) !important;
 }
 
+/* ── Column header (icon + title) ── */
+.columns-container .column-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	margin: -10px -14px 6px !important;
+	border-radius: 4px 4px 0 0;
+	-webkit-user-select: none;
+	user-select: none;
+	line-height: 1.4;
+}
+
+/* When column has left-border mode, adjust header margin to account for the border */
+.columns-container .column-item.columns-left-border > .column-header {
+	/* margin-left: -4px; */
+	border-radius: 0 4px 0 0;
+}
+
+.columns-container .column-header-icon {
+	display: inline-flex;
+	align-items: center;
+	flex-shrink: 0;
+}
+
+.columns-container .column-header-icon .svg-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.columns-container .column-header-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ── Left border mode (callout-style) ── */
+.columns-container .column-item.columns-left-border {
+	border-top: none !important;
+	border-right: none !important;
+	border-bottom: none !important;
+	border-left: 3px solid var(--columns-left-border-color, var(--columns-col-border-color, var(--interactive-accent))) !important;
+	border-radius: 0 6px 6px 0;
+}
+
 .columns-container .column-toolbar {
 	display: flex;
 	flex-direction: column;
@@ -265,6 +310,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	box-shadow: none;
 }
 
 .columns-container .column-add-btn .svg-icon {
@@ -311,8 +357,12 @@
 .columns-container .column-item .column-preview.markdown-rendered ul,
 .columns-container .column-item .column-preview.markdown-rendered ol {
 	margin: 0 !important;
-	padding: 0 !important;
-	padding-inline-start: 1.5em !important;
+	padding: 0 0 0 1.5em !important;
+	list-style-position: outside;
+}
+
+.columns-container .column-item .column-preview.markdown-rendered ul {
+	list-style-type: disc !important;
 }
 
 .columns-container .column-item .column-preview.markdown-rendered li {
@@ -783,6 +833,14 @@
 	border: none;
 	overflow-x: auto;
 	min-width: 0;
+	margin: 0 4px 0 4px !important;
+}
+
+/* Reset header negative margin in reading view — the container has no
+   padding so negative margins would bleed into adjacent columns. */
+.columns-container.columns-reading .column-header {
+	margin: 0 0 6px;
+	border-radius: 4px 4px 0 0;
 }
 
 .columns-container.columns-reading .column-item:hover {

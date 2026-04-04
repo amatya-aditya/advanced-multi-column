@@ -6,7 +6,7 @@ import {ColumnEditorSuggest, SlashCommandSuggest} from "../editor/editor-suggest
 import {ThirdPartySuggestBridge} from "../editor/third-party-suggest";
 import {restoreEditState, wireEditCore} from "../editor/column-editor";
 import {openColumnStyleContextMenu} from "./style-context-menu";
-import {applyColumnStyle, applyContainerStyle, COLOR_CSS} from "../core/column-style";
+import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "../core/column-style";
 import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "../core/types";
 import type {StyleColorOption} from "../../settings";
 import type {ColumnContextActions, ContainerPath} from "../core/widget-types";
@@ -20,6 +20,64 @@ import {
 	addChildColumnToContent,
 	dispatchUpdate,
 } from "../core/column-serializer";
+
+// ── Column Header Parsing ───────────────────────────────────
+
+const HEADER_RE = /^!(\w[\w-]*)\s*:\s*(.*)$/;
+
+export function parseColumnHeader(content: string): {type: string; title: string; restContent: string} | null {
+	const lines = content.split("\n");
+	for (let i = 0; i < lines.length; i++) {
+		const trimmed = lines[i]!.trim();
+		if (trimmed.length === 0) continue;
+		const match = trimmed.match(HEADER_RE);
+		if (!match) return null;
+		const rest = [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n").trim();
+		return {type: match[1]!, title: match[2]!.trim(), restContent: rest};
+	}
+	return null;
+}
+
+function renderColumnHeader(colEl: HTMLElement, content: string): string {
+	const plugin = getPluginInstance();
+	if (!plugin.settings.enableHeaders) return content;
+
+	const parsed = parseColumnHeader(content);
+	if (!parsed) return content;
+
+	const config = plugin.settings.headerTypes.find((h) => h.id === parsed.type);
+	if (!config) return content;
+
+	const headerEl = document.createElement("div");
+	headerEl.className = "column-header";
+	headerEl.style.background = BACKGROUND_CSS[config.background] ?? "transparent";
+	headerEl.style.color = COLOR_CSS[config.textColor] ?? "var(--text-muted)";
+	headerEl.style.fontSize = `${config.fontSize ?? 0.85}em`;
+	headerEl.style.fontWeight = String(config.fontWeight ?? 600);
+
+	const iconEl = document.createElement("span");
+	iconEl.className = "column-header-icon";
+	setIcon(iconEl, config.icon);
+	headerEl.appendChild(iconEl);
+
+	if (parsed.title) {
+		const titleEl = document.createElement("span");
+		titleEl.className = "column-header-title";
+		titleEl.textContent = parsed.title;
+		headerEl.appendChild(titleEl);
+	}
+
+	colEl.appendChild(headerEl);
+
+	// Set the left-border accent color from the header background so it
+	// reads like an Obsidian callout when left-border mode is enabled.
+	const borderColor = HEADER_BORDER_CSS[config.background];
+	if (borderColor) {
+		colEl.style.setProperty("--columns-left-border-color", borderColor);
+	}
+
+	return parsed.restContent;
+}
 
 // ── Render Context ──────────────────────────────────────────
 
@@ -927,6 +985,8 @@ function renderNestedRegion(
 			applyColumnStyle(colEl, col.style);
 			groupParent.appendChild(colEl);
 
+			const colContent = renderColumnHeader(colEl, col.content);
+
 			const toolbar = document.createElement("div");
 			toolbar.className = "column-toolbar";
 
@@ -1001,12 +1061,12 @@ function renderNestedRegion(
 			previewEl.className = "column-preview markdown-rendered";
 			applyCompactPreviewSpacing(previewEl);
 			colEl.appendChild(previewEl);
-			const hasNestedRegions = findColumnRegions(col.content).length > 0;
+			const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
-			if (col.content.length > 0) {
+			if (colContent.length > 0) {
 				renderColumnContent(
 					previewEl,
-					col.content,
+					colContent,
 					sourcePath,
 					depth,
 					(nextChildContent) => {
@@ -1140,7 +1200,8 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 			groupParent.appendChild(colEl);
 
 			try {
-				const hasNestedRegions = findColumnRegions(col.content).length > 0;
+				const colContent = renderColumnHeader(colEl, col.content);
+				const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
 				const toolbar = document.createElement("div");
 				toolbar.className = "column-toolbar";
@@ -1177,7 +1238,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				applyCompactPreviewSpacing(previewEl);
 				colEl.appendChild(previewEl);
 
-				if (col.content.length === 0) {
+				if (colContent.length === 0) {
 					const ph = document.createElement("div");
 					ph.className = "column-empty-placeholder";
 					ph.textContent = "Click to edit";
@@ -1185,7 +1246,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				} else {
 					renderColumnContent(
 						previewEl,
-						col.content,
+						colContent,
 						sourcePath,
 						0,
 						(nextContent) => {

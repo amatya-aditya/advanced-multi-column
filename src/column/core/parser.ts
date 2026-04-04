@@ -41,6 +41,7 @@ type ColumnStyleData = {
 	borderColor?: StyleColorOption;
 	textColor?: StyleColorOption;
 	showBorder?: boolean;
+	leftBorder?: boolean;
 	horizontalDividers?: boolean;
 	separator?: boolean;
 	separatorColor?: StyleColorOption;
@@ -158,6 +159,11 @@ function parseStyleTokens(
 			case "sx":
 				if (rawValue.length > 0 && rawValue.length <= 3) style.separatorCustomChar = rawValue;
 				break;
+			case "lb": {
+				const parsed = parseBoolean(rawValue);
+				if (parsed !== null) style.leftBorder = parsed;
+				break;
+			}
 		}
 	}
 	return style && Object.keys(style).length > 0 ? style : undefined;
@@ -265,6 +271,7 @@ function serializeStyleTokens(style: ColumnStyleData | undefined): string[] {
 	if (style?.separatorStyle) tokens.push(`ss:${style.separatorStyle}`);
 	if (style?.separatorWidth !== undefined) tokens.push(`sw:${style.separatorWidth}`);
 	if (style?.separatorCustomChar) tokens.push(`sx:${style.separatorCustomChar}`);
+	if (style?.leftBorder !== undefined) tokens.push(`lb:${style.leftBorder ? "1" : "0"}`);
 	return tokens;
 }
 
