@@ -3,11 +3,12 @@ import {
 	MarkdownPostProcessorContext,
 	MarkdownRenderer,
 	MarkdownView,
+	setIcon,
 	TFile,
 } from "obsidian";
 import {findColumnRegions} from "./core/parser";
-import {applyColumnStyle, applyContainerStyle} from "./core/column-style";
-import {buildSeparatorElement, groupColumns} from "./render/column-renderer";
+import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS} from "./core/column-style";
+import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
 import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
 
@@ -220,29 +221,46 @@ function teardownSizer(
 	reason = "teardown",
 ): void {
 	const state = states.get(sizer);
-	if (!state) return;
-
-	state.previewObserver?.disconnect();
-	state.hostObserver?.disconnect();
-	state.wrapperObserver?.disconnect();
-	state.sizerObserver?.disconnect();
-	state.component.unload();
-	state.wrapper.remove();
-	restoreFooter(state.previewEl, sizer);
-	restoreSizerContent(sizer);
-	state.previewEl.classList.remove(RV_ACTIVE_CLASS);
-	if (!state.host.hasChildNodes()) {
-		state.host.remove();
+	if (state) {
+		state.previewObserver?.disconnect();
+		state.hostObserver?.disconnect();
+		state.wrapperObserver?.disconnect();
+		state.sizerObserver?.disconnect();
+		state.component.unload();
+		state.wrapper.remove();
+		restoreFooter(state.previewEl, sizer);
+		restoreSizerContent(sizer);
+		state.previewEl.classList.remove(RV_ACTIVE_CLASS);
+		if (!state.host.hasChildNodes()) {
+			state.host.remove();
+		}
+		states.delete(sizer);
+		rvWarn("teardown wrapper", {
+			reason,
+			renderId: state.renderId,
+			sourcePath: state.sourcePath,
+			sizerChildren: sizer.children.length,
+			hostConnected: state.host.isConnected,
+			hostChildren: state.host.children.length,
+		});
+		return;
 	}
-	states.delete(sizer);
-	rvWarn("teardown wrapper", {
-		reason,
-		renderId: state.renderId,
-		sourcePath: state.sourcePath,
-		sizerChildren: sizer.children.length,
-		hostConnected: state.host.isConnected,
-		hostChildren: state.host.children.length,
-	});
+
+	// No state for this sizer — the file may have changed (e.g. navigation)
+	// while the old host/wrapper from a previous file still lingers on the
+	// previewEl.  Clean up the stale artefacts so the new file renders normally.
+	const previewEl = resolvePreviewElementForSizer(sizer);
+	if (!previewEl) return;
+	if (!previewEl.classList.contains(RV_ACTIVE_CLASS)) return;
+
+	const host = getWrapperHost(previewEl);
+	if (host) {
+		host.remove();
+	}
+	restoreFooter(previewEl, sizer);
+	restoreSizerContent(sizer);
+	previewEl.classList.remove(RV_ACTIVE_CLASS);
+	rvWarn("teardown stale preview", {reason});
 }
 
 function textFingerprint(sourcePath: string, text: string, regions: ColumnRegion[]): string {
@@ -333,14 +351,45 @@ async function renderColumnsRegion(
 				colEl.style.flex = `0 0 calc(${col.widthPercent}% - ${shrink.toFixed(1)}px)`;
 			}
 
+			let colContent = col.content;
+			if (plugin.settings.enableHeaders) {
+				const headerParsed = parseColumnHeader(col.content);
+				if (headerParsed) {
+					const config = plugin.settings.headerTypes.find((h) => h.id === headerParsed.type);
+					if (config) {
+						const headerEl = document.createElement("div");
+						headerEl.className = "column-header";
+						headerEl.style.background = BACKGROUND_CSS[config.background] ?? "transparent";
+						headerEl.style.color = COLOR_CSS[config.textColor] ?? "var(--text-muted)";
+						headerEl.style.fontSize = `${config.fontSize ?? 0.85}em`;
+						headerEl.style.fontWeight = String(config.fontWeight ?? 600);
+
+						const iconEl = document.createElement("span");
+						iconEl.className = "column-header-icon";
+						setIcon(iconEl, config.icon);
+						headerEl.appendChild(iconEl);
+
+						if (headerParsed.title) {
+							const titleEl = document.createElement("span");
+							titleEl.className = "column-header-title";
+							titleEl.textContent = headerParsed.title;
+							headerEl.appendChild(titleEl);
+						}
+
+						colEl.appendChild(headerEl);
+						colContent = headerParsed.restContent;
+					}
+				}
+			}
+
 			const previewEl = document.createElement("div");
 			previewEl.className = "column-preview markdown-rendered";
 			colEl.appendChild(previewEl);
 			groupParent.appendChild(colEl);
 
-			if (col.content.trim().length > 0) {
+			if (colContent.trim().length > 0) {
 				await renderColumnContent(
-					plugin, component, previewEl, col.content, sourcePath, depth + 1,
+					plugin, component, previewEl, colContent, sourcePath, depth + 1,
 				);
 			}
 		}
@@ -422,6 +471,24 @@ async function buildWrapper(
 	}
 	const after = text.slice(cursor);
 	await renderMarkdownSegment(plugin, component, wrapper, after, sourcePath);
+
+	// Obsidian's internal-link click handler uses event delegation on the
+	// markdown-preview-sizer. Because the wrapper lives in a sibling host
+	// element, clicks on internal links never reach that handler. Attach
+	// our own delegated handler so wikilinks/internal links navigate correctly.
+	wrapper.addEventListener("click", (evt) => {
+		const target = evt.target as HTMLElement;
+		const link = target.closest("a.internal-link");
+		if (!(link instanceof HTMLAnchorElement)) return;
+		evt.preventDefault();
+		const href = link.dataset.href ?? link.getAttr("href");
+		if (!href) return;
+		void plugin.app.workspace.openLinkText(
+			href,
+			sourcePath,
+			evt.ctrlKey || evt.metaKey,
+		);
+	});
 
 	return wrapper;
 }
@@ -902,6 +969,50 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 			scheduleRender(sizer, ctx.sourcePath ?? "", "postprocessor");
 		},
+	);
+
+	// When navigating to a different file (especially one without columns),
+	// the post-processor may never fire — clean up stale wrappers so the
+	// old file's content doesn't linger in the new file's pane.
+	plugin.registerEvent(
+		plugin.app.workspace.on("active-leaf-change", () => {
+			const leaves = plugin.app.workspace.getLeavesOfType("markdown");
+			for (const leaf of leaves) {
+				const view = leaf.view;
+				if (!(view instanceof MarkdownView)) continue;
+				const previewEl = view.previewMode.containerEl.querySelector(
+					".markdown-preview-view",
+				);
+				if (!(previewEl instanceof HTMLElement)) continue;
+				if (!previewEl.classList.contains(RV_ACTIVE_CLASS)) continue;
+
+				// Check if the current file's source path still matches the wrapper
+				const host = getWrapperHost(previewEl);
+				if (!host) continue;
+				const wrapper = host.querySelector<HTMLElement>(".columns-rv-wrapper");
+				const wrapperPath = wrapper?.dataset.columnsSourcePath ?? "";
+				const currentPath = view.file?.path ?? "";
+
+				if (wrapperPath && currentPath && wrapperPath !== currentPath) {
+					rvWarn("stale wrapper detected on leaf change", {
+						wrapperPath,
+						currentPath,
+					});
+					// Find the sizer for this view and tear down properly
+					const sizer = previewEl.querySelector(
+						".markdown-preview-sizer",
+					);
+					if (sizer instanceof HTMLElement) {
+						teardownSizer(sizer, states, "file-changed");
+					} else {
+						// No sizer — manual cleanup
+						host.remove();
+						restoreSizerContent(previewEl);
+						previewEl.classList.remove(RV_ACTIVE_CLASS);
+					}
+				}
+			}
+		}),
 	);
 
 	// Return cleanup function for plugin onunload
