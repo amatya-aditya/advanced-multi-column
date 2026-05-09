@@ -17,7 +17,7 @@
 }
 
 /* Collapse the sizer's own height/padding so it wraps tightly around
-   the remaining visible children (banner, metadata, title, columns, footer). */
+   the remaining visible children (banner, metadata, title, backlinks). */
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
 	min-height: 0 !important;
 	height: auto !important;
@@ -26,35 +26,29 @@
 
 /* Host container: hidden by default, shown when columns are active.
    Inherit the sizer's readable-line-width constraints. */
-.markdown-preview-view > .markdown-preview-sizer > .amc-reading-columns-host,
 .markdown-preview-view > .amc-reading-columns-host {
 	display: none;
 }
 
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .amc-reading-columns-host,
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host {
 	display: block;
 	width: 100%;
 	box-sizing: border-box;
 }
 
-/* Keep the backlinks footer in Obsidian's sizer so core settings can update it. */
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .mod-footer,
+/* Clean up any footer left relocated by older versions. */
 .markdown-preview-view.amc-reading-columns-active > .mod-footer {
 	width: 100%;
 	box-sizing: border-box;
 }
 
 /* When readable line width is on, cap host and footer to the file line width */
-.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > .amc-reading-columns-host,
-.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > .mod-footer,
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .amc-reading-columns-host,
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .mod-footer {
 	max-width: var(--file-line-width);
 	margin: 0 auto;
 }
 
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .amc-reading-columns-host > .columns-rv-wrapper,
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host > .columns-rv-wrapper {
 	display: block;
 	width: 100%;
@@ -584,9 +578,9 @@
 	.el-h5,
 	.el-h6
 ) {
-	margin-top: 0.3rem !important;
-	margin-bottom: 0.16rem !important;
-	line-height: 0.8rem !important;
+	margin-top: 0.35rem !important;
+	margin-bottom: 0.2rem !important;
+	line-height: normal !important;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered :is(
@@ -597,9 +591,10 @@
 	h5,
 	h6
 ) {
-	margin-block-start: 0.3rem !important;
-	margin-block-end: 0.16rem !important;
-	line-height: 0.8rem !important;
+	margin-block-start: 0.35rem !important;
+	margin-block-end: 0.2rem !important;
+	line-height: 1.2 !important;
+	overflow-wrap: anywhere;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered :is(

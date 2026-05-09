@@ -93,24 +93,8 @@ function resolvePreviewElementForSizer(sizer: HTMLElement): HTMLElement | null {
 }
 
 function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
-	const host = previewEl.querySelector(
-		`:scope > .markdown-preview-sizer > .${RV_HOST_CLASS}, :scope > .${RV_HOST_CLASS}`,
-	);
+	const host = previewEl.querySelector(`:scope > .${RV_HOST_CLASS}`);
 	return host instanceof HTMLElement ? host : null;
-}
-
-function placeWrapperHost(sizer: HTMLElement, host: HTMLElement): void {
-	const footer = sizer.querySelector(":scope > .mod-footer");
-	if (footer instanceof HTMLElement) {
-		if (host.parentElement !== sizer || host.nextSibling !== footer) {
-			sizer.insertBefore(host, footer);
-		}
-		return;
-	}
-
-	if (host.parentElement !== sizer) {
-		sizer.appendChild(host);
-	}
 }
 
 function ensureWrapperHost(
@@ -118,14 +102,15 @@ function ensureWrapperHost(
 	sizer: HTMLElement,
 ): HTMLElement {
 	const existing = getWrapperHost(previewEl);
-	if (existing) {
-		placeWrapperHost(sizer, existing);
-		return existing;
-	}
+	if (existing) return existing;
 
 	const host = document.createElement("div");
 	host.className = RV_HOST_CLASS;
-	placeWrapperHost(sizer, host);
+	if (sizer.nextSibling) {
+		previewEl.insertBefore(host, sizer.nextSibling);
+	} else {
+		previewEl.appendChild(host);
+	}
 	return host;
 }
 
@@ -185,7 +170,7 @@ function restoreScrollSnapshotStable(
 	});
 }
 
-/** Older versions moved .mod-footer out of the sizer; bring it back if found. */
+/** Move any legacy relocated .mod-footer back into Obsidian's sizer. */
 function restoreFooter(previewEl: HTMLElement, sizer: HTMLElement): void {
 	const footer = previewEl.querySelector(":scope > .mod-footer");
 	if (footer instanceof HTMLElement) {
@@ -529,7 +514,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			hostChildren: host?.children.length ?? 0,
 			wrapperConnected: state?.wrapper.isConnected ?? false,
 			wrapperParentMatches: state ? state.wrapper.parentElement === state.host : false,
-			hostParentMatches: state ? state.host.parentElement === sizer : false,
+			hostParentMatches: state ? state.host.parentElement === state.previewEl : false,
 		};
 	};
 
@@ -612,11 +597,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 					}
 				}
 			}
-			if (!state.host.isConnected || state.host.parentElement !== sizer) {
-				handleWrapperDisappearance(sizer, state, "sizer-observer");
-				return;
-			}
-			placeWrapperHost(sizer, state.host);
 		});
 		sizerObserver.observe(sizer, {childList: true});
 
@@ -642,6 +622,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 			if (
 				!state.host.isConnected
+				|| state.host.parentElement !== state.previewEl
 				|| !state.wrapper.isConnected
 				|| state.wrapper.parentElement !== state.host
 			) {
@@ -775,7 +756,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			return;
 		}
 		const view = resolveViewForSizer(sizer, plugin);
-		const scrollSnapshot = captureScrollSnapshot(previewEl);
 		const shouldRestoreScroll = (): boolean => {
 			if (!plugin.settings.enableReadingView) return false;
 			if (!sizer.isConnected) return false;
@@ -842,7 +822,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			&& existing.fingerprint === fingerprint
 			&& existing.wrapper.isConnected
 			&& existing.host.isConnected
-			&& existing.host.parentElement === sizer
+			&& existing.host.parentElement === existing.previewEl
 			&& existing.wrapper.parentElement === existing.host
 		) {
 			if (!existing.previewEl.classList.contains(RV_ACTIVE_CLASS)) {
@@ -852,7 +832,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			existing.previewEl.classList.add(RV_ACTIVE_CLASS);
 			hideSizerContent(sizer);
-			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			rvWarn("render reused existing wrapper", sizerSnapshot(sizer, existing));
 			return;
 		}
@@ -865,42 +844,18 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		}
 
 		const host = ensureWrapperHost(previewEl, sizer);
+		restoreFooter(previewEl, sizer);
 
 		const component = new Component();
 		component.load();
 		const renderId = ++renderIdSeq;
-
-		// Hide sizer content early and install a temporary observer to catch
-		// elements Obsidian adds during the async wrapper build (mode switch,
-		// scroll virtualization). This prevents flat content from flashing.
-		previewEl.classList.add(RV_ACTIVE_CLASS);
-		hideSizerContent(sizer);
-
-		const earlySizerObserver = new MutationObserver((mutations) => {
-			for (const mutation of mutations) {
-				for (const node of Array.from(mutation.addedNodes)) {
-					if (!(node instanceof HTMLElement)) continue;
-					const cls = node.className;
-					const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
-					const isPusher = node.classList.contains("markdown-preview-pusher");
-					if (isElDiv || isPusher) {
-						node.classList.add(RV_HIDDEN_CLASS);
-					}
-				}
-			}
-		});
-		earlySizerObserver.observe(sizer, {childList: true});
+		let scrollSnapshot: ScrollSnapshot[] = [];
 
 		try {
 			const wrapper = await buildWrapper(plugin, sourcePath, text, regions, component);
 
-			// Disconnect the early observer; the full lifecycle observer replaces it
-			earlySizerObserver.disconnect();
-
 			if (!sizer.isConnected || renderTokens.get(sizer) !== token) {
 				component.unload();
-				previewEl.classList.remove(RV_ACTIVE_CLASS);
-				restoreSizerContent(sizer);
 				rvWarn("render result dropped: stale after async build", {
 					renderId,
 					token,
@@ -913,10 +868,11 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				host.removeChild(host.firstChild);
 			}
 			wrapper.dataset.columnsRenderId = String(renderId);
+			scrollSnapshot = captureScrollSnapshot(previewEl);
+			previewEl.classList.add(RV_ACTIVE_CLASS);
 			host.appendChild(wrapper);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
-			placeWrapperHost(sizer, host);
 			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			const state: RenderState = {
 				sourcePath,
@@ -939,11 +895,12 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				sizerChildren: sizer.children.length,
 			});
 		} catch (error) {
-			earlySizerObserver.disconnect();
 			component.unload();
 			previewEl.classList.remove(RV_ACTIVE_CLASS);
 			restoreSizerContent(sizer);
-			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
+			if (scrollSnapshot.length > 0) {
+				restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
+			}
 			rvError("render failed", {
 				renderId,
 				sourcePath,

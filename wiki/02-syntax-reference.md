@@ -51,6 +51,45 @@ You can attach width/stack/style tokens to each `col-break`.
 %% col-break:35,stk:1,b:blue-soft,bc:blue,t:text,sb:1,sep:1,sc:blue,ss:dashed,sw:2 %%
 ```
 
+## Column header syntax
+
+Use a header line as the first non-empty line inside a column:
+
+```md
+%% col-start %%
+%% col-break:b:blue-soft %%
+!info: Project summary
+Main content for this column.
+%% col-break:b:green-soft %%
+!tip: Next action
+- Review the draft
+- Send feedback
+%% col-end %%
+```
+
+Format:
+
+```md
+!type: Header title
+```
+
+Rules:
+
+1. The header line must be the first non-empty line in that column.
+2. `type` must match a configured header type in **Settings -> Advanced multi column -> Headers**.
+3. The header line is removed from the rendered body and shown as the styled column header.
+4. If the type is not configured, the line remains normal column content.
+
+Built-in header types:
+
+| Type | Default icon | Default style |
+|---|---|---|
+| `note` | `pencil` | Blue tint |
+| `info` | `info` | Cyan tint |
+| `tip` | `lightbulb` | Green tint |
+| `warning` | `triangle-alert` | Orange tint |
+| `danger` | `zap` | Red tint |
+
 ## Token reference
 
 | Token | Meaning | Values |
@@ -79,4 +118,3 @@ Sidebar
 Main content
 %% col-end %%
 ```
-
