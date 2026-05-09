@@ -4,27 +4,44 @@ import {editorLivePreviewField} from "obsidian";
 import {findColumnRegions} from "../core/parser";
 import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnWidget} from "./widget";
-import type {ColumnRegion} from "../core/types";
+
+interface ColumnRenderState {
+	decorations: DecorationSet;
+	atomicRanges: DecorationSet;
+}
+
+const EMPTY_COLUMN_RENDER_STATE: ColumnRenderState = {
+	decorations: Decoration.none,
+	atomicRanges: Decoration.none,
+};
 
 /**
  * Scan the document text for %% col-start %% / %% col-end %% markers
  * and build replace decorations for each column region.
  * Only active in Live Preview mode (not source mode).
  */
-function buildDecorations(state: EditorState): DecorationSet {
+function shouldRenderColumns(state: EditorState): boolean {
 	try {
-		if (!getPluginInstance().settings.enableLivePreview) return Decoration.none;
+		if (!getPluginInstance().settings.enableLivePreview) return false;
 	} catch {
-		return Decoration.none;
+		return false;
 	}
 
 	// Don't render widgets in source mode — only live preview
-	if (!state.field(editorLivePreviewField, false)) return Decoration.none;
+	return state.field(editorLivePreviewField, false) === true;
+}
+
+function buildColumnRenderState(state: EditorState): ColumnRenderState {
+	if (!shouldRenderColumns(state)) return EMPTY_COLUMN_RENDER_STATE;
 
 	const doc = state.doc.toString();
-	const regions = findColumnRegions(doc);
-	const decorations: Range<Decoration>[] = [];
+	if (!doc.includes("col-start")) return EMPTY_COLUMN_RENDER_STATE;
 
+	const regions = findColumnRegions(doc);
+	if (regions.length === 0) return EMPTY_COLUMN_RENDER_STATE;
+
+	const decorations: Range<Decoration>[] = [];
+	const atomicRanges: Range<Decoration>[] = [];
 	for (const region of regions) {
 		decorations.push(
 			Decoration.replace({
@@ -32,9 +49,15 @@ function buildDecorations(state: EditorState): DecorationSet {
 				block: true,
 			}).range(region.from, region.to),
 		);
+		if (region.from < region.to) {
+			atomicRanges.push(Decoration.mark({}).range(region.from, region.to));
+		}
 	}
 
-	return Decoration.set(decorations, true);
+	return {
+		decorations: Decoration.set(decorations, true),
+		atomicRanges: Decoration.set(atomicRanges, true),
+	};
 }
 
 /**
@@ -47,37 +70,22 @@ function modeChanged(tr: Transaction): boolean {
 }
 
 /**
- * Track column regions for atomic range behavior.
- */
-const colRegionsField = StateField.define<ColumnRegion[]>({
-	create(state) {
-		return findColumnRegions(state.doc.toString());
-	},
-	update(regions, tr) {
-		if (tr.docChanged) {
-			return findColumnRegions(tr.state.doc.toString());
-		}
-		return regions;
-	},
-});
-
-/**
  * Main decoration state field.
  */
-const columnDecorationsField = StateField.define<DecorationSet>({
+const columnRenderStateField = StateField.define<ColumnRenderState>({
 	create(state) {
-		return buildDecorations(state);
+		return buildColumnRenderState(state);
 	},
 
-	update(decorations: DecorationSet, tr: Transaction) {
+	update(renderState: ColumnRenderState, tr: Transaction) {
 		if (tr.docChanged || modeChanged(tr)) {
-			return buildDecorations(tr.state);
+			return buildColumnRenderState(tr.state);
 		}
-		return decorations;
+		return renderState;
 	},
 
 	provide(field) {
-		return EditorView.decorations.from(field);
+		return EditorView.decorations.from(field, (value) => value.decorations);
 	},
 });
 
@@ -86,26 +94,14 @@ const columnDecorationsField = StateField.define<DecorationSet>({
  * This stops CM6 from collapsing the replace decoration when clicked.
  */
 const atomicCol = EditorView.atomicRanges.of((view) => {
-	// Only block cursor in live preview — source mode needs free navigation
-	if (!view.state.field(editorLivePreviewField, false)) return Decoration.none;
-
-	const regions = view.state.field(colRegionsField, false);
-	if (!regions || regions.length === 0) return Decoration.none;
-
-	const decs: Range<Decoration>[] = [];
-	for (const r of regions) {
-		if (r.from < r.to) {
-			decs.push(Decoration.mark({}).range(r.from, r.to));
-		}
-	}
-	return Decoration.set(decs, true);
+	const renderState = view.state.field(columnRenderStateField, false);
+	return renderState?.atomicRanges ?? Decoration.none;
 });
 
 /**
  * Export all extensions as an array.
  */
 export const columnDecorations = [
-	colRegionsField,
-	columnDecorationsField,
+	columnRenderStateField,
 	atomicCol,
 ];

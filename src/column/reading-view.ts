@@ -93,8 +93,24 @@ function resolvePreviewElementForSizer(sizer: HTMLElement): HTMLElement | null {
 }
 
 function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
-	const host = previewEl.querySelector(`:scope > .${RV_HOST_CLASS}`);
+	const host = previewEl.querySelector(
+		`:scope > .markdown-preview-sizer > .${RV_HOST_CLASS}, :scope > .${RV_HOST_CLASS}`,
+	);
 	return host instanceof HTMLElement ? host : null;
+}
+
+function placeWrapperHost(sizer: HTMLElement, host: HTMLElement): void {
+	const footer = sizer.querySelector(":scope > .mod-footer");
+	if (footer instanceof HTMLElement) {
+		if (host.parentElement !== sizer || host.nextSibling !== footer) {
+			sizer.insertBefore(host, footer);
+		}
+		return;
+	}
+
+	if (host.parentElement !== sizer) {
+		sizer.appendChild(host);
+	}
 }
 
 function ensureWrapperHost(
@@ -102,15 +118,14 @@ function ensureWrapperHost(
 	sizer: HTMLElement,
 ): HTMLElement {
 	const existing = getWrapperHost(previewEl);
-	if (existing) return existing;
+	if (existing) {
+		placeWrapperHost(sizer, existing);
+		return existing;
+	}
 
 	const host = document.createElement("div");
 	host.className = RV_HOST_CLASS;
-	if (sizer.nextSibling) {
-		previewEl.insertBefore(host, sizer.nextSibling);
-	} else {
-		previewEl.appendChild(host);
-	}
+	placeWrapperHost(sizer, host);
 	return host;
 }
 
@@ -170,20 +185,7 @@ function restoreScrollSnapshotStable(
 	});
 }
 
-/** Move .mod-footer from sizer into previewEl (after host) so backlinks appear below columns. */
-function relocateFooter(sizer: HTMLElement, previewEl: HTMLElement, host: HTMLElement): void {
-	const footer = sizer.querySelector(":scope > .mod-footer");
-	if (footer instanceof HTMLElement) {
-		// Insert footer after the host
-		if (host.nextSibling) {
-			previewEl.insertBefore(footer, host.nextSibling);
-		} else {
-			previewEl.appendChild(footer);
-		}
-	}
-}
-
-/** Move .mod-footer back into sizer when tearing down columns. */
+/** Older versions moved .mod-footer out of the sizer; bring it back if found. */
 function restoreFooter(previewEl: HTMLElement, sizer: HTMLElement): void {
 	const footer = previewEl.querySelector(":scope > .mod-footer");
 	if (footer instanceof HTMLElement) {
@@ -479,10 +481,8 @@ async function buildWrapper(
 	const after = text.slice(cursor);
 	await renderMarkdownSegment(plugin, component, wrapper, after, sourcePath);
 
-	// Obsidian's internal-link click handler uses event delegation on the
-	// markdown-preview-sizer. Because the wrapper lives in a sibling host
-	// element, clicks on internal links never reach that handler. Attach
-	// our own delegated handler so wikilinks/internal links navigate correctly.
+	// Keep internal links working even when the wrapper is rebuilt outside
+	// Obsidian's normal rendered block sequence.
 	wrapper.addEventListener("click", (evt) => {
 		const target = evt.target as HTMLElement;
 		const link = target.closest("a.internal-link");
@@ -529,6 +529,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			hostChildren: host?.children.length ?? 0,
 			wrapperConnected: state?.wrapper.isConnected ?? false,
 			wrapperParentMatches: state ? state.wrapper.parentElement === state.host : false,
+			hostParentMatches: state ? state.host.parentElement === sizer : false,
 		};
 	};
 
@@ -611,10 +612,11 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 					}
 				}
 			}
-			const footer = sizer.querySelector(":scope > .mod-footer");
-			if (footer instanceof HTMLElement) {
-				relocateFooter(sizer, state.previewEl, state.host);
+			if (!state.host.isConnected || state.host.parentElement !== sizer) {
+				handleWrapperDisappearance(sizer, state, "sizer-observer");
+				return;
 			}
+			placeWrapperHost(sizer, state.host);
 		});
 		sizerObserver.observe(sizer, {childList: true});
 
@@ -640,7 +642,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 			if (
 				!state.host.isConnected
-				|| state.host.parentElement !== state.previewEl
 				|| !state.wrapper.isConnected
 				|| state.wrapper.parentElement !== state.host
 			) {
@@ -817,16 +818,17 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			return;
 		}
 
-		const regions = findColumnRegions(text);
+		const regions = text.includes("col-start") ? findColumnRegions(text) : [];
 		if (regions.length === 0) {
 			// On first load the vault/view may not be ready yet, yielding empty text.
-			// Retry a few times before giving up.
+			// Retry only that case; ordinary non-column notes should not be reparsed.
 			const retries = retryCounts.get(sizer) ?? 0;
-			if (retries < 5 && sourcePath) {
+			if (text.trim().length === 0 && retries < 2 && sourcePath) {
 				retryCounts.set(sizer, retries + 1);
 				rvWarn("render found no regions, retrying", {sourcePath, retries});
 				scheduleRender(sizer, sourcePath, `retry-no-regions:${retries}`);
 			} else {
+				retryCounts.delete(sizer);
 				rvWarn("render found no marker regions", {sourcePath});
 				teardownSizer(sizer, states, "no regions");
 			}
@@ -840,7 +842,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			&& existing.fingerprint === fingerprint
 			&& existing.wrapper.isConnected
 			&& existing.host.isConnected
-			&& existing.host.parentElement === existing.previewEl
+			&& existing.host.parentElement === sizer
 			&& existing.wrapper.parentElement === existing.host
 		) {
 			if (!existing.previewEl.classList.contains(RV_ACTIVE_CLASS)) {
@@ -914,7 +916,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			host.appendChild(wrapper);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
-			relocateFooter(sizer, previewEl, host);
+			placeWrapperHost(sizer, host);
 			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			const state: RenderState = {
 				sourcePath,
