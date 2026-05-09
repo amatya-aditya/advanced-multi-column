@@ -568,8 +568,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 			const nameRow = new Setting(controls)
 				.setName("Name")
 				.addText((text) => {
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					text.setPlaceholder("header-name").setValue(ht.id);
+					text.setPlaceholder("Header name").setValue(ht.id);
 					text.inputEl.addEventListener("blur", () => {
 						void this.persistHeaderTypeId(i, ht, text, updatePreview);
 					});
@@ -580,8 +579,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 			const iconRow = new Setting(controls)
 				.setName("Icon")
 				.addText((text) => {
-					// eslint-disable-next-line obsidianmd/ui/sentence-case
-					text.setPlaceholder("icon name").setValue(ht.icon);
+					text.setPlaceholder("Icon name").setValue(ht.icon);
 					const suggest = new IconSuggest(this.app, text.inputEl);
 					suggest.onSelectCallback((value) => {
 						ht.icon = value || "hash";
