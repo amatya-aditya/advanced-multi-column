@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      attestations: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +32,6 @@ jobs:
         run: |
           tag="${GITHUB_REF#refs/tags/}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-          echo "zip_name=advanced-multi-column-${tag}.zip" >> "$GITHUB_OUTPUT"
 
           # Treat any non-stable tag as prerelease:
           # examples: 1.0.0b, 1.0.0-beta, 1.0.0-beta.1, 1.0.0-rc.1
@@ -58,29 +59,23 @@ jobs:
             exit 1
           fi
 
-      - name: Create release assets
-        shell: bash
-        run: |
-          # Create a release directory
-          mkdir -p release
-          
-          # Copy main files
-          cp main.js manifest.json styles.css release/
-          
-          # Create zip file for easy distribution
-          cd release
-          zip -r "../${{ steps.meta.outputs.zip_name }}" .
-          cd ..
-
       - name: Verify required assets exist
         shell: bash
         run: |
-          for f in main.js manifest.json styles.css "${{ steps.meta.outputs.zip_name }}"; do
+          for f in main.js manifest.json styles.css; do
             if [[ ! -f "$f" ]]; then
               echo "Missing release asset: $f"
               exit 1
             fi
           done
+
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
 
       - name: Create or update release with assets
         uses: softprops/action-gh-release@v2
@@ -94,6 +89,5 @@ jobs:
             main.js
             manifest.json
             styles.css
-            ${{ steps.meta.outputs.zip_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

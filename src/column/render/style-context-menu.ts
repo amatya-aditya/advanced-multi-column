@@ -159,10 +159,7 @@ function closeActivePopover(): void {
 }
 
 function createSectionLabel(parent: HTMLElement, text: string): void {
-	const label = document.createElement("div");
-	label.className = "columns-style-popover-section";
-	label.textContent = text;
-	parent.appendChild(label);
+	parent.createDiv({cls: "columns-style-popover-section", text});
 }
 
 function createSectionHeader(
@@ -173,17 +170,13 @@ function createSectionHeader(
 		onAction?: () => void;
 	},
 ): void {
-	const row = document.createElement("div");
-	row.className = "columns-style-popover-section-inline";
+	const row = parent.createDiv({cls: "columns-style-popover-section-inline"});
 
-	const label = document.createElement("div");
-	label.className = "columns-style-popover-section";
-	label.textContent = config.label;
-	row.appendChild(label);
+	row.createDiv({cls: "columns-style-popover-section", text: config.label});
 
 	const onAction = config.onAction;
 	if (config.actionLabel && onAction) {
-		const button = document.createElement("button");
+		const button = row.createEl("button");
 		button.type = "button";
 		button.className = "columns-style-popover-mini-btn";
 		button.textContent = config.actionLabel;
@@ -195,13 +188,10 @@ function createSectionHeader(
 		row.appendChild(button);
 	}
 
-	parent.appendChild(row);
 }
 
 function createDivider(parent: HTMLElement): void {
-	const divider = document.createElement("div");
-	divider.className = "columns-style-popover-divider";
-	parent.appendChild(divider);
+	parent.createDiv({cls: "columns-style-popover-divider"});
 }
 
 function createActionRow(
@@ -212,23 +202,17 @@ function createActionRow(
 		onClick: () => void;
 	},
 ): void {
-	const row = document.createElement("div");
-	row.className = "columns-style-popover-row";
+	const row = parent.createDiv({cls: "columns-style-popover-row"});
 	row.tabIndex = 0;
 	row.setAttribute("role", "checkbox");
 	row.setAttribute("aria-checked", config.checked ? "true" : "false");
 	if (config.checked) row.classList.add("is-checked");
 
-	const text = document.createElement("span");
-	text.className = "columns-style-popover-row-label";
-	text.textContent = config.label;
+	const text = row.createSpan({cls: "columns-style-popover-row-label", text: config.label});
 
-	const checkbox = document.createElement("span");
-	checkbox.className = "columns-style-popover-checkbox";
+	const checkbox = row.createSpan({cls: "columns-style-popover-checkbox"});
 
-	const checkMark = document.createElement("span");
-	checkMark.className = "columns-style-popover-checkbox-mark";
-	checkMark.textContent = "\u2713";
+	const checkMark = checkbox.createSpan({cls: "columns-style-popover-checkbox-mark", text: "\u2713"});
 	checkbox.appendChild(checkMark);
 
 	row.appendChild(text);
@@ -244,7 +228,6 @@ function createActionRow(
 		evt.stopPropagation();
 		config.onClick();
 	});
-	parent.appendChild(row);
 }
 
 function createInlineCommandButtons(
@@ -258,11 +241,10 @@ function createInlineCommandButtons(
 ): void {
 	if (items.length === 0) return;
 
-	const row = document.createElement("div");
-	row.className = "columns-style-popover-inline-buttons";
+	const row = parent.createDiv({cls: "columns-style-popover-inline-buttons"});
 
 	for (const item of items) {
-		const button = document.createElement("button");
+		const button = row.createEl("button");
 		button.type = "button";
 		button.className = "columns-style-popover-inline-btn" + (item.className ? ` ${item.className}` : "");
 		button.title = item.label;
@@ -283,10 +265,7 @@ function createInlineCommandButtons(
 			item.onClick();
 			closeActivePopover();
 		});
-		row.appendChild(button);
 	}
-
-	parent.appendChild(row);
 }
 
 function createSelectRow<T extends string>(
@@ -298,25 +277,23 @@ function createSelectRow<T extends string>(
 		onChange: (value: T) => void;
 	},
 ): void {
-	const row = document.createElement("div");
-	row.className = "columns-style-popover-select-row";
+	const row = parent.createDiv({cls: "columns-style-popover-select-row"});
 
 	const selectId = `amc-select-${config.label.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
 
-	const label = document.createElement("label");
-	label.className = "columns-style-popover-select-label";
-	label.textContent = config.label;
+	const label = row.createEl("label", {
+		cls: "columns-style-popover-select-label",
+		text: config.label,
+	});
 	label.setAttribute("for", selectId);
 
-	const select = document.createElement("select");
-	select.className = "columns-style-popover-select";
+	const select = row.createEl("select", {cls: "columns-style-popover-select"});
 	select.id = selectId;
 
 	for (const item of config.options) {
-		const option = document.createElement("option");
+		const option = select.createEl("option");
 		option.value = item.value;
 		option.textContent = item.label;
-		select.appendChild(option);
 	}
 
 	select.value = config.value;
@@ -328,9 +305,6 @@ function createSelectRow<T extends string>(
 		config.onChange(selected.value);
 	});
 
-	row.appendChild(label);
-	row.appendChild(select);
-	parent.appendChild(row);
 }
 
 function createCollapsibleSection(
@@ -343,30 +317,26 @@ function createCollapsibleSection(
 		render: (body: HTMLElement) => void;
 	},
 ): void {
-	const wrapper = document.createElement("div");
-	wrapper.className = "columns-style-popover-collapsible";
-	parent.appendChild(wrapper);
+	const wrapper = parent.createDiv({cls: "columns-style-popover-collapsible"});
 
 	const isCollapsed = collapsedSections.has(config.id);
 
-	const header = document.createElement("div");
-	header.className = "columns-style-popover-collapsible-header";
+	const header = wrapper.createDiv({cls: "columns-style-popover-collapsible-header"});
 	if (isCollapsed) header.classList.add("is-collapsed");
 
-	const chevron = document.createElement("span");
-	chevron.className = "columns-style-popover-chevron";
-	chevron.textContent = isCollapsed ? "\u25B6" : "\u25BC";
+	const chevron = header.createSpan({
+		cls: "columns-style-popover-chevron",
+		text: isCollapsed ? "\u25B6" : "\u25BC",
+	});
 
-	const label = document.createElement("span");
-	label.className = "columns-style-popover-collapsible-label";
-	label.textContent = config.label;
-
-	header.appendChild(chevron);
-	header.appendChild(label);
+	header.createSpan({
+		cls: "columns-style-popover-collapsible-label",
+		text: config.label,
+	});
 
 	const onAction = config.onAction;
 	if (config.actionLabel && onAction) {
-		const btn = document.createElement("button");
+		const btn = header.createEl("button");
 		btn.type = "button";
 		btn.className = "columns-style-popover-mini-btn";
 		btn.textContent = config.actionLabel;
@@ -375,15 +345,10 @@ function createCollapsibleSection(
 			evt.stopPropagation();
 			onAction();
 		});
-		header.appendChild(btn);
 	}
 
-	wrapper.appendChild(header);
-
-	const body = document.createElement("div");
-	body.className = "columns-style-popover-collapsible-body";
+	const body = wrapper.createDiv({cls: "columns-style-popover-collapsible-body"});
 	if (isCollapsed) body.classList.add("is-collapsed");
-	wrapper.appendChild(body);
 
 	config.render(body);
 
@@ -416,23 +381,17 @@ function createInlineToggleSelect<T extends string>(
 		onSelectChange: (value: T) => void;
 	},
 ): void {
-	const row = document.createElement("div");
-	row.className = "columns-style-popover-inline-toggle-select";
+	const row = parent.createDiv({cls: "columns-style-popover-inline-toggle-select"});
 
-	const label = document.createElement("span");
-	label.className = "columns-style-popover-select-label";
-	label.textContent = config.label;
+	row.createSpan({cls: "columns-style-popover-select-label", text: config.label});
 
-	const toggle = document.createElement("span");
-	toggle.className = "columns-style-popover-checkbox";
+	const toggle = row.createSpan({cls: "columns-style-popover-checkbox"});
 	toggle.tabIndex = 0;
 	toggle.setAttribute("role", "checkbox");
 	toggle.setAttribute("aria-checked", config.checked ? "true" : "false");
 	if (config.checked) toggle.classList.add("is-checked");
 
-	const checkMark = document.createElement("span");
-	checkMark.className = "columns-style-popover-checkbox-mark";
-	checkMark.textContent = "\u2713";
+	const checkMark = toggle.createSpan({cls: "columns-style-popover-checkbox-mark", text: "\u2713"});
 	toggle.appendChild(checkMark);
 
 	toggle.addEventListener("click", (evt) => {
@@ -447,14 +406,12 @@ function createInlineToggleSelect<T extends string>(
 		config.onToggle();
 	});
 
-	const select = document.createElement("select");
-	select.className = "columns-style-popover-select";
+	const select = row.createEl("select", {cls: "columns-style-popover-select"});
 
 	for (const item of config.selectOptions) {
-		const option = document.createElement("option");
+		const option = select.createEl("option");
 		option.value = item.value;
 		option.textContent = item.label;
-		select.appendChild(option);
 	}
 	select.value = config.selectValue;
 	select.addEventListener("click", (evt) => evt.stopPropagation());
@@ -465,10 +422,6 @@ function createInlineToggleSelect<T extends string>(
 		config.onSelectChange(selected.value);
 	});
 
-	row.appendChild(label);
-	row.appendChild(toggle);
-	row.appendChild(select);
-	parent.appendChild(row);
 }
 
 function createTextInput(
@@ -481,14 +434,14 @@ function createTextInput(
 		onChange: (value: string) => void;
 	},
 ): void {
-	const row = document.createElement("div");
-	row.className = "columns-style-popover-select-row";
+	const row = parent.createDiv({cls: "columns-style-popover-select-row"});
 
-	const label = document.createElement("label");
-	label.className = "columns-style-popover-select-label";
-	label.textContent = config.label;
+	row.createEl("label", {
+		cls: "columns-style-popover-select-label",
+		text: config.label,
+	});
 
-	const input = document.createElement("input");
+	const input = row.createEl("input");
 	input.type = "text";
 	input.className = "columns-style-popover-text-input";
 	input.value = config.value;
@@ -501,9 +454,6 @@ function createTextInput(
 		config.onChange(input.value);
 	});
 
-	row.appendChild(label);
-	row.appendChild(input);
-	parent.appendChild(row);
 }
 
 interface CompactSelectDef<T extends string> {
@@ -520,27 +470,20 @@ function createCompactSelectRow<A extends string, B extends string, C extends st
 		selects: [CompactSelectDef<A>, CompactSelectDef<B>, CompactSelectDef<C>];
 	},
 ): void {
-	const row = document.createElement("div");
-	row.className = "columns-style-popover-compact-row";
+	const row = parent.createDiv({cls: "columns-style-popover-compact-row"});
 
-	const label = document.createElement("span");
-	label.className = "columns-style-popover-select-label";
-	label.textContent = config.label;
-	row.appendChild(label);
+	row.createSpan({cls: "columns-style-popover-select-label", text: config.label});
 
-	const selectsWrap = document.createElement("div");
-	selectsWrap.className = "columns-style-popover-compact-selects";
+	const selectsWrap = row.createDiv({cls: "columns-style-popover-compact-selects"});
 
 	for (const def of config.selects) {
-		const select = document.createElement("select");
-		select.className = "columns-style-popover-compact-select";
+		const select = selectsWrap.createEl("select", {cls: "columns-style-popover-compact-select"});
 		if (def.title) select.title = def.title;
 
 		for (const item of def.options) {
-			const option = document.createElement("option");
+			const option = select.createEl("option");
 			option.value = item.value;
 			option.textContent = item.label;
-			select.appendChild(option);
 		}
 		select.value = def.value;
 		select.addEventListener("click", (evt) => evt.stopPropagation());
@@ -550,11 +493,7 @@ function createCompactSelectRow<A extends string, B extends string, C extends st
 			if (!selected) return;
 			(def.onChange as (v: string) => void)(selected.value);
 		});
-		selectsWrap.appendChild(select);
 	}
-
-	row.appendChild(selectsWrap);
-	parent.appendChild(row);
 }
 
 function positionPopover(popover: HTMLDivElement, evt: MouseEvent): void {
@@ -1253,8 +1192,9 @@ export function openColumnStyleContextMenu(
 
 	closeActivePopover();
 
-	const popover = document.createElement("div");
-	popover.className = "columns-style-popover";
+	const doc = evt.doc;
+	const win = evt.win;
+	const popover = doc.body.createDiv({cls: "columns-style-popover"});
 	popover.setAttribute("role", "dialog");
 	popover.setAttribute("aria-label", "Column style settings");
 	popover.addEventListener("contextmenu", (e) => {
@@ -1270,7 +1210,6 @@ export function openColumnStyleContextMenu(
 	};
 
 	renderPopoverContent(popover, menuData, state);
-	document.body.appendChild(popover);
 	positionPopover(popover, evt);
 
 	const onPointerDown = (e: MouseEvent) => {
@@ -1282,15 +1221,15 @@ export function openColumnStyleContextMenu(
 	const onViewportResize = () => closeActivePopover();
 
 	window.setTimeout(() => {
-		document.addEventListener("mousedown", onPointerDown, true);
+		doc.addEventListener("mousedown", onPointerDown, true);
 	}, 0);
-	document.addEventListener("keydown", onKeyDown, true);
-	window.addEventListener("resize", onViewportResize);
+	doc.addEventListener("keydown", onKeyDown, true);
+	win.addEventListener("resize", onViewportResize);
 
 	activePopover = popover;
 	cleanupActivePopover = () => {
-		document.removeEventListener("mousedown", onPointerDown, true);
-		document.removeEventListener("keydown", onKeyDown, true);
-		window.removeEventListener("resize", onViewportResize);
+		doc.removeEventListener("mousedown", onPointerDown, true);
+		doc.removeEventListener("keydown", onKeyDown, true);
+		win.removeEventListener("resize", onViewportResize);
 	};
 }

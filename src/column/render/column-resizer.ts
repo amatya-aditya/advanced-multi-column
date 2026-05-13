@@ -84,8 +84,7 @@ export function buildResizeHandle(
 	columns: ColumnData[],
 	onColumnsChange: (nextColumns: ColumnData[]) => void,
 ): void {
-	const handle = document.createElement("div");
-	handle.className = "column-resize-handle";
+	const handle = container.createDiv({cls: "column-resize-handle"});
 
 	// Apply separator styling from the left column
 	const leftCol = columns[resizeIndex];
@@ -104,8 +103,6 @@ export function buildResizeHandle(
 			handle.style.setProperty("--sep-style", sepStyle.separatorStyle);
 		}
 	}
-
-	container.appendChild(handle);
 
 	let startX = 0;
 	let startLeftPct = 0;
@@ -144,8 +141,9 @@ export function buildResizeHandle(
 	};
 
 	const onMouseUp = (e: MouseEvent) => {
-		document.removeEventListener("mousemove", onMouseMove);
-		document.removeEventListener("mouseup", onMouseUp);
+		const doc = container.doc;
+		doc.removeEventListener("mousemove", onMouseMove);
+		doc.removeEventListener("mouseup", onMouseUp);
 		container.classList.remove("columns-resizing");
 		handle.classList.remove("is-active");
 
@@ -199,7 +197,8 @@ export function buildResizeHandle(
 			startLeftPct = gLeftPct;
 		}
 
-		document.addEventListener("mousemove", onMouseMove);
-		document.addEventListener("mouseup", onMouseUp);
+		const doc = container.doc;
+		doc.addEventListener("mousemove", onMouseMove);
+		doc.addEventListener("mouseup", onMouseUp);
 	});
 }

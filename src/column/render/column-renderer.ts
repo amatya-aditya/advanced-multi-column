@@ -48,26 +48,18 @@ function renderColumnHeader(colEl: HTMLElement, content: string): string {
 	const config = plugin.settings.headerTypes.find((h) => h.id === parsed.type);
 	if (!config) return content;
 
-	const headerEl = document.createElement("div");
-	headerEl.className = "column-header";
+	const headerEl = colEl.createDiv({cls: "column-header"});
 	headerEl.style.background = BACKGROUND_CSS[config.background] ?? "transparent";
 	headerEl.style.color = COLOR_CSS[config.textColor] ?? "var(--text-muted)";
 	headerEl.style.fontSize = `${config.fontSize ?? 0.85}em`;
 	headerEl.style.fontWeight = String(config.fontWeight ?? 600);
 
-	const iconEl = document.createElement("span");
-	iconEl.className = "column-header-icon";
+	const iconEl = headerEl.createSpan({cls: "column-header-icon"});
 	setIcon(iconEl, config.icon);
-	headerEl.appendChild(iconEl);
 
 	if (parsed.title) {
-		const titleEl = document.createElement("span");
-		titleEl.className = "column-header-title";
-		titleEl.textContent = parsed.title;
-		headerEl.appendChild(titleEl);
+		headerEl.createSpan({cls: "column-header-title", text: parsed.title});
 	}
-
-	colEl.appendChild(headerEl);
 
 	// Set the left-border accent color from the header background so it
 	// reads like an Obsidian callout when left-border mode is enabled.
@@ -142,12 +134,12 @@ export function groupColumns(columns: ReadonlyArray<ColumnData>): ColumnGroup[] 
 export function getColumnElements(container: HTMLElement): HTMLElement[] {
 	const result: HTMLElement[] = [];
 	for (const child of Array.from(container.children)) {
-		if (!(child instanceof HTMLElement)) continue;
+		if (!child.instanceOf(HTMLElement)) continue;
 		if (child.classList.contains("column-item")) {
 			result.push(child);
 		} else if (child.classList.contains("columns-stack-group")) {
 			for (const inner of Array.from(child.children)) {
-				if (inner instanceof HTMLElement && inner.classList.contains("column-item")) {
+				if (inner.instanceOf(HTMLElement) && inner.classList.contains("column-item")) {
 					result.push(inner);
 				}
 			}
@@ -165,17 +157,14 @@ export function buildSeparatorElement(container: HTMLElement, col: ColumnData): 
 	const color = COLOR_CSS[style.separatorColor as StyleColorOption ?? "gray"] ?? COLOR_CSS.gray;
 
 	if (style.separatorStyle === "custom" && style.separatorCustomChar) {
-		const sep = document.createElement("div");
-		sep.className = "column-separator-custom";
+		const sep = container.createDiv({cls: "column-separator-custom"});
 		sep.textContent = style.separatorCustomChar;
 		sep.style.setProperty("--sep-color", color);
 		if (style.separatorWidth) {
 			sep.style.setProperty("--sep-size", `${style.separatorWidth * 6 + 6}px`);
 		}
-		container.appendChild(sep);
 	} else {
-		const sep = document.createElement("div");
-		sep.className = "column-separator-visual";
+		const sep = container.createDiv({cls: "column-separator-visual"});
 		sep.style.setProperty("--sep-color", color);
 		if (style.separatorWidth) {
 			sep.style.setProperty("--sep-width", `${style.separatorWidth}px`);
@@ -183,7 +172,6 @@ export function buildSeparatorElement(container: HTMLElement, col: ColumnData): 
 		if (style.separatorStyle && style.separatorStyle !== "custom") {
 			sep.style.setProperty("--sep-style", style.separatorStyle);
 		}
-		container.appendChild(sep);
 	}
 }
 
@@ -236,10 +224,7 @@ export function renderMarkdown(
 			}
 		});
 	} catch {
-		const errEl = document.createElement("div");
-		errEl.className = "column-render-error";
-		errEl.textContent = "Failed to render content";
-		parent.appendChild(errEl);
+		parent.createDiv({cls: "column-render-error", text: "Failed to render content"});
 	}
 }
 
@@ -417,9 +402,10 @@ function ensureSelectionClearOnNormalClick(view: EditorView): void {
 		clearColumnSelection(view);
 	};
 
-	document.addEventListener("click", clearOnClick, true);
+	const doc = view.dom.doc;
+	doc.addEventListener("click", clearOnClick, true);
 	iState.cleanupSelectionClickTracking = () => {
-		document.removeEventListener("click", clearOnClick, true);
+		doc.removeEventListener("click", clearOnClick, true);
 	};
 }
 
@@ -676,7 +662,7 @@ function wireTopLevelEditToggle(
 					const nextItem = allItems[next];
 					const nextPreview = nextItem?.querySelector<HTMLElement>(".column-preview");
 					if (nextPreview) {
-						setTimeout(() => nextPreview.click(), 50);
+						nextPreview.win.setTimeout(() => nextPreview.click(), 50);
 					}
 				}
 				return true;
@@ -745,34 +731,25 @@ function renderEditableTextSegment(
 	onCommit: (nextText: string) => void,
 	ctx: RenderContext,
 ): void {
-	const block = document.createElement("div");
-	block.className = "column-inline-edit-block";
-	parent.appendChild(block);
+	const block = parent.createDiv({cls: "column-inline-edit-block"});
 
-	const preview = document.createElement("div");
-	preview.className = "column-inline-edit-preview markdown-rendered";
+	const preview = block.createDiv({cls: "column-inline-edit-preview markdown-rendered"});
 	applyCompactPreviewSpacing(preview);
-	block.appendChild(preview);
 
 	const renderPreview = (text: string) => {
 		preview.empty();
 		if (text.trim().length === 0) {
-			const ph = document.createElement("div");
-			ph.className = "column-empty-placeholder";
-			ph.textContent = "Click to edit";
-			preview.appendChild(ph);
+			preview.createDiv({cls: "column-empty-placeholder", text: "Click to edit"});
 			return;
 		}
 		renderMarkdown(preview, text, sourcePath, ctx, onCommit);
 	};
 	renderPreview(initialText);
 
-	const textarea = document.createElement("textarea");
-	textarea.className = "column-inline-editor";
+	const textarea = block.createEl("textarea", {cls: "column-inline-editor"});
 	textarea.value = initialText;
 	textarea.spellcheck = false;
 	textarea.placeholder = "Type here";
-	block.appendChild(textarea);
 
 	const plugin = getPluginInstance();
 	const suggest = new ColumnEditorSuggest(textarea, plugin.app);
@@ -919,12 +896,10 @@ function renderNestedRegion(
 	ctx: RenderContext,
 	onLayoutChange?: (nextLayout: ColumnLayout | undefined) => void,
 ): void {
-	const container = document.createElement("div");
-	container.className = "columns-container columns-ui columns-nested";
+	const container = parent.createDiv({cls: "columns-container columns-ui columns-nested"});
 	const isContainerStacked = region.layout === "stack";
 	if (isContainerStacked) container.classList.add("columns-stacked");
 	applyContainerStyle(container, region.containerStyle);
-	parent.appendChild(container);
 
 	const groups = isContainerStacked
 		? [{indices: region.columns.map((_, i) => i), isStack: true}]
@@ -950,15 +925,13 @@ function renderNestedRegion(
 		const useStackWrapper = group.isStack && !isContainerStacked && group.indices.length > 1;
 		let groupParent: HTMLElement;
 		if (useStackWrapper) {
-			const stackGroupEl = document.createElement("div");
-			stackGroupEl.className = "columns-stack-group";
+			const stackGroupEl = container.createDiv({cls: "columns-stack-group"});
 			const maxWidth = Math.max(...group.indices.map((idx) => region.columns[idx]!.widthPercent));
 			if (maxWidth > 0) {
 				const handleTotal = (groups.length - 1) * 8;
 				const shrink = handleTotal / groups.length;
 				stackGroupEl.style.flex = `0 0 calc(${maxWidth}% - ${shrink.toFixed(1)}px)`;
 			}
-			container.appendChild(stackGroupEl);
 			groupParent = stackGroupEl;
 		} else {
 			groupParent = container;
@@ -972,8 +945,7 @@ function renderNestedRegion(
 				buildSeparatorElement(groupParent, region.columns[group.indices[gi2 - 1]!]!);
 			}
 
-			const colEl = document.createElement("div");
-			colEl.className = "column-item";
+			const colEl = groupParent.createDiv({cls: "column-item"});
 			colEl.dataset.colIndex = String(i);
 			if (useStackWrapper) {
 				// Stacked: full width via CSS
@@ -983,21 +955,17 @@ function renderNestedRegion(
 				colEl.style.flex = `0 0 calc(${col.widthPercent}% - ${shrink.toFixed(1)}px)`;
 			}
 			applyColumnStyle(colEl, col.style);
-			groupParent.appendChild(colEl);
 
 			const colContent = renderColumnHeader(colEl, col.content);
 
-			const toolbar = document.createElement("div");
-			toolbar.className = "column-toolbar";
+			const toolbar = colEl.createDiv({cls: "column-toolbar"});
 
-			const dragHandle = document.createElement("span");
-			dragHandle.className = "column-drag-handle";
+			const dragHandle = toolbar.createSpan({cls: "column-drag-handle"});
 			dragHandle.setAttribute("aria-label", "Drag to reorder");
 			setIcon(dragHandle, "grip-vertical");
 
 			const isStacked = !!(col.stacked && col.stacked > 0);
-			const addBtn = document.createElement("button");
-			addBtn.className = "column-add-btn";
+			const addBtn = toolbar.createEl("button", {cls: "column-add-btn"});
 			addBtn.setAttribute("aria-label", isStacked ? "Add stacked item below" : "Add column to the right");
 			setIcon(addBtn, "plus");
 			addBtn.addEventListener("click", (e) => {
@@ -1009,13 +977,9 @@ function renderNestedRegion(
 				onRegionChange(updated, region.containerStyle);
 			});
 
-			const toolbarActions = document.createElement("div");
-			toolbarActions.className = "column-toolbar-actions";
+			const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 			toolbarActions.appendChild(addBtn);
 			toolbarActions.appendChild(dragHandle);
-
-			toolbar.appendChild(toolbarActions);
-			colEl.appendChild(toolbar);
 
 			wireDragItem(colEl, dragHandle, containerPath, i, ctx.view, ctx.region);
 			wireColumnSelection(colEl, i, container, ctx.view);
@@ -1057,10 +1021,8 @@ function renderNestedRegion(
 				ctx.view,
 			);
 
-			const previewEl = document.createElement("div");
-			previewEl.className = "column-preview markdown-rendered";
+			const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 			applyCompactPreviewSpacing(previewEl);
-			colEl.appendChild(previewEl);
 			const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
 			if (colContent.length > 0) {
@@ -1080,19 +1042,14 @@ function renderNestedRegion(
 					ctx,
 				);
 			} else {
-				const ph = document.createElement("div");
-				ph.className = "column-empty-placeholder";
-				ph.textContent = "Click to edit";
-				previewEl.appendChild(ph);
+				previewEl.createDiv({cls: "column-empty-placeholder", text: "Click to edit"});
 			}
 
 			if (!hasNestedRegions) {
-				const textarea = document.createElement("textarea");
-				textarea.className = "column-editor";
+				const textarea = colEl.createEl("textarea", {cls: "column-editor"});
 				textarea.value = col.content;
 				textarea.spellcheck = false;
 				textarea.placeholder = "Type here";
-				colEl.appendChild(textarea);
 
 				wireNestedEditToggle(
 					container,
@@ -1163,15 +1120,13 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 		const useStackWrapper = group.isStack && !isContainerStacked && group.indices.length > 1;
 		let groupParent: HTMLElement;
 		if (useStackWrapper) {
-			const stackGroupEl = document.createElement("div");
-			stackGroupEl.className = "columns-stack-group";
+			const stackGroupEl = container.createDiv({cls: "columns-stack-group"});
 			const maxWidth = Math.max(...group.indices.map((idx) => columns[idx]!.widthPercent));
 			if (maxWidth > 0) {
 				const handleTotal = (groups.length - 1) * 8;
 				const shrink = handleTotal / groups.length;
 				stackGroupEl.style.flex = `0 0 calc(${maxWidth}% - ${shrink.toFixed(1)}px)`;
 			}
-			container.appendChild(stackGroupEl);
 			groupParent = stackGroupEl;
 		} else {
 			groupParent = container;
@@ -1186,8 +1141,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				buildSeparatorElement(groupParent, columns[group.indices[gi2 - 1]!]!);
 			}
 
-			const colEl = document.createElement("div");
-			colEl.className = "column-item";
+			const colEl = groupParent.createDiv({cls: "column-item"});
 			if (useStackWrapper) {
 				// Stacked columns: full width via CSS
 			} else if (!isContainerStacked && col.widthPercent > 0) {
@@ -1197,23 +1151,19 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 			}
 			applyColumnStyle(colEl, col.style);
 			colEl.dataset.colIndex = String(i);
-			groupParent.appendChild(colEl);
 
 			try {
 				const colContent = renderColumnHeader(colEl, col.content);
 				const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
-				const toolbar = document.createElement("div");
-				toolbar.className = "column-toolbar";
+				const toolbar = colEl.createDiv({cls: "column-toolbar"});
 
-				const dragHandle = document.createElement("span");
-				dragHandle.className = "column-drag-handle";
+				const dragHandle = toolbar.createSpan({cls: "column-drag-handle"});
 				dragHandle.setAttribute("aria-label", "Drag to reorder");
 				setIcon(dragHandle, "grip-vertical");
 
 				const isStacked = !!(col.stacked && col.stacked > 0);
-				const addBtn = document.createElement("button");
-				addBtn.className = "column-add-btn";
+				const addBtn = toolbar.createEl("button", {cls: "column-add-btn"});
 				addBtn.setAttribute("aria-label", isStacked ? "Add stacked item below" : "Add column to the right");
 				setIcon(addBtn, "plus");
 				addBtn.addEventListener("click", (e) => {
@@ -1225,24 +1175,15 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					dispatchUpdate(ctx.region, updated, ctx.view);
 				});
 
-				const toolbarActions = document.createElement("div");
-				toolbarActions.className = "column-toolbar-actions";
+				const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 				toolbarActions.appendChild(addBtn);
 				toolbarActions.appendChild(dragHandle);
 
-				toolbar.appendChild(toolbarActions);
-				colEl.appendChild(toolbar);
-
-				const previewEl = document.createElement("div");
-				previewEl.className = "column-preview markdown-rendered";
+				const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 				applyCompactPreviewSpacing(previewEl);
-				colEl.appendChild(previewEl);
 
 				if (colContent.length === 0) {
-					const ph = document.createElement("div");
-					ph.className = "column-empty-placeholder";
-					ph.textContent = "Click to edit";
-					previewEl.appendChild(ph);
+					previewEl.createDiv({cls: "column-empty-placeholder", text: "Click to edit"});
 				} else {
 					renderColumnContent(
 						previewEl,
@@ -1259,12 +1200,10 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				}
 
 				if (!hasNestedRegions) {
-					const textarea = document.createElement("textarea");
-					textarea.className = "column-editor";
+					const textarea = colEl.createEl("textarea", {cls: "column-editor"});
 					textarea.value = col.content;
 					textarea.spellcheck = false;
 					textarea.placeholder = "Type here";
-					colEl.appendChild(textarea);
 
 					const suggest = new ColumnEditorSuggest(textarea, plugin.app);
 					const slashSuggest = createSlashSuggest(textarea);
@@ -1318,10 +1257,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					ctx.view,
 				);
 			} catch {
-				const errEl = document.createElement("div");
-				errEl.className = "column-render-error";
-				errEl.textContent = "Failed to render column";
-				colEl.appendChild(errEl);
+				colEl.createDiv({cls: "column-render-error", text: "Failed to render column"});
 			}
 		}
 	}

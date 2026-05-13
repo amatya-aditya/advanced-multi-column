@@ -38,7 +38,7 @@ export class ColumnWidget extends WidgetType {
 	}
 
 	toDOM(view: EditorView): HTMLElement {
-		const container = document.createElement("div");
+		const container = view.dom.doc.createElement("div");
 		container.className = "columns-container columns-ui";
 		applyContainerStyle(container, this.region.containerStyle);
 

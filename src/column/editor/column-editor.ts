@@ -208,10 +208,10 @@ export function wireEditCore(config: EditWireConfig): void {
 
 	// Blur: commit once focus leaves this column editor
 	textarea.addEventListener("blur", () => {
-		setTimeout(() => {
+		textarea.win.setTimeout(() => {
 			if (suggest.active || slashSuggest.active || thirdPartySuggest?.active) return;
 			const currentItem = textarea.parentElement;
-			if (currentItem?.contains(document.activeElement)) return;
+			if (currentItem?.contains(textarea.doc.activeElement)) return;
 			if (textarea.parentElement?.classList.contains("is-editing")) {
 				commitAndClose();
 			}

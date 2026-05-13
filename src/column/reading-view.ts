@@ -55,7 +55,7 @@ function resolveSizerForElement(
 	sourcePathHint: string | undefined,
 ): HTMLElement | null {
 	const closest = el.closest(".markdown-preview-sizer");
-	if (closest instanceof HTMLElement) return closest;
+	if (closest?.instanceOf(HTMLElement)) return closest;
 
 	if (sourcePathHint) {
 		const leaves = plugin.app.workspace.getLeavesOfType("markdown");
@@ -65,7 +65,7 @@ function resolveSizerForElement(
 			if (view.file?.path !== sourcePathHint) continue;
 
 			const sizer = view.previewMode.containerEl.querySelector(".markdown-preview-sizer");
-			if (sizer instanceof HTMLElement) return sizer;
+			if (sizer?.instanceOf(HTMLElement)) return sizer;
 		}
 	}
 
@@ -89,12 +89,12 @@ function resolveViewForSizer(
 
 function resolvePreviewElementForSizer(sizer: HTMLElement): HTMLElement | null {
 	const preview = sizer.closest(".markdown-preview-view");
-	return preview instanceof HTMLElement ? preview : null;
+	return preview?.instanceOf(HTMLElement) ? preview : null;
 }
 
 function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
 	const host = previewEl.querySelector(`:scope > .${RV_HOST_CLASS}`);
-	return host instanceof HTMLElement ? host : null;
+	return host?.instanceOf(HTMLElement) ? host : null;
 }
 
 function ensureWrapperHost(
@@ -104,12 +104,9 @@ function ensureWrapperHost(
 	const existing = getWrapperHost(previewEl);
 	if (existing) return existing;
 
-	const host = document.createElement("div");
-	host.className = RV_HOST_CLASS;
+	const host = previewEl.createDiv({cls: RV_HOST_CLASS});
 	if (sizer.nextSibling) {
 		previewEl.insertBefore(host, sizer.nextSibling);
-	} else {
-		previewEl.appendChild(host);
 	}
 	return host;
 }
@@ -128,7 +125,7 @@ function isScrollableElement(el: HTMLElement): boolean {
 function captureScrollSnapshot(fromEl: HTMLElement): ScrollSnapshot[] {
 	const snapshots: ScrollSnapshot[] = [];
 	const leafContent = fromEl.closest(".workspace-leaf-content");
-	const stopAt = leafContent instanceof HTMLElement ? leafContent : null;
+	const stopAt = leafContent?.instanceOf(HTMLElement) ? leafContent : null;
 	let current: HTMLElement | null = fromEl;
 	while (current) {
 		if (isScrollableElement(current)) {
@@ -173,7 +170,7 @@ function restoreScrollSnapshotStable(
 /** Move any legacy relocated .mod-footer back into Obsidian's sizer. */
 function restoreFooter(previewEl: HTMLElement, sizer: HTMLElement): void {
 	const footer = previewEl.querySelector(":scope > .mod-footer");
-	if (footer instanceof HTMLElement) {
+	if (footer?.instanceOf(HTMLElement)) {
 		sizer.appendChild(footer);
 	}
 }
@@ -184,7 +181,7 @@ const RV_HIDDEN_CLASS = "amc-rv-hidden";
  *  metadata containers, banner plugin elements, inline titles, etc. */
 function hideSizerContent(sizer: HTMLElement): void {
 	for (const child of Array.from(sizer.children)) {
-		if (!(child instanceof HTMLElement)) continue;
+		if (!child.instanceOf(HTMLElement)) continue;
 		const cls = child.className;
 		const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
 		const isPusher = child.classList.contains("markdown-preview-pusher");
@@ -265,9 +262,7 @@ async function renderMarkdownSegment(
 ): Promise<void> {
 	if (markdown.trim().length === 0) return;
 
-	const host = document.createElement("div");
-	host.className = "columns-rv-segment";
-	parent.appendChild(host);
+	const host = parent.createDiv({cls: "columns-rv-segment"});
 	await MarkdownRenderer.render(plugin.app, markdown, host, sourcePath, component);
 }
 
@@ -281,13 +276,11 @@ async function renderColumnsRegion(
 ): Promise<void> {
 	if (depth > 8) return;
 
-	const containerEl = document.createElement("div");
-	containerEl.className = "columns-container columns-ui columns-reading";
+	const containerEl = parent.createDiv({cls: "columns-container columns-ui columns-reading"});
 	const isContainerStacked = region.layout === "stack";
 	if (isContainerStacked) containerEl.classList.add("columns-stacked");
 	applyContainerStyle(containerEl, region.containerStyle);
 	if (depth > 0) containerEl.classList.add("columns-nested");
-	parent.appendChild(containerEl);
 
 	const groups = isContainerStacked
 		? [{indices: region.columns.map((_, i) => i), isStack: true}]
@@ -303,15 +296,13 @@ async function renderColumnsRegion(
 
 		let groupParent: HTMLElement;
 		if (group.isStack && !isContainerStacked && group.indices.length > 0) {
-			const stackGroupEl = document.createElement("div");
-			stackGroupEl.className = "columns-stack-group";
+			const stackGroupEl = containerEl.createDiv({cls: "columns-stack-group"});
 			const maxWidth = Math.max(...group.indices.map((idx) => region.columns[idx]!.widthPercent));
 			if (maxWidth > 0) {
 				const sepTotal = (groups.length - 1) * 8;
 				const shrink = sepTotal / groups.length;
 				stackGroupEl.style.flex = `0 0 calc(${maxWidth}% - ${shrink.toFixed(1)}px)`;
 			}
-			containerEl.appendChild(stackGroupEl);
 			groupParent = stackGroupEl;
 		} else {
 			groupParent = containerEl;
@@ -325,8 +316,7 @@ async function renderColumnsRegion(
 				buildSeparatorElement(groupParent, region.columns[group.indices[gi2 - 1]!]!);
 			}
 
-			const colEl = document.createElement("div");
-			colEl.className = "column-item";
+			const colEl = groupParent.createDiv({cls: "column-item"});
 			colEl.dataset.colIndex = String(ci);
 			applyColumnStyle(colEl, col.style);
 
@@ -344,26 +334,21 @@ async function renderColumnsRegion(
 				if (headerParsed) {
 					const config = plugin.settings.headerTypes.find((h) => h.id === headerParsed.type);
 					if (config) {
-						const headerEl = document.createElement("div");
-						headerEl.className = "column-header";
+						const headerEl = colEl.createDiv({cls: "column-header"});
 						headerEl.style.background = BACKGROUND_CSS[config.background] ?? "transparent";
 						headerEl.style.color = COLOR_CSS[config.textColor] ?? "var(--text-muted)";
 						headerEl.style.fontSize = `${config.fontSize ?? 0.85}em`;
 						headerEl.style.fontWeight = String(config.fontWeight ?? 600);
 
-						const iconEl = document.createElement("span");
-						iconEl.className = "column-header-icon";
+						const iconEl = headerEl.createSpan({cls: "column-header-icon"});
 						setIcon(iconEl, config.icon);
-						headerEl.appendChild(iconEl);
 
 						if (headerParsed.title) {
-							const titleEl = document.createElement("span");
-							titleEl.className = "column-header-title";
-							titleEl.textContent = headerParsed.title;
-							headerEl.appendChild(titleEl);
+							headerEl.createSpan({
+								cls: "column-header-title",
+								text: headerParsed.title,
+							});
 						}
-
-						colEl.appendChild(headerEl);
 
 						// Set left-border accent color from header background
 						const borderColor = HEADER_BORDER_CSS[config.background];
@@ -376,10 +361,7 @@ async function renderColumnsRegion(
 				}
 			}
 
-			const previewEl = document.createElement("div");
-			previewEl.className = "column-preview markdown-rendered";
-			colEl.appendChild(previewEl);
-			groupParent.appendChild(colEl);
+			const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 
 			if (colContent.trim().length > 0) {
 				await renderColumnContent(
@@ -416,8 +398,7 @@ async function renderColumnContent(
 		if (region.from > cursor) {
 			const text = content.slice(cursor, region.from).trim();
 			if (text) {
-				const div = document.createElement("div");
-				parent.appendChild(div);
+				const div = parent.createDiv();
 				await MarkdownRenderer.render(plugin.app, text, div, sourcePath, component);
 			}
 		}
@@ -428,8 +409,7 @@ async function renderColumnContent(
 	if (cursor < content.length) {
 		const text = content.slice(cursor).trim();
 		if (text) {
-			const div = document.createElement("div");
-			parent.appendChild(div);
+			const div = parent.createDiv();
 			await MarkdownRenderer.render(plugin.app, text, div, sourcePath, component);
 		}
 	}
@@ -452,7 +432,7 @@ async function buildWrapper(
 	regions: ColumnRegion[],
 	component: Component,
 ): Promise<HTMLElement> {
-	const wrapper = document.createElement("div");
+	const wrapper = window.activeDocument.createElement("div");
 	wrapper.className = "columns-rv-wrapper";
 	wrapper.dataset.columnsSourcePath = sourcePath;
 
@@ -588,7 +568,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		const sizerObserver = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
 				for (const node of Array.from(mutation.addedNodes)) {
-					if (!(node instanceof HTMLElement)) continue;
+					if (!node.instanceOf(HTMLElement)) continue;
 					const cls = node.className;
 					const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
 					const isPusher = node.classList.contains("markdown-preview-pusher");
@@ -713,7 +693,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		// Race with a 10s timeout to prevent hanging promises
 		const withTimeout = Promise.race([
 			read,
-			new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+			new Promise<null>((resolve) => window.activeWindow.setTimeout(() => resolve(null), 10_000)),
 		]);
 
 		sourceReads.set(sourcePath, withTimeout);
@@ -914,9 +894,9 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			if (el.closest(".columns-rv-wrapper")) return;
 
 			const sizer = resolveSizerForElement(el, plugin, ctx.sourcePath);
-			if (!(sizer instanceof HTMLElement)) return;
+			if (!sizer?.instanceOf(HTMLElement)) return;
 			const previewEl = resolvePreviewElementForSizer(sizer);
-			if (!(previewEl instanceof HTMLElement)) return;
+			if (!previewEl?.instanceOf(HTMLElement)) return;
 			if (!previewEl.closest(".markdown-reading-view")) return;
 
 			if (!plugin.settings.enableReadingView) {
@@ -949,7 +929,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				const previewEl = view.previewMode.containerEl.querySelector(
 					".markdown-preview-view",
 				);
-				if (!(previewEl instanceof HTMLElement)) continue;
+				if (!previewEl?.instanceOf(HTMLElement)) continue;
 				if (!previewEl.classList.contains(RV_ACTIVE_CLASS)) continue;
 
 				// Check if the current file's source path still matches the wrapper
@@ -968,7 +948,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 					const sizer = previewEl.querySelector(
 						".markdown-preview-sizer",
 					);
-					if (sizer instanceof HTMLElement) {
+					if (sizer?.instanceOf(HTMLElement)) {
 						teardownSizer(sizer, states, "file-changed");
 					} else {
 						// No sizer — manual cleanup

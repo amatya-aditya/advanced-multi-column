@@ -145,36 +145,27 @@ export class ColumnEditorSuggest {
 
 	private showPopup(): void {
 		if (!this.popup) {
-			this.popup = document.createElement("div");
-			this.popup.className = "columns-suggest-popup";
+			this.popup = this.textarea.doc.body.createDiv({cls: "columns-suggest-popup"});
 			this.popup.setAttribute("role", "listbox");
 			this.popup.setAttribute("aria-label", "File suggestions");
-			document.body.appendChild(this.popup);
 		}
 
 		const coords = this.getCursorCoords();
-		const lineHeight = parseFloat(window.getComputedStyle(this.textarea).lineHeight) || 20;
+		const lineHeight = parseFloat(this.textarea.win.getComputedStyle(this.textarea).lineHeight) || 20;
 		this.popup.style.top = `${coords.top + lineHeight + 2}px`;
 		this.popup.style.left = `${coords.left}px`;
 
 		this.popup.empty();
 		for (let i = 0; i < this.items.length; i++) {
 			const item = this.items[i]!;
-			const div = document.createElement("div");
-			div.className = "columns-suggest-item" + (i === this.selectedIndex ? " is-selected" : "");
+			const div = this.popup.createDiv({
+				cls: "columns-suggest-item" + (i === this.selectedIndex ? " is-selected" : ""),
+			});
 			div.setAttribute("role", "option");
 			div.setAttribute("aria-selected", String(i === this.selectedIndex));
 
-			const title = document.createElement("span");
-			title.className = "columns-suggest-title";
-			title.textContent = item.label;
-
-			const pathSpan = document.createElement("span");
-			pathSpan.className = "columns-suggest-path";
-			pathSpan.textContent = item.path;
-
-			div.appendChild(title);
-			div.appendChild(pathSpan);
+			div.createSpan({cls: "columns-suggest-title", text: item.label});
+			div.createSpan({cls: "columns-suggest-path", text: item.path});
 
 			div.addEventListener("mousedown", (e) => {
 				e.preventDefault();
@@ -186,19 +177,17 @@ export class ColumnEditorSuggest {
 				this.selectedIndex = i;
 				this.renderSelection();
 			});
-
-			this.popup.appendChild(div);
 		}
 
 		// Keep popup in viewport
 		requestAnimationFrame(() => {
 			if (!this.popup) return;
 			const rect = this.popup.getBoundingClientRect();
-			if (rect.bottom > window.innerHeight) {
+			if (rect.bottom > this.textarea.win.innerHeight) {
 				this.popup.style.top = `${coords.top - rect.height - 4}px`;
 			}
-			if (rect.right > window.innerWidth) {
-				this.popup.style.left = `${window.innerWidth - rect.width - 8}px`;
+			if (rect.right > this.textarea.win.innerWidth) {
+				this.popup.style.left = `${this.textarea.win.innerWidth - rect.width - 8}px`;
 			}
 		});
 	}
@@ -249,8 +238,8 @@ export class ColumnEditorSuggest {
 	 */
 	private getCursorCoords(): {top: number; left: number} {
 		const ta = this.textarea;
-		const mirror = document.createElement("div");
-		const computed = window.getComputedStyle(ta);
+		const mirror = ta.doc.body.createDiv();
+		const computed = ta.win.getComputedStyle(ta);
 
 		const props = [
 			"font-family",
@@ -280,20 +269,14 @@ export class ColumnEditorSuggest {
 		mirror.setCssProps({"--mirror-width": computed.width});
 
 		const textBefore = ta.value.substring(0, ta.selectionStart);
-		const textNode = document.createTextNode(textBefore);
-		mirror.appendChild(textNode);
-
-		const marker = document.createElement("span");
-		marker.textContent = "\u200b";
-		mirror.appendChild(marker);
-
-		document.body.appendChild(mirror);
+		mirror.appendText(textBefore);
+		const marker = mirror.createSpan({text: "\u200b"});
 
 		const taRect = ta.getBoundingClientRect();
 		const markerRect = marker.getBoundingClientRect();
 		const mirrorRect = mirror.getBoundingClientRect();
 
-		document.body.removeChild(mirror);
+		mirror.remove();
 
 		return {
 			top: taRect.top + (markerRect.top - mirrorRect.top) - ta.scrollTop,
@@ -433,45 +416,31 @@ export class SlashCommandSuggest {
 
 	private showPopup(): void {
 		if (!this.popup) {
-			this.popup = document.createElement("div");
-			this.popup.className = "columns-suggest-popup";
+			this.popup = this.textarea.doc.body.createDiv({cls: "columns-suggest-popup"});
 			this.popup.setAttribute("role", "listbox");
 			this.popup.setAttribute("aria-label", "Slash commands");
-			document.body.appendChild(this.popup);
 		}
 
 		const coords = this.getCursorCoords();
-		const lineHeight = parseFloat(window.getComputedStyle(this.textarea).lineHeight) || 20;
+		const lineHeight = parseFloat(this.textarea.win.getComputedStyle(this.textarea).lineHeight) || 20;
 		this.popup.style.top = `${coords.top + lineHeight + 2}px`;
 		this.popup.style.left = `${coords.left}px`;
 
 		this.popup.empty();
 		for (let i = 0; i < this.items.length; i++) {
 			const item = this.items[i]!;
-			const div = document.createElement("div");
-			div.className = "columns-suggest-item" + (i === this.selectedIndex ? " is-selected" : "");
+			const div = this.popup.createDiv({
+				cls: "columns-suggest-item" + (i === this.selectedIndex ? " is-selected" : ""),
+			});
 			div.setAttribute("role", "option");
 			div.setAttribute("aria-selected", String(i === this.selectedIndex));
 
-			const iconSpan = document.createElement("span");
-			iconSpan.className = "columns-suggest-icon";
+			const iconSpan = div.createSpan({cls: "columns-suggest-icon"});
 			setIcon(iconSpan, item.icon);
 
-			const textWrap = document.createElement("span");
-			textWrap.className = "columns-suggest-text";
-
-			const title = document.createElement("span");
-			title.className = "columns-suggest-title";
-			title.textContent = item.label;
-
-			const desc = document.createElement("span");
-			desc.className = "columns-suggest-path";
-			desc.textContent = item.description;
-
-			textWrap.appendChild(title);
-			textWrap.appendChild(desc);
-			div.appendChild(iconSpan);
-			div.appendChild(textWrap);
+			const textWrap = div.createSpan({cls: "columns-suggest-text"});
+			textWrap.createSpan({cls: "columns-suggest-title", text: item.label});
+			textWrap.createSpan({cls: "columns-suggest-path", text: item.description});
 
 			div.addEventListener("mousedown", (e) => {
 				e.preventDefault();
@@ -483,18 +452,16 @@ export class SlashCommandSuggest {
 				this.selectedIndex = i;
 				this.renderSelection();
 			});
-
-			this.popup.appendChild(div);
 		}
 
 		requestAnimationFrame(() => {
 			if (!this.popup) return;
 			const rect = this.popup.getBoundingClientRect();
-			if (rect.bottom > window.innerHeight) {
+			if (rect.bottom > this.textarea.win.innerHeight) {
 				this.popup.style.top = `${coords.top - rect.height - 4}px`;
 			}
-			if (rect.right > window.innerWidth) {
-				this.popup.style.left = `${window.innerWidth - rect.width - 8}px`;
+			if (rect.right > this.textarea.win.innerWidth) {
+				this.popup.style.left = `${this.textarea.win.innerWidth - rect.width - 8}px`;
 			}
 		});
 	}
@@ -540,8 +507,8 @@ export class SlashCommandSuggest {
 
 	private getCursorCoords(): {top: number; left: number} {
 		const ta = this.textarea;
-		const mirror = document.createElement("div");
-		const computed = window.getComputedStyle(ta);
+		const mirror = ta.doc.body.createDiv();
+		const computed = ta.win.getComputedStyle(ta);
 
 		const props = [
 			"font-family", "font-size", "font-weight", "font-style",
@@ -558,20 +525,14 @@ export class SlashCommandSuggest {
 		mirror.setCssProps({"--mirror-width": computed.width});
 
 		const textBefore = ta.value.substring(0, ta.selectionStart);
-		const textNode = document.createTextNode(textBefore);
-		mirror.appendChild(textNode);
-
-		const marker = document.createElement("span");
-		marker.textContent = "\u200b";
-		mirror.appendChild(marker);
-
-		document.body.appendChild(mirror);
+		mirror.appendText(textBefore);
+		const marker = mirror.createSpan({text: "\u200b"});
 
 		const taRect = ta.getBoundingClientRect();
 		const markerRect = marker.getBoundingClientRect();
 		const mirrorRect = mirror.getBoundingClientRect();
 
-		document.body.removeChild(mirror);
+		mirror.remove();
 
 		return {
 			top: taRect.top + (markerRect.top - mirrorRect.top) - ta.scrollTop,

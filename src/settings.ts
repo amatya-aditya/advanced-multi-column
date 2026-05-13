@@ -173,7 +173,7 @@ class IconSuggest extends AbstractInputSuggest<string> {
 		wrapper.createSpan({text: value});
 	}
 
-	selectSuggestion(value: string, evt: MouseEvent | KeyboardEvent): void {
+	selectSuggestion(value: string, _evt: MouseEvent | KeyboardEvent): void {
 		this.setValue(value);
 		if (this.onSelectCb) this.onSelectCb(value);
 		this.close();
@@ -654,11 +654,11 @@ export class ColumnsSettingTab extends PluginSettingTab {
 
 		// Plugin info
 		const infoEl = aboutEl.createDiv({cls: "columns-settings-about-info"});
-		infoEl.createEl("div", {
+		infoEl.createDiv({
 			text: "Advanced multi column",
 			cls: "columns-settings-about-name",
 		});
-		infoEl.createEl("div", {
+		infoEl.createDiv({
 			text: `v${this.plugin.manifest.version}`,
 			cls: "columns-settings-about-version",
 		});
@@ -671,7 +671,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 
 		// Support
 		const supportEl = aboutEl.createDiv({cls: "columns-settings-about-support"});
-		supportEl.createEl("div", {
+		supportEl.createDiv({
 			text: "Support development",
 			cls: "columns-settings-about-support-label",
 		});
@@ -681,7 +681,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 
 		// Other plugins
 		const othersEl = aboutEl.createDiv({cls: "columns-settings-about-others"});
-		othersEl.createEl("div", {
+		othersEl.createDiv({
 			text: "Other plugins",
 			cls: "columns-settings-about-support-label",
 		});

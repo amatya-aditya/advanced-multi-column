@@ -270,10 +270,10 @@ export default class ColumnsPlugin extends Plugin {
 	private ensureRuntimeStyleSheet(): CSSStyleSheet | null {
 		if (this.runtimeStyleSheet) return this.runtimeStyleSheet;
 		if (typeof CSSStyleSheet === "undefined") return null;
-		if (!("adoptedStyleSheets" in document)) return null;
+		if (!("adoptedStyleSheets" in window.activeDocument)) return null;
 
 		const sheet = new CSSStyleSheet();
-		const adoptedTarget = document as Document & {
+		const adoptedTarget = window.activeDocument as Document & {
 			adoptedStyleSheets: CSSStyleSheet[];
 		};
 		adoptedTarget.adoptedStyleSheets = [...adoptedTarget.adoptedStyleSheets, sheet];
@@ -284,8 +284,8 @@ export default class ColumnsPlugin extends Plugin {
 	private detachRuntimeStyleSheet(): void {
 		const sheet = this.runtimeStyleSheet;
 		if (!sheet) return;
-		if ("adoptedStyleSheets" in document) {
-			const adoptedTarget = document as Document & {
+		if ("adoptedStyleSheets" in window.activeDocument) {
+			const adoptedTarget = window.activeDocument as Document & {
 				adoptedStyleSheets: CSSStyleSheet[];
 			};
 			adoptedTarget.adoptedStyleSheets = adoptedTarget.adoptedStyleSheets.filter(

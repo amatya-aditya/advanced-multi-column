@@ -210,8 +210,8 @@ export function moveColumnToCursorBlock(sourceDrag: ActiveDragState, view: Edito
  * snapping to the closest gap between lines.
  */
 function resolveDropPosition(x: number, y: number, view: EditorView): number | null {
-	const target = document.elementFromPoint(x, y);
-	if (!(target instanceof HTMLElement) || !view.dom.contains(target)
+	const target = view.dom.doc.elementFromPoint(x, y);
+	if (!target?.instanceOf(HTMLElement) || !view.dom.contains(target)
 		|| target.closest(".columns-container") || target.closest(".column-item")) {
 		return null;
 	}
@@ -260,21 +260,21 @@ export function startDragPointerTracking(
 		showCursorIndicator(event.clientX, event.clientY);
 	};
 
-	document.addEventListener("dragover", updatePoint, true);
-	document.addEventListener("drop", updatePoint, true);
+	const doc = view.dom.doc;
+	doc.addEventListener("dragover", updatePoint, true);
+	doc.addEventListener("drop", updatePoint, true);
 	iState.cleanupActiveDragTracking = () => {
-		document.removeEventListener("dragover", updatePoint, true);
-		document.removeEventListener("drop", updatePoint, true);
+		doc.removeEventListener("dragover", updatePoint, true);
+		doc.removeEventListener("drop", updatePoint, true);
 	};
 }
 
 export function showCursorDropIndicator(view: EditorView, top: number): void {
 	const iState = getInteractionState(view);
-	if (!iState.cursorDropIndicator) {
-		iState.cursorDropIndicator = document.createElement("div");
-		iState.cursorDropIndicator.className = "amc-cursor-drop-indicator";
-	}
 	const scrollDom = view.scrollDOM;
+	if (!iState.cursorDropIndicator) {
+		iState.cursorDropIndicator = scrollDom.createDiv({cls: "amc-cursor-drop-indicator"});
+	}
 	const scrollRect = scrollDom.getBoundingClientRect();
 	const contentDom = view.contentDOM;
 	const contentRect = contentDom.getBoundingClientRect();
@@ -312,8 +312,8 @@ export function resolveDragPoint(event: DragEvent, view: EditorView): {x: number
 export function shouldInsertDraggedBlockAtCursor(event: DragEvent, view: EditorView): boolean {
 	const point = resolveDragPoint(event, view);
 	if (!point) return false;
-	const target = document.elementFromPoint(point.x, point.y);
-	if (!(target instanceof HTMLElement)) return false;
+	const target = view.dom.doc.elementFromPoint(point.x, point.y);
+	if (!target?.instanceOf(HTMLElement)) return false;
 	if (!view.dom.contains(target)) return false;
 	if (target.closest(".columns-container")) return false;
 	if (target.closest(".column-item")) return false;

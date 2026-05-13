@@ -117,7 +117,7 @@ class TextareaEditorAdapter {
 	}
 
 	hasFocus(): boolean {
-		return document.activeElement === this.textarea;
+		return this.textarea.doc.activeElement === this.textarea;
 	}
 
 	getScrollInfo(): {top: number; left: number} {
@@ -279,15 +279,13 @@ export class ThirdPartySuggestBridge {
 
 	private showPopup(): void {
 		if (!this.popup) {
-			this.popup = document.createElement("div");
-			this.popup.className = "columns-suggest-popup";
+			this.popup = this.textarea.doc.body.createDiv({cls: "columns-suggest-popup"});
 			this.popup.setAttribute("role", "listbox");
 			this.popup.setAttribute("aria-label", "Suggestions");
-			document.body.appendChild(this.popup);
 		}
 
 		const coords = this.getCursorCoords();
-		const lineHeight = parseFloat(window.getComputedStyle(this.textarea).lineHeight) || 20;
+		const lineHeight = parseFloat(this.textarea.win.getComputedStyle(this.textarea).lineHeight) || 20;
 		this.popup.style.top = `${coords.top + lineHeight + 2}px`;
 		this.popup.style.left = `${coords.left}px`;
 
@@ -295,8 +293,9 @@ export class ThirdPartySuggestBridge {
 		const limit = Math.min(this.items.length, this.activeSuggest?.limit ?? 50);
 		for (let i = 0; i < limit; i++) {
 			const item = this.items[i]!;
-			const div = document.createElement("div");
-			div.className = "columns-suggest-item" + (i === this.selectedIndex ? " is-selected" : "");
+			const div = this.popup.createDiv({
+				cls: "columns-suggest-item" + (i === this.selectedIndex ? " is-selected" : ""),
+			});
 			div.setAttribute("role", "option");
 			div.setAttribute("aria-selected", String(i === this.selectedIndex));
 
@@ -317,18 +316,16 @@ export class ThirdPartySuggestBridge {
 				this.selectedIndex = i;
 				this.renderSelection();
 			});
-
-			this.popup.appendChild(div);
 		}
 
 		requestAnimationFrame(() => {
 			if (!this.popup) return;
 			const rect = this.popup.getBoundingClientRect();
-			if (rect.bottom > window.innerHeight) {
+			if (rect.bottom > this.textarea.win.innerHeight) {
 				this.popup.style.top = `${coords.top - rect.height - 4}px`;
 			}
-			if (rect.right > window.innerWidth) {
-				this.popup.style.left = `${window.innerWidth - rect.width - 8}px`;
+			if (rect.right > this.textarea.win.innerWidth) {
+				this.popup.style.left = `${this.textarea.win.innerWidth - rect.width - 8}px`;
 			}
 		});
 	}
@@ -357,7 +354,8 @@ export class ThirdPartySuggestBridge {
 		};
 
 		try {
-			this.activeSuggest.selectSuggestion(item, new MouseEvent("click"));
+			const eventWindow = this.textarea.win as Window & typeof globalThis;
+			this.activeSuggest.selectSuggestion(item, new eventWindow.MouseEvent("click"));
 		} catch {
 			// If selectSuggestion fails, fall back to no-op
 		}
@@ -378,8 +376,8 @@ export class ThirdPartySuggestBridge {
 
 	private getCursorCoords(): {top: number; left: number} {
 		const ta = this.textarea;
-		const mirror = document.createElement("div");
-		const computed = window.getComputedStyle(ta);
+		const mirror = ta.doc.body.createDiv();
+		const computed = ta.win.getComputedStyle(ta);
 
 		const props = [
 			"font-family", "font-size", "font-weight", "font-style",
@@ -396,20 +394,14 @@ export class ThirdPartySuggestBridge {
 		mirror.setCssProps({"--mirror-width": computed.width});
 
 		const textBefore = ta.value.substring(0, ta.selectionStart);
-		const textNode = document.createTextNode(textBefore);
-		mirror.appendChild(textNode);
-
-		const marker = document.createElement("span");
-		marker.textContent = "\u200b";
-		mirror.appendChild(marker);
-
-		document.body.appendChild(mirror);
+		mirror.appendText(textBefore);
+		const marker = mirror.createSpan({text: "\u200b"});
 
 		const taRect = ta.getBoundingClientRect();
 		const markerRect = marker.getBoundingClientRect();
 		const mirrorRect = mirror.getBoundingClientRect();
 
-		document.body.removeChild(mirror);
+		mirror.remove();
 
 		return {
 			top: taRect.top + (markerRect.top - mirrorRect.top) - ta.scrollTop,
