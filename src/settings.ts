@@ -68,6 +68,7 @@ export interface ColumnsPluginSettings {
 	showDragHandles: boolean;
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
+	foldNotePropertiesByDefault: boolean;
 	enableSlashSuggest: boolean;
 	inheritStyleOnAdd: boolean;
 	styleTargetMode: StyleTargetMode;
@@ -91,6 +92,7 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	showDragHandles: true,
 	enableLivePreview: true,
 	enableReadingView: true,
+	foldNotePropertiesByDefault: false,
 	enableSlashSuggest: true,
 	inheritStyleOnAdd: true,
 	styleTargetMode: "all",
@@ -269,6 +271,21 @@ export class ColumnsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.enableReadingView = value;
 						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(panelEl)
+			.setName("Fold note properties by default")
+			.setDesc("Collapse the properties section when a note is opened, including new notes.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.foldNotePropertiesByDefault)
+					.onChange(async (value) => {
+						this.plugin.settings.foldNotePropertiesByDefault = value;
+						await this.plugin.saveSettings();
+						if (value) {
+							this.plugin.collapsePropertiesInOpenNotes();
+						}
 					}),
 			);
 

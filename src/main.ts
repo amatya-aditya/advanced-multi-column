@@ -4,11 +4,13 @@ import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations} from "./column/cm/state-field";
 import {buildRuntimeStyles} from "./column/runtime-styles";
+import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
 
 export default class ColumnsPlugin extends Plugin {
 	settings!: ColumnsPluginSettings;
 	private runtimeStyleSheet: CSSStyleSheet | null = null;
 	private cleanupReadingView: (() => void) | null = null;
+	private cleanupPropertyFolding: (() => void) | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -20,6 +22,7 @@ export default class ColumnsPlugin extends Plugin {
 
 		// Reading view processor (code block fallback)
 		this.cleanupReadingView = registerReadingView(this);
+		this.cleanupPropertyFolding = registerDefaultPropertyFolding(this);
 
 		// ── Commands ──────────────────────────────────────────────
 
@@ -102,6 +105,8 @@ export default class ColumnsPlugin extends Plugin {
 	onunload() {
 		this.cleanupReadingView?.();
 		this.cleanupReadingView = null;
+		this.cleanupPropertyFolding?.();
+		this.cleanupPropertyFolding = null;
 		setPluginInstance(null);
 		this.detachRuntimeStyleSheet();
 	}
@@ -223,10 +228,21 @@ export default class ColumnsPlugin extends Plugin {
 	}
 
 	async loadSettings() {
+		const savedData = ((await this.loadData()) ?? {}) as Partial<ColumnsPluginSettings> & {
+			hideNoteProperties?: boolean;
+		};
+		if (
+			typeof savedData.foldNotePropertiesByDefault !== "boolean"
+			&& typeof savedData.hideNoteProperties === "boolean"
+		) {
+			savedData.foldNotePropertiesByDefault = savedData.hideNoteProperties;
+		}
+		delete savedData.hideNoteProperties;
+
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<ColumnsPluginSettings>,
+			savedData,
 		);
 		this.validateSettings();
 	}
@@ -251,9 +267,16 @@ export default class ColumnsPlugin extends Plugin {
 		if (typeof s.showDragHandles !== "boolean") s.showDragHandles = DEFAULT_SETTINGS.showDragHandles;
 		if (typeof s.enableLivePreview !== "boolean") s.enableLivePreview = DEFAULT_SETTINGS.enableLivePreview;
 		if (typeof s.enableReadingView !== "boolean") s.enableReadingView = DEFAULT_SETTINGS.enableReadingView;
+		if (typeof s.foldNotePropertiesByDefault !== "boolean") {
+			s.foldNotePropertiesByDefault = DEFAULT_SETTINGS.foldNotePropertiesByDefault;
+		}
 		if (typeof s.enableSlashSuggest !== "boolean") s.enableSlashSuggest = DEFAULT_SETTINGS.enableSlashSuggest;
 		if (typeof s.inheritStyleOnAdd !== "boolean") s.inheritStyleOnAdd = DEFAULT_SETTINGS.inheritStyleOnAdd;
 		if (typeof s.showContainerBorder !== "boolean") s.showContainerBorder = DEFAULT_SETTINGS.showContainerBorder;
+	}
+
+	collapsePropertiesInOpenNotes(): void {
+		collapsePropertiesInOpenNotes(this);
 	}
 
 	async saveSettings() {
