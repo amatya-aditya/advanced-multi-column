@@ -13,11 +13,14 @@
    individually via JS (amc-rv-hidden class) so that metadata containers,
    banner plugin elements, inline titles, and other non-content UI survive. */
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .amc-rv-hidden {
-	display: none !important;
+	display: none;
 }
 
 /* Collapse the sizer's own height/padding so it wraps tightly around
-   the remaining visible children (banner, metadata, title, backlinks). */
+   the remaining visible children (banner, metadata, title, backlinks).
+   An override priority flag is required here because Obsidian's virtual
+   scroller writes min-height / padding-bottom as inline styles on the
+   sizer, which a normal rule cannot beat. */
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
 	min-height: 0 !important;
 	height: auto !important;
@@ -57,6 +60,11 @@
 .columns-container {
 	--columns-block-default-border-width: 1px;
 	--columns-block-default-border-color: var(--background-modifier-border);
+	/* Structural flex layout. These rules sit in Obsidian's render tree where
+	   core/theme CSS (often with its own override flag) forces a div's display,
+	   so they need the priority flag to hold the row layout. Specificity alone
+	   is not enough here and CSS variables cannot change precedence. The
+	   .columns-stacked rule below re-flags flex-direction to beat this. */
 	display: flex !important;
 	flex-direction: row !important;
 	flex-wrap: nowrap !important;
@@ -88,8 +96,8 @@
 }
 
 .columns-container.columns-nested .column-toolbar {
-	opacity: 1 !important;
-	display: flex !important;
+	opacity: 1;
+	display: flex;
 	pointer-events: none;
 }
 
@@ -164,31 +172,31 @@
 }
 
 .columns-container.columns-custom-style {
-	background: var(--columns-block-bg, var(--background-primary)) !important;
-	color: var(--columns-block-text, inherit) !important;
-	border-style: solid !important;
+	background: var(--columns-block-bg, var(--background-primary));
+	color: var(--columns-block-text, inherit);
+	border-style: solid;
 	border-color: var(
 		--columns-block-border-color,
 		var(--columns-block-default-border-color)
-	) !important;
+	);
 	border-width: var(
 		--columns-block-border-width,
 		var(--columns-block-default-border-width)
-	) !important;
+	);
 	border-top-width: var(
 		--columns-block-horizontal-width,
 		var(
 			--columns-block-border-width,
 			var(--columns-block-default-border-width)
 		)
-	) !important;
+	);
 	border-bottom-width: var(
 		--columns-block-horizontal-width,
 		var(
 			--columns-block-border-width,
 			var(--columns-block-default-border-width)
 		)
-	) !important;
+	);
 }
 
 /* ── Column header (icon + title) ── */
@@ -197,7 +205,7 @@
 	align-items: center;
 	gap: 6px;
 	padding: 6px 10px;
-	margin: -10px -14px 6px !important;
+	margin: -10px -14px 6px;
 	border-radius: 4px 4px 0 0;
 	-webkit-user-select: none;
 	user-select: none;
@@ -229,10 +237,10 @@
 
 /* ── Left border mode (callout-style) ── */
 .columns-container .column-item.columns-left-border {
-	border-top: none !important;
-	border-right: none !important;
-	border-bottom: none !important;
-	border-left: 3px solid var(--columns-left-border-color, var(--columns-col-border-color, var(--interactive-accent))) !important;
+	border-top: none;
+	border-right: none;
+	border-bottom: none;
+	border-left: 3px solid var(--columns-left-border-color, var(--columns-col-border-color, var(--interactive-accent)));
 	border-radius: 0 6px 6px 0;
 }
 
@@ -301,7 +309,7 @@
 	line-height: 1;
 	border: none;
 	background: none;
-	height: 20px !important;
+	height: 20px;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -346,23 +354,23 @@
 .columns-container .column-item .column-preview.markdown-rendered hr,
 .columns-container .column-item .column-preview.markdown-rendered table,
 .columns-container .column-item .column-preview.markdown-rendered pre {
-	margin: 0 !important;
+	margin: 0;
 }
 
 .columns-container .column-item .column-preview.markdown-rendered ul,
 .columns-container .column-item .column-preview.markdown-rendered ol {
-	margin: 0 !important;
-	padding: 0 0 0 1.5em !important;
+	margin: 0;
+	padding: 0 0 0 1.5em;
 	list-style-position: outside;
 }
 
 .columns-container .column-item .column-preview.markdown-rendered ul {
-	list-style-type: disc !important;
+	list-style-type: disc;
 }
 
 .columns-container .column-item .column-preview.markdown-rendered li {
-	margin: 0 !important;
-	padding: 0 !important;
+	margin: 0;
+	padding: 0;
 }
 
 /* Live preview spacing normalization */
@@ -371,16 +379,16 @@
 	--p-spacing: 0.35rem;
 	--heading-spacing: 0.2rem;
 	--line-height-tight: 1.18;
-	line-height: 1.24 !important;
-	white-space: normal !important;
+	line-height: 1.24;
+	white-space: normal;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) > :first-child {
-	margin-top: 0 !important;
+	margin-top: 0;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) > :last-child {
-	margin-bottom: 0 !important;
+	margin-bottom: 0;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(
@@ -391,18 +399,18 @@
 	h5,
 	h6
 ) {
-	margin-top: 0.35rem !important;
-	margin-bottom: 0.2rem !important;
+	margin-top: 0.35rem;
+	margin-bottom: 0.2rem;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(p, blockquote, pre, table, hr) {
-	margin-top: 0.2rem !important;
-	margin-bottom: 0.2rem !important;
-	line-height: 1.4 !important;
+	margin-top: 0.2rem;
+	margin-bottom: 0.2rem;
+	line-height: 1.4;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(blockquote) {
-	display: flex !important;
+	display: flex;
 }
 
 /* Ensure markdown tables render with visible grid lines inside columns. */
@@ -415,44 +423,44 @@
 	width: 100%;
 	border-collapse: collapse;
 	border-spacing: 0;
-	border: 1px solid var(--background-modifier-border) !important;
+	border: 1px solid var(--background-modifier-border);
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(th, td) {
-	border: 1px solid var(--background-modifier-border) !important;
-	padding: 0.28rem 0.6rem !important;
+	border: 1px solid var(--background-modifier-border);
+	padding: 0.28rem 0.6rem;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(ul, ol) {
-	margin-top: 0.08rem !important;
-	margin-bottom: 0.08rem !important;
-	margin-block-start: 0.08rem !important;
-	margin-block-end: 0.08rem !important;
-	padding-inline-start: 2em !important;
-	display: block !important;
-	white-space: normal !important;
+	margin-top: 0.08rem;
+	margin-bottom: 0.08rem;
+	margin-block-start: 0.08rem;
+	margin-block-end: 0.08rem;
+	padding-inline-start: 2em;
+	display: block;
+	white-space: normal;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) li {
-	margin-top: 0.25em !important;
-	margin-bottom: 0.25em !important;
-	margin-block-start: 0.25em !important;
-	margin-block-end: 0.25em !important;
-	padding: 0 !important;
-	white-space: normal !important;
-	line-height: 1.4em !important;
+	margin-top: 0.25em;
+	margin-bottom: 0.25em;
+	margin-block-start: 0.25em;
+	margin-block-end: 0.25em;
+	padding: 0;
+	white-space: normal;
+	line-height: 1.4em;
 }
 
 /* Blank line gap between list items (added dynamically via JS) */
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) li.amc-list-gap {
-	margin-top: 1.5em !important;
-	margin-block-start: 1.5em !important;
+	margin-top: 1.5em;
+	margin-block-start: 1.5em;
 }
 
 /* Blank line gap between top-level block elements (added dynamically via JS) */
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) > .amc-block-gap {
-	margin-top: 1em !important;
-	margin-block-start: 1em !important;
+	margin-top: 1em;
+	margin-block-start: 1em;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) ul > li.task-list-item {
@@ -460,84 +468,83 @@
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(ul, ol) :is(ul, ol) {
-	margin-top: 0 !important;
-	margin-bottom: 0 !important;
-	margin-block-start: 0 !important;
-	margin-block-end: 0 !important;
-	padding-inline-start: 1.15em !important;
+	margin-top: 0;
+	margin-bottom: 0;
+	margin-block-start: 0;
+	margin-block-end: 0;
+	padding-inline-start: 1.15em;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li:last-child > :is(ul, ol) {
-	margin-bottom: 0 !important;
+	margin-bottom: 0;
 }
 
-.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li > :is(ul, ol) + p:has(> a):not(:has(> :not(a, br))),
-.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li > :is(ul, ol) + p:has(> a):not(:has(> :not(a, br))) ~ p:has(> a):not(:has(> :not(a, br))) {
-	margin-inline-start: -1.25em !important;
-	padding-inline-start: 0 !important;
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li > :is(ul, ol) + p.amc-link-line,
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li > :is(ul, ol) + p.amc-link-line ~ p.amc-link-line {
+	margin-inline-start: -1.25em;
+	padding-inline-start: 0;
 }
 
-.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered p:has(> a:only-child) {
-	margin-block-start: 0 !important;
-	margin-block-end: 0 !important;
-	line-height: 1.2rem !important;
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered p.amc-link-line {
+	margin-block-start: 0;
+	margin-block-end: 0;
+	line-height: 1.2rem;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered :is(ul, ol).contains-task-list {
-	margin-top: 0.04rem !important;
-	margin-bottom: 0.04rem !important;
-	padding-inline-start: 0.1em !important;
-	display: block !important;
+	margin-top: 0.04rem;
+	margin-bottom: 0.04rem;
+	padding-inline-start: 0.1em;
+	display: block;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item {
-	list-style: none !important;
-	display: grid !important;
-	grid-template-columns: auto 1fr !important;
-	column-gap: 0.35em !important;
-	row-gap: 0.02rem !important;
-	align-items: start !important;
-	margin-top: 0 !important;
-	margin-bottom: 0 !important;
-	padding-top: 0 !important;
-	padding-bottom: 0 !important;
-	min-height: 0 !important;
+	list-style: none;
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 0.02rem 0.35em;
+	align-items: start;
+	margin-top: 0;
+	margin-bottom: 0;
+	padding-top: 0;
+	padding-bottom: 0;
+	min-height: 0;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered ul > li.task-list-item {
-	line-height: 1.18rem !important;
+	line-height: 1.18rem;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item::marker {
-	content: "" !important;
+	content: "";
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item > input[type="checkbox"],
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item > .task-list-item-checkbox {
-	grid-column: 1 !important;
-	grid-row: 1 !important;
-	margin: 0.12em 0 0 0 !important;
+	grid-column: 1;
+	grid-row: 1;
+	margin: 0.12em 0 0 0;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item > :is(p, div, label, span) {
-	grid-column: 2 !important;
-	margin-top: 0 !important;
-	margin-bottom: 0 !important;
-	padding-top: 0 !important;
-	padding-bottom: 0 !important;
-	line-height: 1.18rem !important;
+	grid-column: 2;
+	margin-top: 0;
+	margin-bottom: 0;
+	padding-top: 0;
+	padding-bottom: 0;
+	line-height: 1.18rem;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item > :is(ul, ol) {
-	grid-column: 2 !important;
-	margin-top: 0.04rem !important;
-	margin-bottom: 0 !important;
-	padding-inline-start: 1.15em !important;
+	grid-column: 2;
+	margin-top: 0.04rem;
+	margin-bottom: 0;
+	padding-inline-start: 1.15em;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered li.task-list-item :is(p, div, label, span) {
-	margin-block-start: 0 !important;
-	margin-block-end: 0 !important;
+	margin-block-start: 0;
+	margin-block-end: 0;
 }
 
 /* Obsidian MarkdownRenderer wrapper blocks in Live Preview */
@@ -554,9 +561,9 @@
 	.el-table,
 	.el-hr
 ) {
-	margin-top: 0.1rem !important;
-	margin-bottom: 0.1rem !important;
-	line-height: 1.24rem !important;
+	margin-top: 0.1rem;
+	margin-bottom: 0.1rem;
+	line-height: 1.24rem;
 }
 
 /* List wrapper blocks: tighter spacing */
@@ -565,9 +572,9 @@
 	.el-ol,
 	.el-li
 ) {
-	margin-top: 0 !important;
-	margin-bottom: 0 !important;
-	line-height: inherit !important;
+	margin-top: 0;
+	margin-bottom: 0;
+	line-height: inherit;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) :is(
@@ -578,9 +585,9 @@
 	.el-h5,
 	.el-h6
 ) {
-	margin-top: 0.35rem !important;
-	margin-bottom: 0.2rem !important;
-	line-height: normal !important;
+	margin-top: 0.35rem;
+	margin-bottom: 0.2rem;
+	line-height: normal;
 }
 
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) .markdown-rendered :is(
@@ -591,9 +598,9 @@
 	h5,
 	h6
 ) {
-	margin-block-start: 0.35rem !important;
-	margin-block-end: 0.2rem !important;
-	line-height: 1.2 !important;
+	margin-block-start: 0.35rem;
+	margin-block-end: 0.2rem;
+	line-height: 1.2;
 	overflow-wrap: anywhere;
 }
 
@@ -604,9 +611,9 @@
 	table,
 	hr
 ) {
-	margin-block-start: 0.08rem !important;
-	margin-block-end: 0.08rem !important;
-	line-height: 1.24rem !important;
+	margin-block-start: 0.08rem;
+	margin-block-end: 0.08rem;
+	line-height: 1.24rem;
 }
 
 
@@ -614,7 +621,7 @@
 	blockquote
 
 ) {
-	display: flex !important;
+	display: flex;
 }
 
 .columns-container .column-item.is-editing .column-preview {
@@ -777,7 +784,7 @@
 
 .columns-container .column-dragging {
 	opacity: 0.35;
-	border: 1px dashed var(--text-faint) !important;
+	border: 1px dashed var(--text-faint);
 }
 
 /* Drop indicator: a vertical accent line on the side where the column will land */
@@ -829,7 +836,7 @@
 	border: none;
 	overflow-x: auto;
 	min-width: 0;
-	margin: 0 4px 0 4px !important;
+	margin: 0 4px 0 4px;
 }
 
 /* Reset header negative margin in reading view — the container has no
@@ -841,7 +848,7 @@
 
 .columns-container.columns-reading .column-item:hover {
 	border: none;
-	background: var(--background-modifier-active-hover)!important;
+	background: var(--background-modifier-active-hover);
 }
 
 .columns-container.columns-reading .column-toolbar {
@@ -906,8 +913,8 @@
    ========================================================================== */
 
 .columns-container .columns-stack-group {
-	display: flex;
-	flex-direction: column;
+	display: flex !important;
+	flex-direction: column !important;
 	flex: 1 1 0%;
 	min-width: 0;
 	align-items: stretch;
@@ -1029,7 +1036,7 @@
 	flex-direction: row;
 	padding: 5px 10px;
 	cursor: pointer;
-	gap: 0.5rem !important;
+	gap: 0.5rem;
 }
 
 .columns-suggest-item:hover,
@@ -1077,7 +1084,7 @@
 	overflow: hidden;
 }
 
-.columns-suggest-item:has(.columns-suggest-icon) {
+.columns-suggest-item.columns-suggest-with-icon {
 	flex-direction: row;
 	align-items: center;
 	gap: 8px;

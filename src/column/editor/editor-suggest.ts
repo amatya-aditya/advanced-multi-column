@@ -435,6 +435,7 @@ export class SlashCommandSuggest {
 			div.setAttribute("role", "option");
 			div.setAttribute("aria-selected", String(i === this.selectedIndex));
 
+			div.addClass("columns-suggest-with-icon");
 			const iconSpan = div.createSpan({cls: "columns-suggest-icon"});
 			setIcon(iconSpan, item.icon);
 

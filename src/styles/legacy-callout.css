@@ -12,7 +12,7 @@ div[data-callout^="col-md"].callout {
 
 .columnParent,
 div[data-callout="col"].callout > div.callout-content {
-	display: flex !important;
+	display: flex;
 	padding: var(--obsidian-columns-padding);
 	flex-wrap: nowrap;
 	gap: var(--obsidian-columns-gap);
@@ -145,7 +145,7 @@ div[data-callout="col"].cm-callout > div.callout-content,
 div[data-callout="col"].cm-callout > div.cm-callout-content,
 div[data-callout="col"].cm-embed-block > div.callout-content,
 div[data-callout="col"].cm-embed-block > div.cm-callout-content {
-	display: flex !important;
+	display: flex;
 	padding: var(--obsidian-columns-padding);
 	flex-wrap: nowrap;
 	gap: var(--obsidian-columns-gap);

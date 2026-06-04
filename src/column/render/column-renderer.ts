@@ -219,6 +219,9 @@ export function renderMarkdown(
 			unwrapLooseListParagraphs(parent);
 			// Mark list items that follow a blank line in the source with a gap class
 			markListGaps(parent, content);
+			// Tag link-only paragraphs so their spacing rules can target a class
+			// instead of relying on the :has() selector.
+			markLinkLines(parent);
 			if (onContentChange) {
 				wireTaskCheckboxes(parent, content, onContentChange);
 			}
@@ -288,6 +291,30 @@ function wireTaskCheckboxes(
 			lines[lineIdx] = line.replace(/^(\s*[-*+] \[).\]/, `$1${newStatus}]`);
 			onContentChange(lines.join("\n"));
 		});
+	});
+}
+
+/**
+ * Tag paragraphs whose only element children are anchors (and <br>) with the
+ * `amc-link-line` class. Replaces the `p:has(> a)…` selectors so spacing for
+ * link-only paragraphs (e.g. consecutive wikilinks) can be styled by class.
+ */
+function markLinkLines(parent: HTMLElement): void {
+	const paragraphs = parent.querySelectorAll<HTMLElement>("p");
+	paragraphs.forEach((p) => {
+		let hasAnchor = false;
+		let onlyAnchorsOrBreaks = true;
+		for (const child of Array.from(p.children)) {
+			if (child.tagName === "A") {
+				hasAnchor = true;
+			} else if (child.tagName !== "BR") {
+				onlyAnchorsOrBreaks = false;
+				break;
+			}
+		}
+		if (hasAnchor && onlyAnchorsOrBreaks) {
+			p.classList.add("amc-link-line");
+		}
 	});
 }
 

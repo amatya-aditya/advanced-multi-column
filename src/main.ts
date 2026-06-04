@@ -9,6 +9,7 @@ import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./p
 export default class ColumnsPlugin extends Plugin {
 	settings!: ColumnsPluginSettings;
 	private runtimeStyleSheet: CSSStyleSheet | null = null;
+	private runtimeStyleEl: HTMLStyleElement | null = null;
 	private cleanupReadingView: (() => void) | null = null;
 	private cleanupPropertyFolding: (() => void) | null = null;
 
@@ -285,36 +286,85 @@ export default class ColumnsPlugin extends Plugin {
 	}
 
 	private applyRuntimeStyles(): void {
+		const css = buildRuntimeStyles(this.settings);
+
+		// Preferred path: a constructed stylesheet adopted by the document.
 		const styleSheet = this.ensureRuntimeStyleSheet();
-		if (!styleSheet) return;
-		styleSheet.replaceSync(buildRuntimeStyles(this.settings));
+		if (styleSheet) {
+			try {
+				styleSheet.replaceSync(css);
+				return;
+			} catch {
+				// Constructed stylesheets can fail under some runtimes; fall through.
+				this.detachRuntimeStyleSheet();
+			}
+		}
+
+		// Fallback: a plain <style> element. Works everywhere and never throws.
+		this.ensureRuntimeStyleEl().textContent = css;
+	}
+
+	/** Document to attach runtime styles to. Tolerates a missing activeDocument
+	 *  so plugin load can never throw on environments where it is unavailable. */
+	private getStyleDocument(): Document {
+		return (window.activeDocument as Document | undefined) ?? window.document;
 	}
 
 	private ensureRuntimeStyleSheet(): CSSStyleSheet | null {
 		if (this.runtimeStyleSheet) return this.runtimeStyleSheet;
-		if (typeof CSSStyleSheet === "undefined") return null;
-		if (!("adoptedStyleSheets" in window.activeDocument)) return null;
+		try {
+			const doc = this.getStyleDocument();
+			if (!doc || !("adoptedStyleSheets" in doc)) return null;
 
-		const sheet = new CSSStyleSheet();
-		const adoptedTarget = window.activeDocument as Document & {
-			adoptedStyleSheets: CSSStyleSheet[];
-		};
-		adoptedTarget.adoptedStyleSheets = [...adoptedTarget.adoptedStyleSheets, sheet];
-		this.runtimeStyleSheet = sheet;
-		return sheet;
+			// Construct in the target document's own realm to avoid
+			// cross-document adoption errors in newer Chromium.
+			const view = doc.defaultView ?? window;
+			if (typeof view.CSSStyleSheet === "undefined") return null;
+
+			const sheet = new view.CSSStyleSheet();
+			const adoptedTarget = doc as Document & {
+				adoptedStyleSheets: CSSStyleSheet[];
+			};
+			adoptedTarget.adoptedStyleSheets = [...adoptedTarget.adoptedStyleSheets, sheet];
+			this.runtimeStyleSheet = sheet;
+			return sheet;
+		} catch {
+			return null;
+		}
+	}
+
+	private ensureRuntimeStyleEl(): HTMLStyleElement {
+		if (this.runtimeStyleEl?.isConnected) return this.runtimeStyleEl;
+		const doc = this.getStyleDocument();
+		const el = doc.createElement("style");
+		el.id = "amc-runtime-styles";
+		(doc.head ?? doc.documentElement).appendChild(el);
+		this.runtimeStyleEl = el;
+		return el;
 	}
 
 	private detachRuntimeStyleSheet(): void {
 		const sheet = this.runtimeStyleSheet;
-		if (!sheet) return;
-		if ("adoptedStyleSheets" in window.activeDocument) {
-			const adoptedTarget = window.activeDocument as Document & {
-				adoptedStyleSheets: CSSStyleSheet[];
-			};
-			adoptedTarget.adoptedStyleSheets = adoptedTarget.adoptedStyleSheets.filter(
-				(existing) => existing !== sheet,
-			);
-		}
 		this.runtimeStyleSheet = null;
+		if (sheet) {
+			try {
+				const doc = this.getStyleDocument();
+				if ("adoptedStyleSheets" in doc) {
+					const adoptedTarget = doc as Document & {
+						adoptedStyleSheets: CSSStyleSheet[];
+					};
+					adoptedTarget.adoptedStyleSheets = adoptedTarget.adoptedStyleSheets.filter(
+						(existing) => existing !== sheet,
+					);
+				}
+			} catch {
+				// Ignore detach failures during teardown.
+			}
+		}
+
+		if (this.runtimeStyleEl) {
+			this.runtimeStyleEl.remove();
+			this.runtimeStyleEl = null;
+		}
 	}
 }
