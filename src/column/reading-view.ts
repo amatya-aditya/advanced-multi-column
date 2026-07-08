@@ -473,11 +473,48 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const sourceHints = new WeakMap<HTMLElement, string>();
 	const retryCounts = new WeakMap<HTMLElement, number>();
 	const activeSizers = new Set<HTMLElement>();
+	const buildTimes = new WeakMap<HTMLElement, {fingerprint: string; time: number}[]>();
+	const suppressedSizers = new WeakSet<HTMLElement>();
+	// One entry per sizer while a wrapper build is in flight.  Renders whose
+	// fingerprint matches the in-flight build coalesce into it instead of
+	// invalidating it — otherwise frequent async re-renders (e.g. Dataview
+	// inline queries refreshing during index churn) can starve every build
+	// and the wrapper never mounts.
+	const inFlightBuilds = new WeakMap<HTMLElement, {token: number; fingerprint: string}>();
 	let renderIdSeq = 0;
+
+	// Safety net: an idle note must never rebuild continuously.  Legitimate
+	// rebuilds (edits, navigation) change the fingerprint, so only repeated
+	// rebuilds of the *same* content within the window count as a loop.
+	const BUILD_WINDOW_MS = 10_000;
+	const MAX_SAME_CONTENT_BUILDS = 5;
+
+	const shouldSuppressBuild = (sizer: HTMLElement, fingerprint: string): boolean => {
+		const now = Date.now();
+		const entries = (buildTimes.get(sizer) ?? []).filter((e) => now - e.time < BUILD_WINDOW_MS);
+		const sameContent = entries.filter((e) => e.fingerprint === fingerprint);
+		if (sameContent.length >= MAX_SAME_CONTENT_BUILDS) {
+			buildTimes.set(sizer, entries);
+			if (!suppressedSizers.has(sizer)) {
+				suppressedSizers.add(sizer);
+				console.warn(
+					"[Advanced Multi Column] Reading view columns were rebuilt "
+					+ `${sameContent.length} times within ${BUILD_WINDOW_MS / 1000}s `
+					+ "without a content change; suspending further rebuilds to break the loop.",
+				);
+			}
+			return true;
+		}
+		suppressedSizers.delete(sizer);
+		entries.push({fingerprint, time: now});
+		buildTimes.set(sizer, entries);
+		return false;
+	};
 
 	const invalidateRenderToken = (sizer: HTMLElement): void => {
 		const current = renderTokens.get(sizer) ?? 0;
 		renderTokens.set(sizer, current + 1);
+		inFlightBuilds.delete(sizer);
 	};
 
 	const sizerSnapshot = (sizer: HTMLElement, state?: RenderState) => {
@@ -502,6 +539,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		sizer: HTMLElement,
 		sourcePath: string,
 		reason: string,
+		delayMs = 50,
 	): void {
 		sourceHints.set(sizer, sourcePath);
 		const existingTimer = timers.get(sizer);
@@ -519,7 +557,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		const timer = window.setTimeout(() => {
 			timers.delete(sizer);
 			void renderSizer(sizer, reason);
-		}, 50);
+		}, delayMs);
 		timers.set(sizer, timer);
 	}
 
@@ -532,14 +570,19 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			reason,
 			...sizerSnapshot(sizer, state),
 		});
-		if (states.get(sizer) !== state) return;
-
+		// Always disconnect this state's observers — even when a newer state
+		// has replaced it, stale observers must not keep firing.
 		state.previewObserver?.disconnect();
 		state.hostObserver?.disconnect();
 		state.wrapperObserver?.disconnect();
 		state.sizerObserver?.disconnect();
+		if (states.get(sizer) !== state) return;
+
 		state.component.unload();
 		states.delete(sizer);
+		// Detach the old render tree so it can be garbage collected instead
+		// of lingering as a detached DOM subtree.
+		state.wrapper.remove();
 		state.previewEl.classList.remove(RV_ACTIVE_CLASS);
 		if (!state.host.hasChildNodes()) {
 			state.host.remove();
@@ -736,10 +779,18 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			return;
 		}
 		const view = resolveViewForSizer(sizer, plugin);
+		let mountedState: RenderState | null = null;
 		const shouldRestoreScroll = (): boolean => {
 			if (!plugin.settings.enableReadingView) return false;
 			if (!sizer.isConnected) return false;
-			if (renderTokens.get(sizer) !== token) return false;
+			// After a successful mount, restore as long as that render is still
+			// the current one.  Coalesced renders bump the token, so the token
+			// alone would wrongly cancel the restore.
+			if (mountedState) {
+				if (states.get(sizer) !== mountedState) return false;
+			} else if (renderTokens.get(sizer) !== token) {
+				return false;
+			}
 			if (!previewEl.isConnected) return false;
 			if (!previewEl.closest(".markdown-reading-view")) return false;
 			return true;
@@ -790,6 +841,9 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			} else {
 				retryCounts.delete(sizer);
 				rvWarn("render found no marker regions", {sourcePath});
+				// Kill any pending build so it cannot mount columns for
+				// content that no longer has any.
+				inFlightBuilds.delete(sizer);
 				teardownSizer(sizer, states, "no regions");
 			}
 			return;
@@ -816,6 +870,21 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			return;
 		}
 
+		const flying = inFlightBuilds.get(sizer);
+		if (flying && flying.fingerprint === fingerprint) {
+			rvWarn("render coalesced into in-flight build", {token, fingerprint});
+			return;
+		}
+
+		if (shouldSuppressBuild(sizer, fingerprint)) {
+			rvWarn("render suppressed: too many rebuilds", sizerSnapshot(sizer, existing));
+			// Re-check after the window has cleared so a legitimate change made
+			// during suppression is still rendered eventually.  If nothing
+			// changed, the fingerprint reuse path exits without a rebuild.
+			scheduleRender(sizer, sourcePath, "retry-after-suppression", BUILD_WINDOW_MS);
+			return;
+		}
+
 		if (existing) {
 			if (!existing.wrapper.isConnected || existing.wrapper.parentElement !== existing.host) {
 				rvError("existing wrapper missing before rebuild", sizerSnapshot(sizer, existing));
@@ -830,11 +899,14 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		component.load();
 		const renderId = ++renderIdSeq;
 		let scrollSnapshot: ScrollSnapshot[] = [];
+		inFlightBuilds.set(sizer, {token, fingerprint});
 
 		try {
 			const wrapper = await buildWrapper(plugin, sourcePath, text, regions, component);
 
-			if (!sizer.isConnected || renderTokens.get(sizer) !== token) {
+			// Drop only if a different build superseded this one (or the view
+			// went away) — same-fingerprint renders coalesced instead.
+			if (!sizer.isConnected || inFlightBuilds.get(sizer)?.token !== token) {
 				component.unload();
 				rvWarn("render result dropped: stale after async build", {
 					renderId,
@@ -843,6 +915,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				});
 				return;
 			}
+			inFlightBuilds.delete(sizer);
 
 			while (host.firstChild) {
 				host.removeChild(host.firstChild);
@@ -853,7 +926,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			host.appendChild(wrapper);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
-			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			const state: RenderState = {
 				sourcePath,
 				fingerprint,
@@ -865,6 +937,8 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				createdAt: Date.now(),
 			};
 			states.set(sizer, state);
+			mountedState = state;
+			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			retryCounts.delete(sizer);
 			installLifecycleObservers(sizer, state);
 			rvWarn("rendered wrapper", {
@@ -875,6 +949,9 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				sizerChildren: sizer.children.length,
 			});
 		} catch (error) {
+			if (inFlightBuilds.get(sizer)?.token === token) {
+				inFlightBuilds.delete(sizer);
+			}
 			component.unload();
 			previewEl.classList.remove(RV_ACTIVE_CLASS);
 			restoreSizerContent(sizer);
@@ -891,7 +968,13 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 	plugin.registerMarkdownPostProcessor(
 		(el: HTMLElement, ctx: MarkdownPostProcessorContext) => {
-			if (el.closest(".columns-rv-wrapper")) return;
+			// Ignore renders inside our own containers.  This must also match
+			// containers that are no longer attached to a wrapper: when a
+			// stale build is dropped and its component unloaded, pending
+			// async post-processors (Dataview, Meta Bind, ...) still fire for
+			// the detached column elements.  Scheduling from those would make
+			// every rebuild trigger the next one — an infinite remount loop.
+			if (el.closest(".columns-rv-wrapper, .columns-rv-segment, .column-preview")) return;
 
 			const sizer = resolveSizerForElement(el, plugin, ctx.sourcePath);
 			if (!sizer?.instanceOf(HTMLElement)) return;
