@@ -659,6 +659,43 @@
 	outline: none;
 }
 
+/* ── Embedded live-preview editor ───────────────────────────── */
+
+.columns-container .amc-embedded-editor {
+	width: 100%;
+	min-height: 60px;
+	cursor: text;
+}
+
+.columns-container .amc-embedded-editor .markdown-source-view.mod-cm6 {
+	padding: 0;
+	background: transparent;
+}
+
+.columns-container .amc-embedded-editor .cm-editor {
+	background: transparent;
+}
+
+.columns-container .amc-embedded-editor .cm-editor .cm-scroller {
+	padding: 0;
+	min-height: 60px;
+}
+
+.columns-container .amc-embedded-editor .cm-editor .cm-sizer {
+	margin: 0;
+	padding: 0;
+	max-width: none;
+	min-height: 0;
+}
+
+.columns-container .amc-embedded-editor .cm-editor .cm-content {
+	padding: 4px 0;
+}
+
+.columns-container .amc-embedded-editor .cm-editor .cm-contentContainer {
+	width: 100%;
+}
+
 .columns-container .column-inline-edit-block {
 	margin: 0 0 8px;
 }

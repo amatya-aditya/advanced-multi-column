@@ -44,6 +44,9 @@ export class ColumnWidget extends WidgetType {
 
 		container.addEventListener("mousedown", (e) => {
 			const target = e.target as HTMLElement;
+			// Never swallow events inside the embedded live-preview editor —
+			// it needs native mousedown for caret placement and selection.
+			if (target.closest(".amc-embedded-editor")) return;
 			if (isInteractivePreviewTarget(target, container)) return;
 			e.preventDefault();
 		});

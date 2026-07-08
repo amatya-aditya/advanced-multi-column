@@ -18,11 +18,10 @@ export function autoSize(ta: HTMLTextAreaElement): void {
 
 // ── Image paste handling ────────────────────────────────────
 
-export async function handleImagePaste(
+export async function createPastedImageLink(
 	blob: File,
 	mimeType: string,
-	textarea: HTMLTextAreaElement,
-): Promise<void> {
+): Promise<string | null> {
 	try {
 		const plugin = getPluginInstance();
 		const ext = mimeType === "image/jpeg" ? "jpg" : (mimeType.split("/")[1] ?? "png");
@@ -33,18 +32,28 @@ export async function handleImagePaste(
 
 		const buf = await blob.arrayBuffer();
 		const created = await plugin.app.vault.createBinary(fullPath, buf);
-
-		const link = `![[${created.name}]]`;
-		const start = textarea.selectionStart;
-		const end = textarea.selectionEnd;
-		const value = textarea.value;
-		textarea.value = value.substring(0, start) + link + value.substring(end);
-		textarea.selectionStart = start + link.length;
-		textarea.selectionEnd = start + link.length;
-		textarea.dispatchEvent(new Event("input", {bubbles: true}));
+		return `![[${created.name}]]`;
 	} catch {
 		new Notice("Failed to paste image");
+		return null;
 	}
+}
+
+export async function handleImagePaste(
+	blob: File,
+	mimeType: string,
+	textarea: HTMLTextAreaElement,
+): Promise<void> {
+	const link = await createPastedImageLink(blob, mimeType);
+	if (!link) return;
+
+	const start = textarea.selectionStart;
+	const end = textarea.selectionEnd;
+	const value = textarea.value;
+	textarea.value = value.substring(0, start) + link + value.substring(end);
+	textarea.selectionStart = start + link.length;
+	textarea.selectionEnd = start + link.length;
+	textarea.dispatchEvent(new Event("input", {bubbles: true}));
 }
 
 // ── Restore edit state ──────────────────────────────────────
