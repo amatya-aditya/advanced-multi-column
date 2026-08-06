@@ -99,20 +99,24 @@ function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
 	return host?.instanceOf(HTMLElement) ? host : null;
 }
 
-/** Keep the replacement content in Obsidian's sizer immediately before its
- * native footer. This preserves native ownership of backlinks so the core
- * setting can add/remove them without AMC relocating or orphaning the footer. */
-function placeWrapperHost(sizer: HTMLElement, host: HTMLElement): void {
-	const footer = sizer.querySelector(":scope > .mod-footer");
+/** Keep AMC's replacement tree outside Obsidian's virtualized sizer. The
+ * sizer removes children while scrolling, so mounting the host inside it makes
+ * a normal scroll look like wrapper damage and starts a recovery-render loop. */
+function placeWrapperHost(
+	previewEl: HTMLElement,
+	sizer: HTMLElement,
+	host: HTMLElement,
+): void {
+	const footer = previewEl.querySelector(":scope > .mod-footer");
 	if (footer?.instanceOf(HTMLElement)) {
-		if (host.parentElement !== sizer || host.nextSibling !== footer) {
-			sizer.insertBefore(host, footer);
+		if (host.parentElement !== previewEl || host.nextSibling !== footer) {
+			previewEl.insertBefore(host, footer);
 		}
 		return;
 	}
 
-	if (host.parentElement !== sizer) {
-		sizer.appendChild(host);
+	if (host.parentElement !== previewEl || sizer.nextSibling !== host) {
+		previewEl.insertBefore(host, sizer.nextSibling);
 	}
 }
 
@@ -122,13 +126,35 @@ function ensureWrapperHost(
 ): HTMLElement {
 	const existing = getWrapperHost(previewEl);
 	if (existing) {
-		placeWrapperHost(sizer, existing);
+		placeWrapperHost(previewEl, sizer, existing);
 		return existing;
 	}
 
-	const host = sizer.createDiv({cls: RV_HOST_CLASS});
-	placeWrapperHost(sizer, host);
+	const host = previewEl.createDiv({cls: RV_HOST_CLASS});
+	placeWrapperHost(previewEl, sizer, host);
 	return host;
+}
+
+/** Keep Obsidian's native footer after AMC's external host so embedded
+ * backlinks remain below the rendered note. Obsidian still owns the footer;
+ * we return it to the sizer whenever AMC tears down. */
+function relocateFooter(
+	sizer: HTMLElement,
+	previewEl: HTMLElement,
+	host: HTMLElement,
+): void {
+	const nestedFooter = sizer.querySelector(":scope > .mod-footer");
+	const externalFooter = previewEl.querySelector(":scope > .mod-footer");
+	const footer = nestedFooter?.instanceOf(HTMLElement)
+		? nestedFooter
+		: externalFooter?.instanceOf(HTMLElement)
+			? externalFooter
+			: null;
+	if (!footer) return;
+
+	if (footer.parentElement !== previewEl || host.nextSibling !== footer) {
+		previewEl.insertBefore(footer, host.nextSibling);
+	}
 }
 
 function isScrollableElement(el: HTMLElement): boolean {
@@ -562,7 +588,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			hostChildren: host?.children.length ?? 0,
 			wrapperConnected: state?.wrapper.isConnected ?? false,
 			wrapperParentMatches: state ? state.wrapper.parentElement === state.host : false,
-			hostParentMatches: state ? state.host.parentElement === sizer : false,
+			hostParentMatches: state ? state.host.parentElement === state.previewEl : false,
 		};
 	};
 
@@ -639,6 +665,8 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 		// Watch sizer for newly added children (scroll virtualization, mode switch)
 		// and hide el-* / pusher elements that Obsidian adds after our initial render.
+		// The AMC host deliberately remains a sibling of the sizer so those virtual
+		// DOM mutations cannot remove it and trigger a recovery-render loop.
 		const sizerObserver = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
 				for (const node of Array.from(mutation.addedNodes)) {
@@ -651,13 +679,14 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 					}
 				}
 			}
-			if (!state.host.isConnected || state.host.parentElement !== sizer) {
+			if (!state.host.isConnected || state.host.parentElement !== state.previewEl) {
 				handleWrapperDisappearance(sizer, state, "sizer-observer");
 				return;
 			}
-			// Obsidian adds/removes .mod-footer when the backlinks setting changes.
-			// Reposition the host without rebuilding the rendered note.
-			placeWrapperHost(sizer, state.host);
+			// Obsidian may add a fresh .mod-footer when backlinks are toggled or
+			// the reading view is refreshed. Keep it below the stable AMC host.
+			placeWrapperHost(state.previewEl, sizer, state.host);
+			relocateFooter(sizer, state.previewEl, state.host);
 		});
 		sizerObserver.observe(sizer, {childList: true});
 
@@ -683,7 +712,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 			if (
 				!state.host.isConnected
-				|| state.host.parentElement !== sizer
+				|| state.host.parentElement !== state.previewEl
 				|| !state.wrapper.isConnected
 				|| state.wrapper.parentElement !== state.host
 			) {
@@ -894,7 +923,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			&& existing.fingerprint === fingerprint
 			&& existing.wrapper.isConnected
 			&& existing.host.isConnected
-			&& existing.host.parentElement === sizer
+			&& existing.host.parentElement === existing.previewEl
 			&& existing.wrapper.parentElement === existing.host
 		) {
 			if (!existing.previewEl.classList.contains(RV_ACTIVE_CLASS)) {
@@ -931,7 +960,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		}
 
 		const host = ensureWrapperHost(previewEl, sizer);
-		restoreFooter(previewEl, sizer);
 
 		const component = new Component();
 		component.load();
@@ -959,12 +987,18 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				host.removeChild(host.firstChild);
 			}
 			wrapper.dataset.columnsRenderId = String(renderId);
-			scrollSnapshot = captureScrollSnapshot(previewEl);
+			// Recovery renders must not force a scroll position captured after the
+			// DOM was damaged. That position may already be stale and was the source
+			// of the repeated scrollbar jumps in the old remount loop.
+			if (!reason.startsWith("recover:")) {
+				scrollSnapshot = captureScrollSnapshot(previewEl);
+			}
 			previewEl.classList.add(RV_ACTIVE_CLASS);
 			host.appendChild(wrapper);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
-			placeWrapperHost(sizer, host);
+			placeWrapperHost(previewEl, sizer, host);
+			relocateFooter(sizer, previewEl, host);
 			const state: RenderState = {
 				sourcePath,
 				fingerprint,
@@ -977,7 +1011,9 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			};
 			states.set(sizer, state);
 			mountedState = state;
-			restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
+			if (scrollSnapshot.length > 0) {
+				restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
+			}
 			retryCounts.delete(sizer);
 			installLifecycleObservers(sizer, state);
 			rvWarn("rendered wrapper", {
