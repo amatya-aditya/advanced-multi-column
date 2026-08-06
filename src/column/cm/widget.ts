@@ -44,6 +44,9 @@ export class ColumnWidget extends WidgetType {
 
 		container.addEventListener("mousedown", (e) => {
 			const target = e.target as HTMLElement;
+			// Never swallow events inside the embedded live-preview editor —
+			// it needs native mousedown for caret placement and selection.
+			if (target.closest(".amc-embedded-editor")) return;
 			if (isInteractivePreviewTarget(target, container)) return;
 			e.preventDefault();
 		});
@@ -57,20 +60,10 @@ export class ColumnWidget extends WidgetType {
 		return container;
 	}
 
-	updateDOM(dom: HTMLElement, view: EditorView): boolean {
-		this.cleanupComponents();
-		dom.className = "columns-container columns-ui";
-		applyContainerStyle(dom, this.region.containerStyle);
-		dom.empty();
-		buildColumns(dom, {
-			region: this.region,
-			view,
-			components: this.components,
-			suggests: this.suggests,
-		});
-		return true;
-	}
-
+	// Intentionally use WidgetType.updateDOM's default `false` result. CodeMirror
+	// calls updateDOM on the replacement widget and only destroys the previous
+	// widget when that update is rejected. Since column updates rebuild all DOM
+	// anyway, replacement guarantees the previous components are unloaded.
 	destroy(): void {
 		this.cleanupComponents();
 	}

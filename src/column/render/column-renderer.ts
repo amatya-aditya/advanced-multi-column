@@ -5,6 +5,8 @@ import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnEditorSuggest, SlashCommandSuggest} from "../editor/editor-suggest";
 import {ThirdPartySuggestBridge} from "../editor/third-party-suggest";
 import {restoreEditState, wireEditCore} from "../editor/column-editor";
+import {isEmbeddedEditorAvailable} from "../editor/embedded-editor";
+import {wireLivePreviewEdit} from "../editor/live-edit";
 import {openColumnStyleContextMenu} from "./style-context-menu";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "../core/column-style";
 import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "../core/types";
@@ -491,7 +493,7 @@ export function wireContextMenu(
 ): void {
 	item.addEventListener("contextmenu", (e: MouseEvent) => {
 		const target = e.target as HTMLElement;
-		if (target.closest("textarea") || target.closest("input")) return;
+		if (target.closest("textarea") || target.closest("input") || target.closest(".amc-embedded-editor")) return;
 
 		let selectedIndices: Set<number> | undefined;
 		if (view && containerEl) {
@@ -773,6 +775,25 @@ function renderEditableTextSegment(
 	};
 	renderPreview(initialText);
 
+	let currentText = initialText;
+
+	if (isEmbeddedEditorAvailable()) {
+		wireLivePreviewEdit({
+			container: block,
+			hostEl: block,
+			previewEl: preview,
+			components: ctx.components,
+			getContent: () => currentText,
+			onCommit: (nextText) => {
+				currentText = nextText;
+				onCommit(nextText);
+			},
+		});
+		return;
+	}
+
+	// Legacy textarea editor (fallback when the internal live-preview
+	// editor class cannot be resolved).
 	const textarea = block.createEl("textarea", {cls: "column-inline-editor"});
 	textarea.value = initialText;
 	textarea.spellcheck = false;
@@ -783,8 +804,6 @@ function renderEditableTextSegment(
 	const slashSuggest = createSlashSuggest(textarea);
 	const tpSuggest = new ThirdPartySuggestBridge(textarea, plugin.app);
 	ctx.suggests.push(suggest);
-
-	let currentText = initialText;
 
 	wireEditCore({
 		container: block,
@@ -1073,24 +1092,42 @@ function renderNestedRegion(
 			}
 
 			if (!hasNestedRegions) {
-				const textarea = colEl.createEl("textarea", {cls: "column-editor"});
-				textarea.value = col.content;
-				textarea.spellcheck = false;
-				textarea.placeholder = "Type here";
+				const commitNested = (nextChildContent: string) => {
+					const updated = region.columns.map((c, idx) =>
+						idx === i ? {...c, content: nextChildContent} : c,
+					);
+					onRegionChange(updated, region.containerStyle);
+				};
 
-				wireNestedEditToggle(
-					container,
-					previewEl,
-					textarea,
-					() => region.columns[i]!.content,
-					(nextChildContent) => {
-						const updated = region.columns.map((c, idx) =>
-							idx === i ? {...c, content: nextChildContent} : c,
-						);
-						onRegionChange(updated, region.containerStyle);
-					},
-					ctx,
-				);
+				if (isEmbeddedEditorAvailable()) {
+					wireLivePreviewEdit({
+						container,
+						hostEl: colEl,
+						previewEl,
+						components: ctx.components,
+						getContent: () => region.columns[i]!.content,
+						onCommit: commitNested,
+						clickGuard: (target) => {
+							const currentNested = previewEl.closest(".columns-nested");
+							const clickedNested = target.closest(".columns-nested");
+							return !!(currentNested && clickedNested && clickedNested !== currentNested);
+						},
+					});
+				} else {
+					const textarea = colEl.createEl("textarea", {cls: "column-editor"});
+					textarea.value = col.content;
+					textarea.spellcheck = false;
+					textarea.placeholder = "Type here";
+
+					wireNestedEditToggle(
+						container,
+						previewEl,
+						textarea,
+						() => region.columns[i]!.content,
+						commitNested,
+						ctx,
+					);
+				}
 			}
 		}
 	}
@@ -1227,20 +1264,53 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				}
 
 				if (!hasNestedRegions) {
-					const textarea = colEl.createEl("textarea", {cls: "column-editor"});
-					textarea.value = col.content;
-					textarea.spellcheck = false;
-					textarea.placeholder = "Type here";
+					if (isEmbeddedEditorAvailable()) {
+						const liveEdit = wireLivePreviewEdit({
+							container,
+							hostEl: colEl,
+							previewEl,
+							components: ctx.components,
+							getContent: () => ctx.region.columns[i]!.content,
+							onCommit: (nextContent) => commitEdit(i, nextContent, ctx),
+							clickGuard: (target) => !!target.closest(".columns-nested"),
+							blurDelay: 200,
+							editState: {view: ctx.view, regionFrom: ctx.region.from, columnIndex: i},
+							onNavigate: (dir) => {
+								const next = i + dir;
+								if (next < 0 || next >= ctx.region.columns.length) return;
+								const allItems = getColumnElements(container);
+								const nextPreview = allItems[next]?.querySelector<HTMLElement>(".column-preview");
+								if (nextPreview) {
+									nextPreview.win.setTimeout(() => nextPreview.click(), 50);
+								}
+							},
+						});
 
-					const suggest = new ColumnEditorSuggest(textarea, plugin.app);
-					const slashSuggest = createSlashSuggest(textarea);
-					const tpSuggest = new ThirdPartySuggestBridge(textarea, plugin.app);
-					ctx.suggests.push(suggest);
-					wireTopLevelEditToggle(container, previewEl, textarea, i, suggest, slashSuggest, tpSuggest, ctx);
+						const iState = getInteractionState(ctx.view);
+						if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.columnIndex === i) {
+							const saved = iState.activeEdit;
+							liveEdit.enterEdit({
+								value: saved.value,
+								cursorStart: saved.cursorStart,
+								cursorEnd: saved.cursorEnd,
+							});
+						}
+					} else {
+						const textarea = colEl.createEl("textarea", {cls: "column-editor"});
+						textarea.value = col.content;
+						textarea.spellcheck = false;
+						textarea.placeholder = "Type here";
 
-					const iState = getInteractionState(ctx.view);
-					if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.columnIndex === i) {
-						restoreEditState(textarea, ctx.view);
+						const suggest = new ColumnEditorSuggest(textarea, plugin.app);
+						const slashSuggest = createSlashSuggest(textarea);
+						const tpSuggest = new ThirdPartySuggestBridge(textarea, plugin.app);
+						ctx.suggests.push(suggest);
+						wireTopLevelEditToggle(container, previewEl, textarea, i, suggest, slashSuggest, tpSuggest, ctx);
+
+						const iState = getInteractionState(ctx.view);
+						if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.columnIndex === i) {
+							restoreEditState(textarea, ctx.view);
+						}
 					}
 				}
 
