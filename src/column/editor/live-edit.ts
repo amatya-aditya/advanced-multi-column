@@ -73,6 +73,13 @@ function handleEditorImagePaste(e: ClipboardEvent, editor: InternalMarkdownEdito
 export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 	const {blurDelay = 180} = config;
 	let active: EmbeddedEditorHandle | null = null;
+	let blurTimer: number | null = null;
+
+	const clearBlurTimer = () => {
+		if (blurTimer === null) return;
+		config.hostEl.win.clearTimeout(blurTimer);
+		blurTimer = null;
+	};
 
 	const clearEditState = () => {
 		if (!config.editState) return;
@@ -90,6 +97,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 	const commitAndClose = () => {
 		const handle = active;
 		if (!handle) return;
+		clearBlurTimer();
 		active = null;
 		const nextValue = handle.value;
 		handle.destroy();
@@ -152,8 +160,12 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			placeholder: "Type here",
 			onEscape: () => commitAndClose(),
 			onBlur: () => {
-				config.hostEl.win.setTimeout(() => {
-					if (!active) return;
+				const blurredHandle = active;
+				if (!blurredHandle) return;
+				clearBlurTimer();
+				blurTimer = config.hostEl.win.setTimeout(() => {
+					blurTimer = null;
+					if (active !== blurredHandle) return;
 					if (config.hostEl.contains(config.hostEl.doc.activeElement)) return;
 					commitAndClose();
 				}, blurDelay);
@@ -184,7 +196,14 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 
 		// Destroy the editor when the widget is rebuilt or destroyed.
 		const holder = new Component();
-		holder.register(() => handle.destroy());
+		holder.register(() => {
+			if (active === handle) {
+				active = null;
+				clearBlurTimer();
+				config.hostEl.classList.remove("is-editing");
+			}
+			handle.destroy();
+		});
 		holder.load();
 		config.components.push(holder);
 

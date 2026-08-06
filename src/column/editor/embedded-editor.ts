@@ -68,6 +68,7 @@ let cachedEditorClass: InternalMarkdownEditorConstructor | null | undefined;
 function resolveEditorClass(app: App): InternalMarkdownEditorConstructor | null {
 	if (cachedEditorClass !== undefined) return cachedEditorClass;
 	cachedEditorClass = null;
+	let temp: WidgetEditorView | null = null;
 	try {
 		const registry = (app as App & {embedRegistry?: EmbedRegistry}).embedRegistry;
 		const createMdEmbed = registry?.embedByExtension?.md;
@@ -75,7 +76,7 @@ function resolveEditorClass(app: App): InternalMarkdownEditorConstructor | null 
 
 		// Create a throwaway editable markdown embed just to grab the
 		// prototype of the internal MarkdownEditor class.
-		const temp = createMdEmbed(
+		temp = createMdEmbed(
 			{app, containerEl: document.createElement("div"), state: {}},
 			null,
 			"",
@@ -90,9 +91,14 @@ function resolveEditorClass(app: App): InternalMarkdownEditorConstructor | null 
 				cachedEditorClass = ctor as InternalMarkdownEditorConstructor;
 			}
 		}
-		temp.unload();
 	} catch {
 		cachedEditorClass = null;
+	} finally {
+		try {
+			temp?.unload();
+		} catch {
+			// Best-effort cleanup when probing an unsupported internal API.
+		}
 	}
 	return cachedEditorClass;
 }
@@ -278,6 +284,16 @@ export function createEmbeddedEditor(
 		editor.load();
 		editor.set(options.value);
 	} catch {
+		try {
+			instance?.unload();
+		} catch {
+			// Best-effort component cleanup after partial initialization.
+		}
+		try {
+			instance?.destroy();
+		} catch {
+			// Best-effort editor cleanup after partial initialization.
+		}
 		containerEl.remove();
 		return null;
 	}

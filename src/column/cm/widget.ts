@@ -60,20 +60,10 @@ export class ColumnWidget extends WidgetType {
 		return container;
 	}
 
-	updateDOM(dom: HTMLElement, view: EditorView): boolean {
-		this.cleanupComponents();
-		dom.className = "columns-container columns-ui";
-		applyContainerStyle(dom, this.region.containerStyle);
-		dom.empty();
-		buildColumns(dom, {
-			region: this.region,
-			view,
-			components: this.components,
-			suggests: this.suggests,
-		});
-		return true;
-	}
-
+	// Intentionally use WidgetType.updateDOM's default `false` result. CodeMirror
+	// calls updateDOM on the replacement widget and only destroys the previous
+	// widget when that update is rejected. Since column updates rebuild all DOM
+	// anyway, replacement guarantees the previous components are unloaded.
 	destroy(): void {
 		this.cleanupComponents();
 	}
