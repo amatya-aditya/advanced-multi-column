@@ -448,8 +448,12 @@ export function serializeColumns(
 	const parts: string[] = [`%% col-start${serializeStartPayload(containerStyle, layout)} %%`];
 	for (const col of columns) {
 		parts.push(`%% col-break${serializeBreakPayload(col)} %%`);
-		parts.push(col.content);
+		if (col.content.trim().length > 0) {
+			parts.push(col.content);
+		}
 	}
 	parts.push("%% col-end %%");
-	return parts.join("\n");
+	// Blank lines keep Obsidian comments out of adjacent HTML blocks and make
+	// every rewritten marker a standalone Markdown block in Reading View.
+	return parts.join("\n\n");
 }

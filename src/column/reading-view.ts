@@ -93,8 +93,27 @@ function resolvePreviewElementForSizer(sizer: HTMLElement): HTMLElement | null {
 }
 
 function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
-	const host = previewEl.querySelector(`:scope > .${RV_HOST_CLASS}`);
+	const host = previewEl.querySelector(
+		`:scope > .markdown-preview-sizer > .${RV_HOST_CLASS}, :scope > .${RV_HOST_CLASS}`,
+	);
 	return host?.instanceOf(HTMLElement) ? host : null;
+}
+
+/** Keep the replacement content in Obsidian's sizer immediately before its
+ * native footer. This preserves native ownership of backlinks so the core
+ * setting can add/remove them without AMC relocating or orphaning the footer. */
+function placeWrapperHost(sizer: HTMLElement, host: HTMLElement): void {
+	const footer = sizer.querySelector(":scope > .mod-footer");
+	if (footer?.instanceOf(HTMLElement)) {
+		if (host.parentElement !== sizer || host.nextSibling !== footer) {
+			sizer.insertBefore(host, footer);
+		}
+		return;
+	}
+
+	if (host.parentElement !== sizer) {
+		sizer.appendChild(host);
+	}
 }
 
 function ensureWrapperHost(
@@ -102,12 +121,13 @@ function ensureWrapperHost(
 	sizer: HTMLElement,
 ): HTMLElement {
 	const existing = getWrapperHost(previewEl);
-	if (existing) return existing;
-
-	const host = previewEl.createDiv({cls: RV_HOST_CLASS});
-	if (sizer.nextSibling) {
-		previewEl.insertBefore(host, sizer.nextSibling);
+	if (existing) {
+		placeWrapperHost(sizer, existing);
+		return existing;
 	}
+
+	const host = sizer.createDiv({cls: RV_HOST_CLASS});
+	placeWrapperHost(sizer, host);
 	return host;
 }
 
@@ -248,9 +268,20 @@ function teardownSizer(
 }
 
 function textFingerprint(sourcePath: string, text: string, regions: ColumnRegion[]): string {
-	const first = text.length > 0 ? text.charCodeAt(0) : 0;
-	const last = text.length > 0 ? text.charCodeAt(text.length - 1) : 0;
-	return `${sourcePath}\u0000${text.length}\u0000${regions.length}\u0000${first}\u0000${last}`;
+	// Two independent 32-bit hashes keep the fingerprint compact while still
+	// detecting same-length edits such as GUI width/style changes. The previous
+	// length/first/last fingerprint treated many real edits as unchanged.
+	let hashA = 0x811c9dc5;
+	let hashB = 0x9e3779b9;
+	for (let i = 0; i < text.length; i++) {
+		const code = text.charCodeAt(i);
+		hashA = Math.imul(hashA ^ code, 0x01000193);
+		hashB = Math.imul(hashB ^ code, 0x85ebca6b);
+	}
+	return (
+		`${sourcePath}\u0000${text.length}\u0000${regions.length}`
+		+ `\u0000${(hashA >>> 0).toString(16)}${(hashB >>> 0).toString(16)}`
+	);
 }
 
 async function renderMarkdownSegment(
@@ -531,7 +562,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			hostChildren: host?.children.length ?? 0,
 			wrapperConnected: state?.wrapper.isConnected ?? false,
 			wrapperParentMatches: state ? state.wrapper.parentElement === state.host : false,
-			hostParentMatches: state ? state.host.parentElement === state.previewEl : false,
+			hostParentMatches: state ? state.host.parentElement === sizer : false,
 		};
 	};
 
@@ -620,6 +651,13 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 					}
 				}
 			}
+			if (!state.host.isConnected || state.host.parentElement !== sizer) {
+				handleWrapperDisappearance(sizer, state, "sizer-observer");
+				return;
+			}
+			// Obsidian adds/removes .mod-footer when the backlinks setting changes.
+			// Reposition the host without rebuilding the rendered note.
+			placeWrapperHost(sizer, state.host);
 		});
 		sizerObserver.observe(sizer, {childList: true});
 
@@ -645,7 +683,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 			if (
 				!state.host.isConnected
-				|| state.host.parentElement !== state.previewEl
+				|| state.host.parentElement !== sizer
 				|| !state.wrapper.isConnected
 				|| state.wrapper.parentElement !== state.host
 			) {
@@ -856,7 +894,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			&& existing.fingerprint === fingerprint
 			&& existing.wrapper.isConnected
 			&& existing.host.isConnected
-			&& existing.host.parentElement === existing.previewEl
+			&& existing.host.parentElement === sizer
 			&& existing.wrapper.parentElement === existing.host
 		) {
 			if (!existing.previewEl.classList.contains(RV_ACTIVE_CLASS)) {
@@ -926,6 +964,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			host.appendChild(wrapper);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
+			placeWrapperHost(sizer, host);
 			const state: RenderState = {
 				sourcePath,
 				fingerprint,

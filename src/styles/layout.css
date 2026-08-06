@@ -17,7 +17,7 @@
 }
 
 /* Collapse the sizer's own height/padding so it wraps tightly around
-   the remaining visible children (banner, metadata, title, backlinks).
+   the remaining visible children (banner, metadata, title, columns, backlinks).
    An override priority flag is required here because Obsidian's virtual
    scroller writes min-height / padding-bottom as inline styles on the
    sizer, which a normal rule cannot beat. */
@@ -29,29 +29,35 @@
 
 /* Host container: hidden by default, shown when columns are active.
    Inherit the sizer's readable-line-width constraints. */
+.markdown-preview-view > .markdown-preview-sizer > .amc-reading-columns-host,
 .markdown-preview-view > .amc-reading-columns-host {
 	display: none;
 }
 
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .amc-reading-columns-host,
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host {
 	display: block;
 	width: 100%;
 	box-sizing: border-box;
 }
 
-/* Clean up any footer left relocated by older versions. */
+/* Keep native and legacy-relocated footers aligned with the rendered note. */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .mod-footer,
 .markdown-preview-view.amc-reading-columns-active > .mod-footer {
 	width: 100%;
 	box-sizing: border-box;
 }
 
 /* When readable line width is on, cap host and footer to the file line width */
+.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > .amc-reading-columns-host,
+.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > .mod-footer,
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .amc-reading-columns-host,
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .mod-footer {
 	max-width: var(--file-line-width);
 	margin: 0 auto;
 }
 
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .amc-reading-columns-host > .columns-rv-wrapper,
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host > .columns-rv-wrapper {
 	display: block;
 	width: 100%;
