@@ -7,12 +7,10 @@ import {ColumnWidget} from "./widget";
 
 interface ColumnRenderState {
 	decorations: DecorationSet;
-	atomicRanges: DecorationSet;
 }
 
 const EMPTY_COLUMN_RENDER_STATE: ColumnRenderState = {
 	decorations: Decoration.none,
-	atomicRanges: Decoration.none,
 };
 
 /**
@@ -41,7 +39,6 @@ function buildColumnRenderState(state: EditorState): ColumnRenderState {
 	if (regions.length === 0) return EMPTY_COLUMN_RENDER_STATE;
 
 	const decorations: Range<Decoration>[] = [];
-	const atomicRanges: Range<Decoration>[] = [];
 	for (const region of regions) {
 		decorations.push(
 			Decoration.replace({
@@ -49,14 +46,10 @@ function buildColumnRenderState(state: EditorState): ColumnRenderState {
 				block: true,
 			}).range(region.from, region.to),
 		);
-		if (region.from < region.to) {
-			atomicRanges.push(Decoration.mark({}).range(region.from, region.to));
-		}
 	}
 
 	return {
 		decorations: Decoration.set(decorations, true),
-		atomicRanges: Decoration.set(atomicRanges, true),
 	};
 }
 
@@ -90,18 +83,8 @@ const columnRenderStateField = StateField.define<ColumnRenderState>({
 });
 
 /**
- * Atomic ranges: prevent the cursor from entering column regions.
- * This stops CM6 from collapsing the replace decoration when clicked.
- */
-const atomicCol = EditorView.atomicRanges.of((view) => {
-	const renderState = view.state.field(columnRenderStateField, false);
-	return renderState?.atomicRanges ?? Decoration.none;
-});
-
-/**
  * Export all extensions as an array.
  */
 export const columnDecorations = [
 	columnRenderStateField,
-	atomicCol,
 ];
