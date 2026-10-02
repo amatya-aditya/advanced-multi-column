@@ -151,6 +151,8 @@ function createEditorAppProxy(app: App): App {
 
 export interface EmbeddedEditorOptions {
 	value: string;
+	/** Note that owns the column; links and suggestions resolve against it. */
+	sourcePath?: string;
 	placeholder?: string;
 	onEscape: () => void;
 	onBlur: () => void;
@@ -184,7 +186,8 @@ export function createEmbeddedEditor(
 	// Captured once: while this editor is focused it becomes the workspace's
 	// activeEditor, and workspace.getActiveFile() consults activeEditor.file —
 	// resolving the file lazily through getActiveFile() would recurse.
-	const contextFile = app.workspace.getActiveFile();
+	const ownerFile = options.sourcePath ? app.vault.getAbstractFileByPath(options.sourcePath) : null;
+	const contextFile = ownerFile instanceof TFile ? ownerFile : app.workspace.getActiveFile();
 
 	const owner: EmbeddedEditorOwner = {
 		app,

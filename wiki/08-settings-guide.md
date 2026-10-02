@@ -25,6 +25,12 @@ Open `Settings -> Community Plugins -> Advanced multi column`.
 2. Prevents dragging a column below minimum.
 3. Range is `5..30` (%).
 
+### Stack columns on narrow screens
+
+1. When the column block is narrower than the breakpoint (phones, narrow panes, split views), columns are placed below each other instead of side by side.
+2. Live editing keeps working in the stacked layout.
+3. Default: **On**, breakpoint **480 px** (adjust with **Narrow screen breakpoint**).
+
 ### Show drag handles
 
 1. Turns header grip visibility on/off.
@@ -50,10 +56,9 @@ Sections in UI:
 2. Container settings (background, border, width, radius, text color).
 3. Vertical divider settings (width, style, color).
 
-Practical note:
+These settings apply to every column block in both Live Preview and Reading View. Styles set on a block (marker tokens or the right-click popover) take precedence over them.
 
-1. Per-block styling from right-click popover is the most direct way to style specific layouts.
-2. If a global appearance option does not visibly change an existing block, style that block from the context menu.
+With **Specific column**, the vertical divider is drawn only after the chosen column.
 
 ## Headers tab
 

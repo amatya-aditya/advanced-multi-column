@@ -84,6 +84,8 @@ export interface ColumnsPluginSettings {
 	verticalDividerColor: StyleColorOption;
 	enableHeaders: boolean;
 	headerTypes: HeaderTypeConfig[];
+	stackOnNarrowScreens: boolean;
+	narrowBreakpointPx: number;
 }
 
 export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
@@ -108,6 +110,8 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	verticalDividerColor: "gray",
 	enableHeaders: true,
 	headerTypes: [...DEFAULT_HEADER_TYPES],
+	stackOnNarrowScreens: true,
+	narrowBreakpointPx: 480,
 };
 
 // ── Option maps ──────────────────────────────────────────────────────
@@ -330,6 +334,28 @@ export class ColumnsSettingTab extends PluginSettingTab {
 			value: this.plugin.settings.minColumnWidthPercent,
 			onChange: (value) => {
 				this.plugin.settings.minColumnWidthPercent = value;
+			},
+		});
+
+		new Setting(panelEl)
+			.setName("Stack columns on narrow screens")
+			.setDesc("Place columns below each other when the layout is narrower than the breakpoint, such as on phones or in narrow panes.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.stackOnNarrowScreens)
+					.onChange(async (value) => {
+						this.plugin.settings.stackOnNarrowScreens = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		this.addSliderWithNumber(panelEl, "Narrow screen breakpoint", "Layouts narrower than this width (in pixels) are stacked.", {
+			min: 300,
+			max: 1200,
+			step: 20,
+			value: this.plugin.settings.narrowBreakpointPx,
+			onChange: (value) => {
+				this.plugin.settings.narrowBreakpointPx = value;
 			},
 		});
 
@@ -682,8 +708,8 @@ export class ColumnsSettingTab extends PluginSettingTab {
 
 		// Links
 		const linksEl = aboutEl.createDiv({cls: "columns-settings-about-links"});
-		this.addAboutLink(linksEl, "GitHub", "https://github.com/amatya-aditya/obsidian-multi-columns");
-		this.addAboutLink(linksEl, "Report Issue", "https://github.com/amatya-aditya/obsidian-multi-columns/issues");
+		this.addAboutLink(linksEl, "GitHub", "https://github.com/amatya-aditya/advanced-multi-column");
+		this.addAboutLink(linksEl, "Report Issue", "https://github.com/amatya-aditya/advanced-multi-column/issues");
 		this.addAboutLink(linksEl, "Discord", "https://discord.gg/9bu7V9BBbs");
 
 		// Support

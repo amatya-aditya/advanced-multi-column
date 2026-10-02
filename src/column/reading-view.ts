@@ -1,6 +1,7 @@
 import {
 	Component,
 	MarkdownPostProcessorContext,
+	MarkdownRenderChild,
 	MarkdownRenderer,
 	MarkdownView,
 	setIcon,
@@ -90,6 +91,42 @@ function resolveViewForSizer(
 function resolvePreviewElementForSizer(sizer: HTMLElement): HTMLElement | null {
 	const preview = sizer.closest(".markdown-preview-view");
 	return preview?.instanceOf(HTMLElement) ? preview : null;
+}
+
+interface CanvasFileNode {
+	nodeEl?: HTMLElement;
+	file?: TFile | null;
+	subpath?: string;
+}
+
+/**
+ * Subpath of the canvas file node that renders `nodeEl`, or null when the node
+ * is not a markdown file node (text cards render the canvas JSON's text).
+ */
+function getCanvasNoteSubpath(plugin: ColumnsPlugin, nodeEl: Element): string | null {
+	for (const leaf of plugin.app.workspace.getLeavesOfType("canvas")) {
+		const canvas = (leaf.view as unknown as {canvas?: {nodes?: Map<string, CanvasFileNode>}}).canvas;
+		const nodes = canvas?.nodes;
+		if (!(nodes instanceof Map)) continue;
+		for (const node of nodes.values()) {
+			if (node.nodeEl !== nodeEl) continue;
+			return node.file instanceof TFile && node.file.extension === "md" ? node.subpath ?? "" : null;
+		}
+	}
+	return null;
+}
+
+/**
+ * Rendered previews that show a whole note: reading view, plus whole-note
+ * embeds and canvas file cards in any mode. Embeds of a heading or block
+ * (`#subpath`) show only part of the note, so they are left to Obsidian.
+ */
+function isSupportedPreview(previewEl: HTMLElement, plugin: ColumnsPlugin): boolean {
+	const embed = previewEl.closest(".internal-embed");
+	if (embed) return !(embed.getAttribute("src") ?? "").includes("#");
+	const canvasNode = previewEl.closest(".canvas-node");
+	if (canvasNode) return getCanvasNoteSubpath(plugin, canvasNode) === "";
+	return !!previewEl.closest(".markdown-reading-view");
 }
 
 function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
@@ -522,6 +559,42 @@ async function buildWrapper(
 	return wrapper;
 }
 
+/**
+ * PDF export: replace the exported note body with the column layout. The
+ * exporter awaits `ctx.promises` before printing, so the async render lands
+ * in the PDF.
+ */
+function renderForExport(
+	plugin: ColumnsPlugin,
+	el: HTMLElement,
+	ctx: MarkdownPostProcessorContext,
+): void {
+	const promises = (ctx as MarkdownPostProcessorContext & {promises?: Promise<unknown>[]}).promises;
+	const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+	if (!(file instanceof TFile)) return;
+
+	const task = (async () => {
+		const text = await plugin.app.vault.cachedRead(file);
+		if (!text.includes("col-start")) return;
+		const regions = findColumnRegions(text);
+		if (regions.length === 0) return;
+
+		const child = new MarkdownRenderChild(el);
+		ctx.addChild(child);
+		const wrapper = await buildWrapper(plugin, ctx.sourcePath, text, regions, child);
+		// Keep the optional note-title heading the exporter adds; the note body
+		// itself is wrapped in divs (and bare <hr>s).
+		for (const node of Array.from(el.children)) {
+			if (node.tagName !== "H1") node.remove();
+		}
+		el.appendChild(wrapper);
+	})().catch((error) => {
+		rvError("export render failed", error);
+	});
+
+	promises?.push(task);
+}
+
 export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const states = new WeakMap<HTMLElement, RenderState>();
 	const timers = new WeakMap<HTMLElement, number>();
@@ -840,7 +913,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			rvWarn("render skipped: no preview element for sizer", {token});
 			return;
 		}
-		if (!previewEl.closest(".markdown-reading-view")) {
+		if (!isSupportedPreview(previewEl, plugin)) {
 			invalidateRenderToken(sizer);
 			teardownSizer(sizer, states, "render skipped: not in reading view");
 			return;
@@ -859,7 +932,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				return false;
 			}
 			if (!previewEl.isConnected) return false;
-			if (!previewEl.closest(".markdown-reading-view")) return false;
+			if (!isSupportedPreview(previewEl, plugin)) return false;
 			return true;
 		};
 		if (!plugin.settings.enableReadingView) {
@@ -1051,11 +1124,17 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			// every rebuild trigger the next one — an infinite remount loop.
 			if (el.closest(".columns-rv-wrapper, .columns-rv-segment, .column-preview")) return;
 
+			// PDF export renders the whole note into one element outside any view.
+			if (el.closest(".print")) {
+				if (plugin.settings.enableReadingView) renderForExport(plugin, el, ctx);
+				return;
+			}
+
 			const sizer = resolveSizerForElement(el, plugin, ctx.sourcePath);
 			if (!sizer?.instanceOf(HTMLElement)) return;
 			const previewEl = resolvePreviewElementForSizer(sizer);
 			if (!previewEl?.instanceOf(HTMLElement)) return;
-			if (!previewEl.closest(".markdown-reading-view")) return;
+			if (!isSupportedPreview(previewEl, plugin)) return;
 
 			if (!plugin.settings.enableReadingView) {
 				teardownSizer(sizer, states, "settings disabled in postprocessor");

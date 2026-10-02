@@ -1,6 +1,7 @@
 import type {ColumnData} from "./types";
 
 export interface ColumnContextActions {
+	editColumn?: () => void;
 	addColumn?: () => void;
 	addChild?: () => void;
 	deleteColumn?: () => void;
@@ -15,11 +16,18 @@ export type ContainerPath = ContainerPathEntry[];
 
 export interface ActiveEditState {
 	regionFrom: number;
-	columnIndex: number;
+	/** Source text of the block when editing started (see live-edit). */
+	regionSource?: string;
+	/** Identifies the editor inside the block, e.g. "c0" or "c1/0.0/c2/s1". */
+	key: string;
 	cursorStart: number;
 	cursorEnd: number;
 	scrollTop: number;
 	value: string;
+	/** The editor wiring that currently owns this state. */
+	owner?: object;
+	/** Set when the owning editor was destroyed by a rebuild. */
+	orphaned?: boolean;
 }
 
 export interface ActiveDragState {
@@ -56,12 +64,13 @@ export const INTERACTIVE_PREVIEW_SELECTOR = [
 	"[role='tab']",
 	"[role='menuitem']",
 	".clickable-icon",
+	// Collapsible callout headers toggle their fold instead of opening the editor.
+	".callout.is-collapsible > .callout-title",
 	".mod-slider",
 	".slider",
 	".markdown-embed",
 	".internal-embed",
 	".media-embed",
-	".image-embed",
 	BLOCK_LANGUAGE_PREVIEW_SELECTOR,
 ].join(",");
 
@@ -81,6 +90,9 @@ export function isInteractivePreviewTarget(
 ): boolean {
 	const interactive = target.closest(INTERACTIVE_PREVIEW_SELECTOR);
 	if (!interactive) return false;
+	// Plain image embeds have nothing to interact with; clicking them must
+	// still open the column editor (image-only columns were uneditable).
+	if (interactive.classList.contains("image-embed") && !target.closest("a")) return false;
 	if (!scopeEl) return true;
 	return scopeEl.contains(interactive);
 }

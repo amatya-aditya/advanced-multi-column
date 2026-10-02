@@ -1,8 +1,9 @@
-import {Editor, Menu, MenuItem, Plugin} from "obsidian";
+import {Editor, MarkdownView, Menu, MenuItem, Plugin} from "obsidian";
+import type {EditorView} from "@codemirror/view";
 import {ColumnsPluginSettings, ColumnsSettingTab, DEFAULT_SETTINGS} from "./settings";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
-import {columnDecorations} from "./column/cm/state-field";
+import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
 import {buildRuntimeStyles} from "./column/runtime-styles";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
 
@@ -12,9 +13,11 @@ export default class ColumnsPlugin extends Plugin {
 	private runtimeStyleEl: HTMLStyleElement | null = null;
 	private cleanupReadingView: (() => void) | null = null;
 	private cleanupPropertyFolding: (() => void) | null = null;
+	private lastLiveRenderFingerprint = "";
 
 	async onload() {
 		await this.loadSettings();
+		this.lastLiveRenderFingerprint = this.liveRenderFingerprint();
 		this.applyRuntimeStyles();
 		setPluginInstance(this);
 
@@ -274,6 +277,11 @@ export default class ColumnsPlugin extends Plugin {
 		if (typeof s.enableSlashSuggest !== "boolean") s.enableSlashSuggest = DEFAULT_SETTINGS.enableSlashSuggest;
 		if (typeof s.inheritStyleOnAdd !== "boolean") s.inheritStyleOnAdd = DEFAULT_SETTINGS.inheritStyleOnAdd;
 		if (typeof s.showContainerBorder !== "boolean") s.showContainerBorder = DEFAULT_SETTINGS.showContainerBorder;
+		if (typeof s.stackOnNarrowScreens !== "boolean") s.stackOnNarrowScreens = DEFAULT_SETTINGS.stackOnNarrowScreens;
+		if (typeof s.narrowBreakpointPx !== "number" || !Number.isFinite(s.narrowBreakpointPx)) {
+			s.narrowBreakpointPx = DEFAULT_SETTINGS.narrowBreakpointPx;
+		}
+		s.narrowBreakpointPx = Math.max(300, Math.min(1200, Math.round(s.narrowBreakpointPx)));
 	}
 
 	collapsePropertiesInOpenNotes(): void {
@@ -283,6 +291,28 @@ export default class ColumnsPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		this.applyRuntimeStyles();
+		const fingerprint = this.liveRenderFingerprint();
+		if (fingerprint !== this.lastLiveRenderFingerprint) {
+			this.lastLiveRenderFingerprint = fingerprint;
+			this.refreshLivePreviewColumns();
+		}
+	}
+
+	/** Settings that are baked into rendered live preview widgets (not CSS). */
+	private liveRenderFingerprint(): string {
+		const s = this.settings;
+		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes, s.enableSlashSuggest]);
+	}
+
+	/** Re-render live preview columns so rendering settings take effect. */
+	private refreshLivePreviewColumns(): void {
+		const views: EditorView[] = [];
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (!(leaf.view instanceof MarkdownView)) return;
+			const cm = (leaf.view.editor as Editor & {cm?: EditorView}).cm;
+			if (cm) views.push(cm);
+		});
+		refreshColumnWidgets(views);
 	}
 
 	private applyRuntimeStyles(): void {

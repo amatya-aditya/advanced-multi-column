@@ -40,6 +40,20 @@ All styling actions are available from the right-click popover.
 1. `Reset` in a section clears only that section's style fields.
 2. `Clear all` removes style tokens recursively from parent and nested blocks.
 
+## Custom palette colors (CSS snippet)
+
+Every palette color is a CSS variable, so a theme or CSS snippet can recolor it without `!important`:
+
+```css
+body {
+	--amc-bg-blue-soft: rgba(80, 120, 200, 0.18); /* backgrounds: --amc-bg-<name> */
+	--amc-color-blue: #4f7bd9;                     /* text/border/separator colors: --amc-color-<name> */
+	--amc-stripe-blue-soft: #4f7bd9;               /* header left-border stripe: --amc-stripe-<background> */
+}
+```
+
+Names match the style tokens (`b:blue-soft` → `--amc-bg-blue-soft`, `bc:red` → `--amc-color-red`).
+
 ## Example: style by markers (portable)
 
 ```md

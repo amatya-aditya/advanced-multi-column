@@ -3,6 +3,7 @@ import {findColumnRegions, serializeColumns} from "../core/parser";
 import type {ColumnRegion} from "../core/types";
 import type {ContainerPath, ActiveDragState} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
+import {refreshRegionPosition} from "../core/region-position";
 import {
 	getColumnsAtPath,
 	removeColumnAtPath,
@@ -89,6 +90,7 @@ export function moveColumnBetweenBlocks(
 	destinationIndex: number,
 	view: EditorView,
 ): void {
+	refreshRegionPosition(region);
 	const doc = view.state.doc.toString();
 	const regions = findColumnRegions(doc);
 	const sourceRegion = regions.find((r) => r.from === sourceDrag.sourceRegionFrom);
@@ -346,6 +348,7 @@ export function wireDragItem(
 		if (!e.dataTransfer) return;
 		e.dataTransfer.effectAllowed = "move";
 		e.dataTransfer.setData("text/plain", "");
+		refreshRegionPosition(region);
 		getInteractionState(view).activeDragState = {
 			sourceRegionFrom: region.from,
 			sourcePath: containerPath.map((entry) => ({...entry})),
@@ -393,6 +396,7 @@ export function wireDragItem(
 		item.classList.remove("column-drag-over", "column-drop-before", "column-drop-after");
 		const source = dropIState.activeDragState;
 		source.dropHandled = true;
+		refreshRegionPosition(region);
 		if (source.sourceRegionFrom === region.from) {
 			moveColumnBetweenContainers(
 				region,

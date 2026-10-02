@@ -28,6 +28,7 @@ const CLEAR_STYLE_PATCH: StylePatch = {
 };
 
 export interface ColumnContextActions {
+	editColumn?: () => void;
 	addColumn?: () => void;
 	addChild?: () => void;
 	deleteColumn?: () => void;
@@ -937,9 +938,17 @@ function renderPopoverContent(
 		onAction: () => clearAllStylesAndRerender(menuData, state),
 	});
 
-	if (menuData.actions?.addColumn || menuData.actions?.addChild || menuData.actions?.deleteColumn) {
+	if (
+		menuData.actions?.editColumn
+		|| menuData.actions?.addColumn
+		|| menuData.actions?.addChild
+		|| menuData.actions?.deleteColumn
+	) {
 		createDivider(popover);
 		createInlineCommandButtons(popover, [
+			...(menuData.actions.editColumn
+				? [{label: "Edit column", icon: "pencil", onClick: menuData.actions.editColumn}]
+				: []),
 			...(menuData.actions.addColumn
 				? [{label: "Add column", icon: "plus", onClick: menuData.actions.addColumn}]
 				: []),

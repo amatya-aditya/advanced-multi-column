@@ -63,9 +63,22 @@
 	width: 100%;
 }
 
+/* Query containers for narrow-width stacking (rules come from runtime styles).
+   The live preview host also contains the block's margins, so CodeMirror
+   measures the widget's real height and scrolling stays stable. */
+.amc-columns-host,
+.columns-rv-wrapper {
+	container-type: inline-size;
+	container-name: amc-columns;
+}
+
+.amc-columns-host {
+	display: flow-root;
+}
+
 .columns-container {
-	--columns-block-default-border-width: 1px;
-	--columns-block-default-border-color: var(--background-modifier-border);
+	--columns-block-default-border-width: var(--amc-container-border-width, 1px);
+	--columns-block-default-border-color: var(--amc-container-border-color, var(--background-modifier-border));
 	/* Structural flex layout. These rules sit in Obsidian's render tree where
 	   core/theme CSS (often with its own override flag) forces a div's display,
 	   so they need the priority flag to hold the row layout. Specificity alone
@@ -77,11 +90,12 @@
 	align-items: stretch !important;
 	width: 100%;
 	margin: 12px 0;
-	/* min-height: 60px; */
-	/* border: 1px solid var(--background-modifier-border); */
-	border-radius: 8px;
+	/* Global appearance settings arrive as --amc-* variables (runtime styles). */
+	border: var(--amc-container-border-width, 0px) solid var(--amc-container-border-color, var(--background-modifier-border));
+	border-radius: var(--amc-container-radius, 8px);
 	padding: 4px;
-	background: var(--background-primary);
+	background: var(--amc-container-bg, var(--background-primary));
+	color: var(--amc-container-text, inherit);
 	position: relative;
 	box-sizing: border-box;
 }
@@ -178,8 +192,8 @@
 }
 
 .columns-container.columns-custom-style {
-	background: var(--columns-block-bg, var(--background-primary));
-	color: var(--columns-block-text, inherit);
+	background: var(--columns-block-bg, var(--amc-container-bg, var(--background-primary)));
+	color: var(--columns-block-text, var(--amc-container-text, inherit));
 	border-style: solid;
 	border-color: var(
 		--columns-block-border-color,
@@ -307,7 +321,7 @@
 	color: var(--interactive-accent);
 }
 
-.columns-container .column-add-btn {
+.columns-container :is(.column-add-btn, .column-remove-btn) {
 	cursor: pointer;
 	color: var(--text-faint);
 	padding: 2px 4px;
@@ -322,12 +336,12 @@
 	box-shadow: none;
 }
 
-.columns-container .column-add-btn .svg-icon {
+.columns-container :is(.column-add-btn, .column-remove-btn) .svg-icon {
 	width: 14px;
 	height: 14px;
 }
 
-.columns-container .column-add-btn:hover {
+.columns-container :is(.column-add-btn, .column-remove-btn):hover {
 	color: var(--text-normal);
 	background: var(--background-modifier-hover);
 }
@@ -348,18 +362,10 @@
 	margin-bottom: 0;
 }
 
-.columns-container .column-item .column-preview.markdown-rendered p,
-.columns-container .column-item .column-preview.markdown-rendered h1,
-.columns-container .column-item .column-preview.markdown-rendered h2,
-.columns-container .column-item .column-preview.markdown-rendered h3,
-.columns-container .column-item .column-preview.markdown-rendered h4,
-.columns-container .column-item .column-preview.markdown-rendered h5,
-.columns-container .column-item .column-preview.markdown-rendered h6,
-.columns-container .column-item .column-preview.markdown-rendered div,
-.columns-container .column-item .column-preview.markdown-rendered blockquote,
-.columns-container .column-item .column-preview.markdown-rendered hr,
-.columns-container .column-item .column-preview.markdown-rendered table,
-.columns-container .column-item .column-preview.markdown-rendered pre {
+/* Live preview uses compact spacing (gaps come from .amc-block-gap); reading
+   view keeps Obsidian's normal block spacing, like the rest of the note. */
+.columns-container:where(:not(.columns-reading)) .column-item .column-preview.markdown-rendered :is(p, h1, h2, h3, h4, h5, h6, blockquote, hr, table, pre),
+.columns-container .column-item .column-preview.markdown-rendered div {
 	margin: 0;
 }
 
@@ -463,8 +469,10 @@
 	margin-block-start: 1.5em;
 }
 
-/* Blank line gap between top-level block elements (added dynamically via JS) */
-.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) > .amc-block-gap {
+/* Blank line gap between top-level block elements (added dynamically via JS).
+   Two adjacent paragraphs always come from a blank line in the source. */
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview).markdown-rendered > .amc-block-gap.amc-block-gap,
+.columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview).markdown-rendered > p + p {
 	margin-top: 1em;
 	margin-block-start: 1em;
 }
@@ -667,9 +675,10 @@
 
 /* ── Embedded live-preview editor ───────────────────────────── */
 
+/* The editor must take exactly the height of its text, like the preview it
+   replaces, so a column does not grow when you click into it. */
 .columns-container .amc-embedded-editor {
 	width: 100%;
-	min-height: 60px;
 	cursor: text;
 }
 
@@ -682,9 +691,17 @@
 	background: transparent;
 }
 
+/* Obsidian pads editors inside embeds with --file-margins; the priority
+   flag beats those rules regardless of the note's embed/pane context. */
 .columns-container .amc-embedded-editor .cm-editor .cm-scroller {
-	padding: 0;
-	min-height: 60px;
+	padding: 0 !important;
+	min-height: 0;
+}
+
+/* Only the text area belongs in a column editor (no inline title,
+   properties or backlinks slots). */
+.columns-container .amc-embedded-editor .cm-editor .cm-sizer > :not(.cm-contentContainer) {
+	display: none;
 }
 
 .columns-container .amc-embedded-editor .cm-editor .cm-sizer {
@@ -694,8 +711,13 @@
 	min-height: 0;
 }
 
+/* The embedded editor inherits a full-note content inset (16px padding with
+   -16px side margins) from the editor theme and inline styles, which the
+   priority flag is needed to override; without it the text jumps inward
+   while editing and back when the column preview returns. */
 .columns-container .amc-embedded-editor .cm-editor .cm-content {
-	padding: 4px 0;
+	padding: 0 !important;
+	margin: 0 !important;
 }
 
 .columns-container .amc-embedded-editor .cm-editor .cm-contentContainer {
@@ -801,6 +823,23 @@
 	user-select: none;
 }
 
+/* Global vertical divider (Appearance settings) when no per-column separator is set */
+.columns-container .column-resize-handle:not(.has-separator)::before {
+	content: "";
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	top: 8px;
+	bottom: 8px;
+	width: 0;
+	border-left: var(--amc-divider-width, 0px) var(--amc-divider-style, solid) var(--amc-divider-color, var(--background-modifier-border));
+	pointer-events: none;
+}
+
+.columns-container .column-resize-handle.is-active:not(.has-separator)::before {
+	opacity: 0;
+}
+
 /* Hover accent line (::after) — shown on hover/resizing */
 .columns-container .column-resize-handle::after {
 	content: "";
@@ -869,17 +908,36 @@
 
 
 .columns-container.columns-reading {
-	--columns-block-default-border-width: 0px;
-	border: none;
 	padding: 0;
 	overflow: visible;
 }
 
 .columns-container.columns-reading .column-item {
-	border: none;
 	overflow-x: auto;
 	min-width: 0;
 	margin: 0 4px 0 4px;
+}
+
+/* Only unstyled columns drop their border; per-column styles (borders set via
+   syntax or the style menu) must render the same as in live preview. */
+.columns-container.columns-reading .column-item:not(.columns-custom-style) {
+	border: none;
+}
+
+/* Global vertical divider between reading view columns */
+.columns-container.columns-reading .columns-stack-group {
+	position: relative;
+}
+
+.columns-container.columns-reading:not(.columns-stacked) > :is(.column-item, .columns-stack-group) + :is(.column-item, .columns-stack-group)::before {
+	content: "";
+	position: absolute;
+	left: -5px;
+	top: 8px;
+	bottom: 8px;
+	width: 0;
+	border-left: var(--amc-divider-width, 0px) var(--amc-divider-style, solid) var(--amc-divider-color, var(--background-modifier-border));
+	pointer-events: none;
 }
 
 /* Reset header negative margin in reading view — the container has no
@@ -889,7 +947,7 @@
 	border-radius: 4px 4px 0 0;
 }
 
-.columns-container.columns-reading .column-item:hover {
+.columns-container.columns-reading .column-item:not(.columns-custom-style):hover {
 	border: none;
 	background: var(--background-modifier-active-hover);
 }

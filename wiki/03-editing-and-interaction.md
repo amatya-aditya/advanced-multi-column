@@ -4,7 +4,7 @@ This page covers daily editing behavior in Live Preview.
 
 ## Enter and exit edit mode
 
-1. Click a column preview area to open editor for that column.
+1. Click a column preview area to open editor for that column (or right-click the column and choose **Edit column**, which also works for image-only columns).
 2. Type content.
 3. Use one of these to finish:
 4. Press `Esc`.
@@ -61,17 +61,22 @@ Column editors automatically bridge Obsidian's EditorSuggest API, so suggestions
 3. Plugin saves image to current note folder.
 4. Plugin inserts embed like `![[pasted-image-...png]]`.
 
+Links and collapsible callouts stay interactive while a column is not being edited: click a link to follow it (`Ctrl/Cmd + Click` opens it in a new tab), and click a callout title to fold or unfold it.
+
+Unsaved column text is never dropped when a block re-renders: if the note changes while a column editor is open, the editor re-opens with your text, and if you switch the tab to another note before the edit is committed, the edit is written to the note file.
+
 ## Add column shortcuts
 
 | Action | Result |
 |---|---|
 | Click `+` | Add sibling (respects stacked context) |
 | `Ctrl/Cmd + Click` `+` | Add opposite type (stacked → non-stacked, non-stacked → stacked) |
+| Click `x` | Remove the column (shown when the block has more than one column) |
 
 ## Column multi-select behavior
 
 1. Hold `Ctrl` (or `Cmd` on macOS).
-2. Click columns to add/remove from selection.
+2. Click columns (not links inside them) to add/remove from selection.
 3. Right-click one selected column to apply style actions to selection.
 
 Deselect behavior:

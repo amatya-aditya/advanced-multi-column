@@ -1,6 +1,11 @@
-import {Component} from "obsidian";
+import {App, Component, editorInfoField, Notice, TFile} from "obsidian";
+import {captureBlockUpdate} from "../core/column-serializer";
+import {getPluginInstance} from "../core/plugin-ref";
 import type {EditorView} from "@codemirror/view";
 import type {ViewUpdate} from "@codemirror/view";
+import type {ColumnRegion} from "../core/types";
+import type {ActiveEditState} from "../core/widget-types";
+import {refreshRegionPosition} from "../core/region-position";
 import {
 	createEmbeddedEditor,
 	EmbeddedEditorHandle,
@@ -28,6 +33,21 @@ export interface LiveEditRestoreState {
 	cursorEnd: number;
 }
 
+/** Identifies one editor slot so a rebuilt widget can re-open it. */
+export interface LiveEditState {
+	view: EditorView;
+	/** Live region; `from` is refreshed before it is compared. */
+	region: ColumnRegion;
+	/** Source text of the block when it was rendered. */
+	regionSource: string;
+	key: string;
+}
+
+export interface LiveEditNavigationTarget {
+	key: string;
+	value: string;
+}
+
 export interface LiveEditConfig {
 	/** Columns container used to force-commit sibling editors. */
 	container: HTMLElement;
@@ -42,14 +62,27 @@ export interface LiveEditConfig {
 	clickGuard?: (target: HTMLElement) => boolean;
 	/** Delay in ms for blur commit (default: 180). */
 	blurDelay?: number;
-	/** Top-level columns: persist edit state across widget rebuilds. */
-	editState?: {view: EditorView; regionFrom: number; columnIndex: number};
-	/** Top-level columns: Tab outside a list navigates to a sibling column. */
-	onNavigate?: (dir: 1 | -1) => void;
+	/** Persist edit state across widget rebuilds. */
+	editState: LiveEditState;
+	/** Tab outside a list moves to the sibling editor this returns. */
+	onNavigate?: (dir: 1 | -1) => LiveEditNavigationTarget | null;
 }
 
 export interface LiveEditHandle {
 	enterEdit(restore?: LiveEditRestoreState): void;
+}
+
+const EDIT_KEY_ATTR = "data-amc-edit-key";
+const RESTORE_EVENT = "amc-restore-edit";
+
+function matchesEditState(st: ActiveEditState | null, editState: LiveEditState): st is ActiveEditState {
+	if (!st || st.key !== editState.key) return false;
+	refreshRegionPosition(editState.region);
+	if (st.regionFrom === editState.region.from) return true;
+	// A whole-file reload invalidates offsets; then fall back to identical
+	// source — but only for a draft whose editor was destroyed, so an open
+	// editor is never duplicated into an identical block elsewhere.
+	return !!st.orphaned && st.regionSource === editState.regionSource;
 }
 
 function handleEditorImagePaste(e: ClipboardEvent, editor: InternalMarkdownEditor): boolean {
@@ -70,10 +103,42 @@ function handleEditorImagePaste(e: ClipboardEvent, editor: InternalMarkdownEdito
 	return false;
 }
 
+/**
+ * Write a column draft straight into the note when its editor was destroyed
+ * before it could commit (the tab switched notes or closed). Only replaces the
+ * block when its original text is still present exactly once.
+ */
+async function saveDraftToFile(
+	app: App,
+	sourcePath: string,
+	oldBlock: string,
+	newBlock: string,
+	draft: string,
+): Promise<void> {
+	const file = app.vault.getAbstractFileByPath(sourcePath);
+	if (!(file instanceof TFile)) return;
+	let saved = false;
+	await app.vault.process(file, (data) => {
+		const at = data.indexOf(oldBlock);
+		if (at < 0 || data.indexOf(oldBlock, at + 1) >= 0) return data;
+		saved = true;
+		return data.slice(0, at) + newBlock + data.slice(at + oldBlock.length);
+	});
+	if (!saved) {
+		await navigator.clipboard.writeText(draft).catch(() => undefined);
+		new Notice("Could not save a column edit because the note changed. The text was copied to the clipboard.");
+	}
+}
+
 export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
-	const {blurDelay = 180} = config;
+	const {blurDelay = 180, editState} = config;
+	const owner = {};
 	let active: EmbeddedEditorHandle | null = null;
 	let blurTimer: number | null = null;
+
+	config.hostEl.setAttribute(EDIT_KEY_ATTR, editState.key);
+	const sourcePath = editState.view.state.field(editorInfoField, false)?.file?.path ?? "";
+	const app = getPluginInstance().app;
 
 	const clearBlurTimer = () => {
 		if (blurTimer === null) return;
@@ -82,16 +147,8 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 	};
 
 	const clearEditState = () => {
-		if (!config.editState) return;
-		const {view, regionFrom, columnIndex} = config.editState;
-		const iState = getInteractionState(view);
-		if (
-			iState.activeEdit
-			&& iState.activeEdit.regionFrom === regionFrom
-			&& iState.activeEdit.columnIndex === columnIndex
-		) {
-			iState.activeEdit = null;
-		}
+		const iState = getInteractionState(editState.view);
+		if (iState.activeEdit?.owner === owner) iState.activeEdit = null;
 	};
 
 	const commitAndClose = () => {
@@ -108,20 +165,43 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		}
 	};
 
-	const trackChange = config.editState
-		? (update: ViewUpdate) => {
-			const {view, regionFrom, columnIndex} = config.editState!;
-			const st = getInteractionState(view).activeEdit;
-			if (st && st.regionFrom === regionFrom && st.columnIndex === columnIndex) {
-				st.value = update.state.doc.toString();
-				const sel = update.state.selection.main;
-				st.cursorStart = sel.from;
-				st.cursorEnd = sel.to;
-			}
-		}
-		: undefined;
+	const trackChange = (update: ViewUpdate) => {
+		const st = getInteractionState(editState.view).activeEdit;
+		if (st?.owner !== owner) return;
+		st.value = update.state.doc.toString();
+		const sel = update.state.selection.main;
+		st.cursorStart = sel.from;
+		st.cursorEnd = sel.to;
+	};
 
-	const enterEdit = (restore?: LiveEditRestoreState) => {
+	const navigate = (dir: 1 | -1): boolean => {
+		const target = config.onNavigate?.(dir) ?? null;
+		const container = config.container;
+		if (target) {
+			// Register the sibling first: if this commit rebuilds the widget,
+			// the rebuilt sibling editor re-opens from this state.
+			refreshRegionPosition(editState.region);
+			getInteractionState(editState.view).activeEdit = {
+				regionFrom: editState.region.from,
+				regionSource: editState.regionSource,
+				key: target.key,
+				cursorStart: target.value.length,
+				cursorEnd: target.value.length,
+				scrollTop: 0,
+				value: target.value,
+			};
+		}
+		commitAndClose();
+		if (!target || !container.isConnected) return true;
+		// No rebuild happened: open the sibling in the current DOM.
+		const sibling = container.querySelector<HTMLElement>(
+			`[${EDIT_KEY_ATTR}="${CSS.escape(target.key)}"]`,
+		);
+		sibling?.dispatchEvent(new CustomEvent(RESTORE_EVENT));
+		return true;
+	};
+
+	const enterEdit = (restore?: LiveEditRestoreState, restoring = false) => {
 		if (active) return;
 
 		const value = restore?.value ?? config.getContent();
@@ -130,27 +210,29 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		// sibling commit dispatches a document change that synchronously
 		// rebuilds the widget DOM, and the rebuild re-opens this editor from
 		// the interaction state.
-		if (config.editState) {
-			const {view, regionFrom, columnIndex} = config.editState;
-			getInteractionState(view).activeEdit = {
-				regionFrom,
-				columnIndex,
-				cursorStart: restore?.cursorStart ?? value.length,
-				cursorEnd: restore?.cursorEnd ?? value.length,
-				scrollTop: 0,
-				value,
-			};
+		refreshRegionPosition(editState.region);
+		getInteractionState(editState.view).activeEdit = {
+			regionFrom: editState.region.from,
+			regionSource: editState.regionSource,
+			key: editState.key,
+			cursorStart: restore?.cursorStart ?? value.length,
+			cursorEnd: restore?.cursorEnd ?? value.length,
+			scrollTop: 0,
+			value,
+			owner,
+		};
+
+		if (!restoring) {
+			// Commit and close other open editors in this container.
+			config.container.querySelectorAll<HTMLElement>(".is-editing").forEach((el) => {
+				if (el !== config.hostEl) {
+					el.dispatchEvent(new CustomEvent("amc-force-commit", {bubbles: false}));
+				}
+			});
 		}
 
-		// Commit and close other open editors in this container.
-		config.container.querySelectorAll<HTMLElement>(".is-editing").forEach((el) => {
-			if (el !== config.hostEl) {
-				el.dispatchEvent(new CustomEvent("amc-force-commit", {bubbles: false}));
-			}
-		});
-
 		// A sibling commit rebuilt the widget: this wiring now points at
-		// detached DOM, and the rebuilt widget already restored the editor.
+		// detached DOM, and the rebuilt widget re-opens the editor itself.
 		if (!config.hostEl.isConnected) return;
 
 		config.hostEl.classList.add("is-editing");
@@ -158,6 +240,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		const handle = createEmbeddedEditor(config.hostEl, {
 			value,
 			placeholder: "Type here",
+			sourcePath,
 			onEscape: () => commitAndClose(),
 			onBlur: () => {
 				const blurredHandle = active;
@@ -180,9 +263,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 					const line = state.doc.lineAt(state.selection.main.head).text;
 					// Let the editor indent/unindent list items natively.
 					if (LIST_LINE_RE.test(line)) return false;
-					commitAndClose();
-					config.onNavigate!(shift ? -1 : 1);
-					return true;
+					return navigate(shift ? -1 : 1);
 				}
 				: undefined,
 		});
@@ -194,13 +275,31 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		}
 		active = handle;
 
-		// Destroy the editor when the widget is rebuilt or destroyed.
+		// Destroy the editor when the widget is rebuilt or destroyed. The edit
+		// state survives so the rebuilt widget can re-open the editor with the
+		// unsaved text; if nothing claims it, drop it so a stale draft can never
+		// be restored into an unrelated block later.
 		const holder = new Component();
 		holder.register(() => {
 			if (active === handle) {
 				active = null;
 				clearBlurTimer();
 				config.hostEl.classList.remove("is-editing");
+				const draft = handle.value;
+				const st = getInteractionState(editState.view).activeEdit;
+				if (st?.owner === owner) st.orphaned = true;
+				// Compute the block text now, while the render closures still
+				// describe this block; it is only written if no rebuilt widget
+				// re-opens the draft (e.g. the tab switched to another note).
+				const rescuedBlock = draft !== config.getContent()
+					? captureBlockUpdate(() => config.onCommit(draft))
+					: null;
+				queueMicrotask(() => {
+					const claimed = !!st && st.owner !== owner;
+					clearEditState();
+					if (claimed || rescuedBlock === null) return;
+					void saveDraftToFile(app, sourcePath, editState.regionSource, rescuedBlock, draft);
+				});
 			}
 			handle.destroy();
 		});
@@ -216,8 +315,35 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		});
 	};
 
+	const restorePending = () => {
+		if (active) return;
+		const st = getInteractionState(editState.view).activeEdit;
+		if (!matchesEditState(st, editState)) return;
+		enterEdit({value: st.value, cursorStart: st.cursorStart, cursorEnd: st.cursorEnd}, true);
+	};
+
 	// Force-commit: triggered by another editor opening in the same container.
 	config.hostEl.addEventListener("amc-force-commit", () => commitAndClose());
+	config.hostEl.addEventListener(RESTORE_EVENT, () => restorePending());
+
+	// Re-open an editor that was open when the widget was rebuilt. Claim the
+	// state now (synchronously, inside the rebuild) and open it once the new
+	// DOM is attached.
+	const pending = getInteractionState(editState.view).activeEdit;
+	if (matchesEditState(pending, editState)) {
+		pending.owner = owner;
+		pending.orphaned = false;
+		queueMicrotask(() => {
+			if (config.hostEl.isConnected) {
+				restorePending();
+				return;
+			}
+			requestAnimationFrame(() => {
+				if (config.hostEl.isConnected) restorePending();
+				else clearEditState();
+			});
+		});
+	}
 
 	// Click preview → edit
 	config.previewEl.addEventListener("click", (e) => {
@@ -238,5 +364,5 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		enterEdit();
 	});
 
-	return {enterEdit};
+	return {enterEdit: (restore) => enterEdit(restore)};
 }

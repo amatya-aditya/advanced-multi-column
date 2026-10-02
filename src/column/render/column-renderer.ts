@@ -7,12 +7,15 @@ import {ThirdPartySuggestBridge} from "../editor/third-party-suggest";
 import {restoreEditState, wireEditCore} from "../editor/column-editor";
 import {isEmbeddedEditorAvailable} from "../editor/embedded-editor";
 import {wireLivePreviewEdit} from "../editor/live-edit";
+import type {LiveEditHandle} from "../editor/live-edit";
 import {openColumnStyleContextMenu} from "./style-context-menu";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "../core/column-style";
 import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "../core/types";
 import type {StyleColorOption} from "../../settings";
 import type {ColumnContextActions, ContainerPath} from "../core/widget-types";
+import {isInteractivePreviewTarget} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
+import {refreshRegionPosition} from "../core/region-position";
 import {buildResizeHandle} from "./column-resizer";
 import {wireDragItem} from "./column-drag";
 import {
@@ -77,9 +80,20 @@ function renderColumnHeader(colEl: HTMLElement, content: string): string {
 
 export interface RenderContext {
 	region: ColumnRegion;
+	/** Source text of the whole block. */
+	source: string;
 	view: EditorView;
+	/** Path of the note that owns the editor (not necessarily the active file). */
+	sourcePath: string;
 	components: Component[];
 	suggests: ColumnEditorSuggest[];
+}
+
+/** Stable id of a column editor inside its top-level block. */
+function editKey(containerPath: ContainerPath, columnIndex: number): string {
+	let key = "";
+	for (const entry of containerPath) key += `c${entry.columnIndex}.r${entry.regionIndex}/`;
+	return `${key}c${columnIndex}`;
 }
 
 type SlashSuggestController = Pick<SlashCommandSuggest, "active" | "handleKeydown" | "handleInput">;
@@ -354,49 +368,101 @@ function markListGaps(parent: HTMLElement, content: string): void {
 	markBlockGaps(parent, content);
 }
 
+type SourceBlockKind = "para" | "heading" | "hr" | "list" | "quote" | "table" | "fence" | "math";
+
+const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})/;
+const HEADING_RE = /^\s{0,3}#{1,6}(\s|$)/;
+const HR_RE = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/;
+const LIST_ITEM_RE = /^\s{0,3}([-*+]|\d+[.)])(\s|$)/;
+const QUOTE_RE = /^\s{0,3}>/;
+const TABLE_RE = /^\s*\|/;
+const COMMENT_LINE_RE = /^\s*%%.*%%\s*$/;
+
 /**
- * Detect blank lines between top-level blocks in markdown source and add
- * an `amc-block-gap` class to the rendered element that follows the gap.
- *
- * Strategy: split content into top-level "chunks" separated by blank lines.
- * Each chunk produces one or more rendered top-level children. We count
- * rendered children per chunk and mark the first child of each chunk
- * (after the first) with the gap class.
+ * For each top-level block the markdown renderer will produce, whether a blank
+ * line precedes it in the source. Tracks fenced code, math and lists so blank
+ * lines inside them do not split blocks. Returns null for constructs it cannot
+ * map reliably (multi-line comments, raw HTML).
+ */
+function sourceBlockGaps(content: string): boolean[] | null {
+	const gaps: boolean[] = [];
+	let prev: SourceBlockKind | null = null;
+	let pendingBlank = false;
+	let fence: string | null = null;
+	let inMath = false;
+
+	for (const line of content.split("\n")) {
+		if (fence !== null) {
+			if (line.trim().startsWith(fence)) fence = null;
+			continue;
+		}
+		if (inMath) {
+			if (line.trim().endsWith("$$")) inMath = false;
+			continue;
+		}
+		if (line.trim() === "") {
+			pendingBlank = true;
+			continue;
+		}
+		if (COMMENT_LINE_RE.test(line)) continue;
+		const trimmed = line.trim();
+		if (trimmed.startsWith("%%") || trimmed.startsWith("<")) return null;
+
+		let kind: SourceBlockKind;
+		let continues = false;
+		const fenceMatch = line.match(FENCE_RE);
+		if (fenceMatch) {
+			kind = "fence";
+			fence = fenceMatch[1]!.slice(0, 3);
+		} else if (trimmed.startsWith("$$")) {
+			kind = "math";
+			inMath = !(trimmed.length > 2 && trimmed.endsWith("$$"));
+		} else if (HEADING_RE.test(line)) {
+			kind = "heading";
+		} else if (HR_RE.test(line)) {
+			kind = "hr";
+		} else if (LIST_ITEM_RE.test(line)) {
+			kind = "list";
+			continues = prev === "list";
+		} else if (prev === "list" && (/^\s/.test(line) || !pendingBlank)) {
+			// Indented continuation, or a lazy continuation line of an item.
+			kind = "list";
+			continues = true;
+		} else if (QUOTE_RE.test(line)) {
+			kind = "quote";
+			continues = prev === "quote" && !pendingBlank;
+		} else if (TABLE_RE.test(line)) {
+			kind = "table";
+			continues = prev === "table" && !pendingBlank;
+		} else {
+			kind = "para";
+			// Lazy continuation of a paragraph or blockquote.
+			continues = !pendingBlank && (prev === "para" || prev === "quote");
+			if (continues && prev === "quote") kind = "quote";
+		}
+
+		if (!continues) gaps.push(pendingBlank && gaps.length > 0);
+		pendingBlank = false;
+		prev = kind;
+	}
+	return gaps;
+}
+
+/**
+ * Mark top-level rendered blocks that follow a blank line in the source with
+ * `amc-block-gap`, so the compact live preview keeps paragraph spacing. When
+ * the source blocks cannot be matched one-to-one with the rendered elements,
+ * nothing is marked rather than marking the wrong elements (the CSS still
+ * separates adjacent paragraphs, which always come from a blank line).
  */
 function markBlockGaps(parent: HTMLElement, content: string): void {
-	// Split into groups of non-blank lines separated by blank lines
-	const groups: string[][] = [];
-	let current: string[] = [];
-	for (const line of content.split("\n")) {
-		if (line.trim() === "") {
-			if (current.length > 0) {
-				groups.push(current);
-				current = [];
-			}
-		} else {
-			current.push(line);
-		}
-	}
-	if (current.length > 0) groups.push(current);
-
-	// If only one group or none, no gaps to mark
-	if (groups.length <= 1) return;
-
-	// Count how many top-level rendered children each group produces.
-	// Each group of contiguous non-blank lines maps to one rendered block element
-	// (a <p>, <ul>, <h1>, <blockquote>, etc.) — except list items which stay in
-	// one <ul>/<ol> until interrupted by a blank line.
-	const children = Array.from(parent.querySelectorAll<HTMLElement>(":scope > *"));
-	// With blank-line separation, markdown typically produces one top-level element
-	// per group. Mark child elements starting from the second group.
-	let childIdx = 0;
-	for (let g = 0; g < groups.length; g++) {
-		if (childIdx >= children.length) break;
-		if (g > 0) {
-			children[childIdx]!.classList.add("amc-block-gap");
-		}
-		childIdx++;
-	}
+	const gaps = sourceBlockGaps(content);
+	if (!gaps) return;
+	const children = Array.from(parent.children);
+	if (children.length !== gaps.length) return;
+	children.forEach((child, i) => {
+		if (gaps[i]) child.classList.add("amc-block-gap");
+	});
 }
 
 // ── Column Selection ────────────────────────────────────────
@@ -448,6 +514,10 @@ function wireColumnSelection(
 		// Let toolbar action buttons (add/drag) handle their own Ctrl+Click
 		const target = e.target as HTMLElement;
 		if (target.closest(".column-toolbar-actions")) return;
+		// Ctrl/Cmd+Click on a link opens it in a new tab; never turn it into
+		// a column selection (this capture listener would swallow the click).
+		if (target.closest(".amc-embedded-editor")) return;
+		if (isInteractivePreviewTarget(target, item)) return;
 
 		if (!e.ctrlKey && !e.metaKey) {
 			const iState = getInteractionState(view);
@@ -520,6 +590,19 @@ export function wireContextMenu(
 	});
 }
 
+// ── Toolbar Remove Button ───────────────────────────────────
+
+function buildRemoveButton(toolbarActions: HTMLElement, onRemove: () => void): void {
+	const removeBtn = toolbarActions.createEl("button", {cls: "column-remove-btn"});
+	removeBtn.setAttribute("aria-label", "Remove column");
+	setIcon(removeBtn, "x");
+	removeBtn.addEventListener("click", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		onRemove();
+	});
+}
+
 // ── Commit Edit Helper ──────────────────────────────────────
 
 function commitEdit(editedIndex: number, newContent: string, ctx: RenderContext): void {
@@ -589,7 +672,7 @@ function wireTopLevelEditToggle(
 			plugin.app.keymap.pushScope(editScope);
 			getInteractionState(ctx.view).activeEdit = {
 				regionFrom: ctx.region.from,
-				columnIndex: index,
+				key: `c${index}`,
 				cursorStart: textarea.value.length,
 				cursorEnd: textarea.value.length,
 				scrollTop: 0,
@@ -698,7 +781,7 @@ function wireTopLevelEditToggle(
 			}
 			requestAnimationFrame(() => {
 				const iState = getInteractionState(ctx.view);
-				if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.columnIndex === index) {
+				if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${index}`) {
 					iState.activeEdit.cursorStart = textarea.selectionStart;
 					iState.activeEdit.cursorEnd = textarea.selectionEnd;
 					iState.activeEdit.scrollTop = textarea.scrollTop;
@@ -711,7 +794,7 @@ function wireTopLevelEditToggle(
 
 	textarea.addEventListener("input", () => {
 		const iStateInput = getInteractionState(ctx.view);
-		if (iStateInput.activeEdit && iStateInput.activeEdit.regionFrom === ctx.region.from && iStateInput.activeEdit.columnIndex === index) {
+		if (iStateInput.activeEdit && iStateInput.activeEdit.regionFrom === ctx.region.from && iStateInput.activeEdit.key === `c${index}`) {
 			iStateInput.activeEdit.value = textarea.value;
 		}
 	});
@@ -759,6 +842,7 @@ function renderEditableTextSegment(
 	sourcePath: string,
 	onCommit: (nextText: string) => void,
 	ctx: RenderContext,
+	key: string,
 ): void {
 	const block = parent.createDiv({cls: "column-inline-edit-block"});
 
@@ -788,6 +872,7 @@ function renderEditableTextSegment(
 				currentText = nextText;
 				onCommit(nextText);
 			},
+			editState: {view: ctx.view, region: ctx.region, regionSource: ctx.source, key},
 		});
 		return;
 	}
@@ -873,7 +958,8 @@ function renderColumnContent(
 	);
 	let renderedFallbackTextEditor = false;
 
-	for (const part of parts) {
+	for (let partIndex = 0; partIndex < parts.length; partIndex++) {
+		const part = parts[partIndex]!;
 		if (part.kind === "text") {
 			const shouldRender = part.text.trim().length > 0 || (!hasNonEmptyText && !renderedFallbackTextEditor);
 			if (!shouldRender) continue;
@@ -888,6 +974,7 @@ function renderColumnContent(
 					onContentChange(nextContent);
 				},
 				ctx,
+				`${editKey(containerPath, columnIndex)}/s${partIndex}`,
 			);
 			continue;
 		}
@@ -1023,9 +1110,22 @@ function renderNestedRegion(
 				onRegionChange(updated, region.containerStyle);
 			});
 
+			const deleteNestedColumn = () => {
+				if (region.columns.length <= 1) {
+					onRemoveRegion();
+					return;
+				}
+				const updated = removeColumnPreservingWidths(region.columns, i);
+				onRegionChange(updated, region.containerStyle);
+			};
+
 			const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 			toolbarActions.appendChild(addBtn);
+			buildRemoveButton(toolbarActions, deleteNestedColumn);
 			toolbarActions.appendChild(dragHandle);
+
+			const hasNestedRegions = findColumnRegions(colContent).length > 0;
+			let liveEdit: LiveEditHandle | null = null;
 
 			wireDragItem(colEl, dragHandle, containerPath, i, ctx.view, ctx.region);
 			wireColumnSelection(colEl, i, container, ctx.view);
@@ -1038,6 +1138,7 @@ function renderNestedRegion(
 					onRegionChange(nextColumns, nextContainerStyle);
 				},
 				{
+					editColumn: hasNestedRegions ? undefined : () => liveEdit?.enterEdit(),
 					addColumn: () => {
 						const updated = insertColumnAfter(region.columns, i);
 						onRegionChange(updated, region.containerStyle);
@@ -1049,14 +1150,7 @@ function renderNestedRegion(
 						);
 						onRegionChange(updated, region.containerStyle);
 					},
-					deleteColumn: () => {
-						if (region.columns.length <= 1) {
-							onRemoveRegion();
-							return;
-						}
-						const updated = removeColumnPreservingWidths(region.columns, i);
-						onRegionChange(updated, region.containerStyle);
-					},
+					deleteColumn: deleteNestedColumn,
 				},
 				containerPath[containerPath.length - 1]?.columnIndex !== undefined
 					? containerPath[containerPath.length - 1]!.columnIndex + 1
@@ -1069,7 +1163,6 @@ function renderNestedRegion(
 
 			const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 			applyCompactPreviewSpacing(previewEl);
-			const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
 			if (colContent.length > 0) {
 				renderColumnContent(
@@ -1100,7 +1193,7 @@ function renderNestedRegion(
 				};
 
 				if (isEmbeddedEditorAvailable()) {
-					wireLivePreviewEdit({
+					liveEdit = wireLivePreviewEdit({
 						container,
 						hostEl: colEl,
 						previewEl,
@@ -1112,6 +1205,7 @@ function renderNestedRegion(
 							const clickedNested = target.closest(".columns-nested");
 							return !!(currentNested && clickedNested && clickedNested !== currentNested);
 						},
+						editState: {view: ctx.view, region: ctx.region, regionSource: ctx.source, key: editKey(containerPath, i)},
 					});
 				} else {
 					const textarea = colEl.createEl("textarea", {cls: "column-editor"});
@@ -1140,8 +1234,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 	const isContainerStacked = ctx.region.layout === "stack";
 	if (isContainerStacked) container.classList.add("columns-stacked");
 	const plugin = getPluginInstance();
-	const activeFile = plugin.app.workspace.getActiveFile();
-	const sourcePath = activeFile?.path ?? "";
+	const sourcePath = ctx.sourcePath;
 
 	// Clear any stale selection state when the container is rebuilt
 	// (updateDOM reuses the same DOM element but empties its children,
@@ -1239,12 +1332,20 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					dispatchUpdate(ctx.region, updated, ctx.view);
 				});
 
+				const deleteColumn = () => {
+					if (columns.length <= 1) return;
+					const updated = removeColumnPreservingWidths(columns, i);
+					dispatchUpdate(ctx.region, updated, ctx.view);
+				};
+
 				const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 				toolbarActions.appendChild(addBtn);
+				if (columns.length > 1) buildRemoveButton(toolbarActions, deleteColumn);
 				toolbarActions.appendChild(dragHandle);
 
 				const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 				applyCompactPreviewSpacing(previewEl);
+				let liveEdit: LiveEditHandle | null = null;
 
 				if (colContent.length === 0) {
 					previewEl.createDiv({cls: "column-empty-placeholder", text: "Click to edit"});
@@ -1265,7 +1366,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 
 				if (!hasNestedRegions) {
 					if (isEmbeddedEditorAvailable()) {
-						const liveEdit = wireLivePreviewEdit({
+						liveEdit = wireLivePreviewEdit({
 							container,
 							hostEl: colEl,
 							previewEl,
@@ -1274,27 +1375,16 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 							onCommit: (nextContent) => commitEdit(i, nextContent, ctx),
 							clickGuard: (target) => !!target.closest(".columns-nested"),
 							blurDelay: 200,
-							editState: {view: ctx.view, regionFrom: ctx.region.from, columnIndex: i},
+							editState: {view: ctx.view, region: ctx.region, regionSource: ctx.source, key: editKey([], i)},
 							onNavigate: (dir) => {
 								const next = i + dir;
-								if (next < 0 || next >= ctx.region.columns.length) return;
-								const allItems = getColumnElements(container);
-								const nextPreview = allItems[next]?.querySelector<HTMLElement>(".column-preview");
-								if (nextPreview) {
-									nextPreview.win.setTimeout(() => nextPreview.click(), 50);
-								}
+								const nextCol = ctx.region.columns[next];
+								if (!nextCol) return null;
+								// Columns holding nested blocks have no single editor.
+								if (findColumnRegions(nextCol.content).length > 0) return null;
+								return {key: editKey([], next), value: nextCol.content};
 							},
 						});
-
-						const iState = getInteractionState(ctx.view);
-						if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.columnIndex === i) {
-							const saved = iState.activeEdit;
-							liveEdit.enterEdit({
-								value: saved.value,
-								cursorStart: saved.cursorStart,
-								cursorEnd: saved.cursorEnd,
-							});
-						}
 					} else {
 						const textarea = colEl.createEl("textarea", {cls: "column-editor"});
 						textarea.value = col.content;
@@ -1308,7 +1398,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						wireTopLevelEditToggle(container, previewEl, textarea, i, suggest, slashSuggest, tpSuggest, ctx);
 
 						const iState = getInteractionState(ctx.view);
-						if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.columnIndex === i) {
+						if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${i}`) {
 							restoreEditState(textarea, ctx.view);
 						}
 					}
@@ -1325,6 +1415,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						dispatchUpdate(ctx.region, nextColumns, ctx.view, nextContainerStyle);
 					},
 					{
+						editColumn: liveEdit ? () => liveEdit?.enterEdit() : undefined,
 						addColumn: () => {
 							const updated = insertColumnAfter(columns, i);
 							dispatchUpdate(ctx.region, updated, ctx.view);
@@ -1333,16 +1424,13 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 							const nextContent = addChildColumnToContent(col.content);
 							commitEdit(i, nextContent, ctx);
 						},
-						deleteColumn: () => {
-							if (columns.length <= 1) return;
-							const updated = removeColumnPreservingWidths(columns, i);
-							dispatchUpdate(ctx.region, updated, ctx.view);
-						},
+						deleteColumn,
 					},
 					undefined,
 					container,
 					ctx.region.layout,
 					(nextLayout) => {
+						refreshRegionPosition(ctx.region);
 						ctx.view.dispatch({
 							changes: {
 								from: ctx.region.from,

@@ -3,6 +3,7 @@ import {findColumnRegions, serializeColumns} from "./parser";
 import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "./types";
 import type {ContainerPath} from "./widget-types";
 import {getPluginInstance} from "./plugin-ref";
+import {refreshRegionPosition} from "./region-position";
 
 /** Copy the neighbor's style if the "Inherit style on add" setting is on. */
 function inheritedStyle(neighbor: ColumnData): ColumnStyleData | undefined {
@@ -242,6 +243,13 @@ export function buildStandaloneBlockInsertion(doc: string, cursorPos: number, bl
 	return parts.join("");
 }
 
+function isColumnBlockAt(view: EditorView, region: ColumnRegion): boolean {
+	const doc = view.state.doc;
+	if (region.from < 0 || region.to > doc.length || region.from >= region.to) return false;
+	const text = doc.sliceString(region.from, region.to).trim();
+	return /^%%\s*col-start/.test(text) && /col-end\s*%%$/.test(text);
+}
+
 export function dispatchUpdate(
 	region: ColumnRegion,
 	columns: ColumnData[],
@@ -251,21 +259,57 @@ export function dispatchUpdate(
 ): void {
 	const effectiveStyle = containerStyle !== undefined ? containerStyle : region.containerStyle;
 	const effectiveLayout = layout !== undefined ? layout : region.layout;
+	const insert = serializeColumns(columns, effectiveStyle, effectiveLayout);
+
+	if (captureSink) {
+		captureSink(insert);
+		return;
+	}
+
+	// The rendered block may have moved since it was built; never write over
+	// text that is no longer this block.
+	refreshRegionPosition(region);
+	if (!isColumnBlockAt(view, region)) return;
 
 	// Save scroll position to prevent jump when columns change
 	const scrollDOM = view.scrollDOM;
 	const savedScrollTop = scrollDOM.scrollTop;
 
 	view.dispatch({
-		changes: {
-			from: region.from,
-			to: region.to,
-			insert: serializeColumns(columns, effectiveStyle, effectiveLayout),
-		},
+		changes: {from: region.from, to: region.to, insert},
 	});
 
-	// Restore scroll position after dispatch to prevent jumping to end of file
+	// Restore the scroll position after the rebuild settles, unless the user
+	// scrolled meanwhile — snapping back would fight their scroll direction.
+	let userScrolled = false;
+	const markUserScroll = () => {
+		userScrolled = true;
+	};
+	scrollDOM.addEventListener("wheel", markUserScroll, {passive: true});
+	scrollDOM.addEventListener("touchmove", markUserScroll, {passive: true});
 	requestAnimationFrame(() => {
-		scrollDOM.scrollTop = savedScrollTop;
+		scrollDOM.removeEventListener("wheel", markUserScroll);
+		scrollDOM.removeEventListener("touchmove", markUserScroll);
+		if (!userScrolled) scrollDOM.scrollTop = savedScrollTop;
 	});
+}
+
+let captureSink: ((blockText: string) => void) | null = null;
+
+/**
+ * Run a column commit without touching the editor and return the block text
+ * it would have written. Used to rescue a draft whose editor is gone.
+ */
+export function captureBlockUpdate(commit: () => void): string | null {
+	let captured: string | null = null;
+	const previous = captureSink;
+	captureSink = (blockText) => {
+		captured = blockText;
+	};
+	try {
+		commit();
+	} finally {
+		captureSink = previous;
+	}
+	return captured;
 }

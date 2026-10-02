@@ -85,6 +85,7 @@ export function buildResizeHandle(
 	onColumnsChange: (nextColumns: ColumnData[]) => void,
 ): void {
 	const handle = container.createDiv({cls: "column-resize-handle"});
+	handle.dataset.afterCol = String(resizeIndex);
 
 	// Apply separator styling from the left column
 	const leftCol = columns[resizeIndex];
