@@ -38,6 +38,8 @@ export interface ColumnRegion {
 	containerStyle?: ColumnStyleData;
 	/** Layout direction: "row" (side-by-side, default) or "stack" (top-to-bottom) */
 	layout?: ColumnLayout;
+	/** MOC template that generates this block (`moc:<id>` on col-start). */
+	mocId?: string;
 	/** Line number (0-based) of the `%% col-start %%` line */
 	lineStart: number;
 	/** Line number (0-based) of the `%% col-end %%` line */

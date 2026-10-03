@@ -1,4 +1,4 @@
-import {Editor, MarkdownView, Menu, MenuItem, Plugin} from "obsidian";
+import {App, Editor, MarkdownFileInfo, MarkdownView, Menu, MenuItem, Notice, Plugin, SuggestModal, TFile} from "obsidian";
 import type {EditorView} from "@codemirror/view";
 import {ColumnsPluginSettings, ColumnsSettingTab, DEFAULT_SETTINGS} from "./settings";
 import {setPluginInstance} from "./column/core/plugin-ref";
@@ -6,6 +6,30 @@ import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
 import {buildRuntimeStyles} from "./column/runtime-styles";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
+import {LAYOUT_TEMPLATES, LayoutTemplate} from "./layouts";
+import {MocSync} from "./moc/sync";
+import {generateMocBlock} from "./moc/generate";
+import {MocTemplate, sanitizeMocTemplate} from "./moc/types";
+
+class MocTemplateModal extends SuggestModal<MocTemplate> {
+	constructor(app: App, private readonly templates: MocTemplate[], private readonly onPick: (t: MocTemplate) => void) {
+		super(app);
+		this.setPlaceholder("Choose a MOC template");
+	}
+
+	getSuggestions(query: string): MocTemplate[] {
+		const q = query.toLowerCase();
+		return this.templates.filter((t) => t.name.toLowerCase().includes(q));
+	}
+
+	renderSuggestion(template: MocTemplate, el: HTMLElement): void {
+		el.setText(template.name || template.id);
+	}
+
+	onChooseSuggestion(template: MocTemplate): void {
+		this.onPick(template);
+	}
+}
 
 export default class ColumnsPlugin extends Plugin {
 	settings!: ColumnsPluginSettings;
@@ -14,6 +38,8 @@ export default class ColumnsPlugin extends Plugin {
 	private cleanupReadingView: (() => void) | null = null;
 	private cleanupPropertyFolding: (() => void) | null = null;
 	private lastLiveRenderFingerprint = "";
+	private settingTab!: ColumnsSettingTab;
+	mocSync!: MocSync;
 
 	async onload() {
 		await this.loadSettings();
@@ -30,77 +56,74 @@ export default class ColumnsPlugin extends Plugin {
 
 		// ── Commands ──────────────────────────────────────────────
 
-		this.addCommand({
-			id: "insert-2-columns",
-			name: "Insert 2-wide layout",
-			editorCallback: (editor: Editor) => this.insertColumns(editor, 2),
-		});
+		for (const layout of LAYOUT_TEMPLATES) {
+			this.addCommand({
+				id: layout.id,
+				name: layout.name,
+				icon: layout.icon,
+				editorCallback: (editor: Editor) => this.insertLayout(editor, layout),
+			});
+		}
 
-		this.addCommand({
-			id: "insert-3-columns",
-			name: "Insert 3-wide layout",
-			editorCallback: (editor: Editor) => this.insertColumns(editor, 3),
-		});
+		this.settingTab = new ColumnsSettingTab(this.app, this);
+		this.addSettingTab(this.settingTab);
 
+		// ── MOC (map of content) ────────────────────────────────
+		this.mocSync = new MocSync(this);
+		this.mocSync.register();
 		this.addCommand({
-			id: "insert-4-columns",
-			name: "Insert 4-wide layout",
-			editorCallback: (editor: Editor) => this.insertColumns(editor, 4),
-		});
-
-		this.addCommand({
-			id: "insert-column-block",
-			name: "Insert layout (custom count)",
-			editorCallback: (editor: Editor) => {
-				this.insertColumns(editor, this.settings.defaultColumnCount);
+			id: "insert-moc",
+			name: "Insert MOC",
+			icon: "list-tree",
+			editorCallback: (editor: Editor, ctx: MarkdownView | MarkdownFileInfo) => {
+				new MocTemplateModal(this.app, this.settings.mocTemplates, (template) => {
+					this.insertMoc(editor, template, ctx.file);
+				}).open();
 			},
 		});
-
-		this.addCommand({
-			id: "insert-nested-layout",
-			name: "Insert nested layout (parent + children)",
-			editorCallback: (editor: Editor) => {
-				this.insertNestedTemplate(editor);
-			},
-		});
-
-		this.addSettingTab(new ColumnsSettingTab(this.app, this));
 
 		// ── Editor context menu ──────────────────────────────────
 		this.registerEvent(
-			this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor) => {
-				menu.addItem((item) =>
-					item
-						.setSection("insert")
-						.setTitle("Insert 2 columns")
-						.setIcon("columns-2")
-						.onClick(() => this.insertColumns(editor, 2)),
-				);
-				menu.addItem((item) =>
-					item
-						.setSection("insert")
-						.setTitle("Insert 3 columns")
-						.setIcon("columns-3")
-						.onClick(() => this.insertColumns(editor, 3)),
-				);
+			this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor, info: MarkdownView | MarkdownFileInfo) => {
+				for (const layout of LAYOUT_TEMPLATES.filter((l) => l.quick)) {
+					menu.addItem((item) =>
+						item
+							.setSection("insert")
+							.setTitle(layout.menuTitle)
+							.setIcon(layout.icon)
+							.onClick(() => this.insertLayout(editor, layout)),
+					);
+				}
 				menu.addItem((item) => {
 					item
 						.setSection("insert")
 						.setTitle("Insert layout")
 						.setIcon("layout-grid");
 					const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
-					sub.addItem((s: MenuItem) => s.setTitle("Nested columns").setIcon("git-merge")
-						.onClick(() => this.insertNestedTemplate(editor)));
-					sub.addItem((s: MenuItem) => s.setTitle("Sidebar + content").setIcon("panel-left")
-						.onClick(() => this.insertSidebarLayout(editor)));
-					sub.addItem((s: MenuItem) => s.setTitle("Stacked + wide").setIcon("rows-3")
-						.onClick(() => this.insertStackedLayout(editor)));
-					sub.addItem((s: MenuItem) => s.setTitle("Cornell notes").setIcon("notebook-pen")
-						.onClick(() => this.insertCornellTemplate(editor)));
-					sub.addItem((s: MenuItem) => s.setTitle("Kanban board").setIcon("kanban")
-						.onClick(() => this.insertKanbanTemplate(editor)));
-					sub.addItem((s: MenuItem) => s.setTitle("Info card").setIcon("id-card")
-						.onClick(() => this.insertInfoCardTemplate(editor)));
+					for (const layout of LAYOUT_TEMPLATES.filter((l) => !l.quick)) {
+						sub.addItem((s: MenuItem) => s
+							.setTitle(layout.menuTitle)
+							.setIcon(layout.icon)
+							.onClick(() => this.insertLayout(editor, layout)));
+					}
+				});
+				menu.addItem((item) => {
+					item
+						.setSection("insert")
+						.setTitle("Insert MOC")
+						.setIcon("list-tree");
+					const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
+					for (const template of this.settings.mocTemplates) {
+						sub.addItem((s: MenuItem) => s
+							.setTitle(template.name || template.id)
+							.setIcon("list-tree")
+							.onClick(() => this.insertMoc(editor, template, info.file)));
+					}
+					sub.addSeparator();
+					sub.addItem((s: MenuItem) => s
+						.setTitle("Manage MOC templates…")
+						.setIcon("settings")
+						.onClick(() => this.openMocSettings()));
 				});
 			}),
 		);
@@ -115,120 +138,28 @@ export default class ColumnsPlugin extends Plugin {
 		this.detachRuntimeStyleSheet();
 	}
 
-	private insertColumns(editor: Editor, count: number): void {
-		const parts: string[] = ["%% col-start %%"];
-		for (let i = 0; i < count; i++) {
-			parts.push("%% col-break:b:secondary %%");
-			parts.push(`Column ${i + 1}`);
+	private insertMoc(editor: Editor, template: MocTemplate, file: TFile | null): void {
+		if (!file) {
+			new Notice("Open a note to insert a MOC.");
+			return;
 		}
-		parts.push("%% col-end %%");
-		this.insertTemplate(editor, parts);
+		const block = generateMocBlock(this.app, template, file.path);
+		editor.replaceSelection("\n" + block + "\n");
+		void this.mocSync.track(file.path);
 	}
 
-	private insertNestedTemplate(editor: Editor): void {
-		this.insertTemplate(editor, [
-			"%% col-start %%",
-			"%% col-break:40,b:secondary %%",
-			"Top-level content.",
-			"%% col-break:60,b:secondary %%",
-			"This column contains nested columns.",
-			"",
-			"%% col-start %%",
-			"%% col-break:b:secondary %%",
-			"Child column 1",
-			"%% col-break:b:secondary %%",
-			"Child column 2",
-			"%% col-end %%",
-			"%% col-end %%",
-		]);
+	private openMocSettings(): void {
+		const setting = (this.app as App & {
+			setting?: {open(): void; openTabById(id: string): void};
+		}).setting;
+		if (!setting) return;
+		this.settingTab.showTab("moc");
+		setting.open();
+		setting.openTabById(this.manifest.id);
 	}
 
-	private insertSidebarLayout(editor: Editor): void {
-		this.insertTemplate(editor, [
-			"%% col-start %%",
-			"%% col-break:30,b:secondary %%",
-			"Sidebar",
-			"%% col-break:70,b:secondary %%",
-			"Main content",
-			"%% col-end %%",
-		]);
-	}
-
-	private insertStackedLayout(editor: Editor): void {
-		this.insertTemplate(editor, [
-			"%% col-start %%",
-			"%% col-break:40,stk:1,b:secondary %%",
-			"Stacked row 1",
-			"%% col-break:stk:1,b:secondary %%",
-			"Stacked row 2",
-			"%% col-break:stk:1,b:secondary %%",
-			"Stacked row 3",
-			"%% col-break:60,b:secondary %%",
-			"Wide column",
-			"%% col-end %%",
-		]);
-	}
-
-	private insertCornellTemplate(editor: Editor): void {
-		this.insertTemplate(editor, [
-			"%% col-start %%",
-			"%% col-break:stk:1,b:secondary %%",
-			"**Topic / Title**",
-			"%% col-break:30,stk:1,b:secondary %%",
-			"**Cues / Questions**",
-			"",
-			"- Key term 1",
-			"- Key question",
-			"- Concept",
-			"%% col-break:70,b:secondary %%",
-			"**Notes**",
-			"",
-			"Main lecture or reading notes go here.",
-			"%% col-end %%",
-		]);
-	}
-
-	private insertKanbanTemplate(editor: Editor): void {
-		this.insertTemplate(editor, [
-			"%% col-start:sb:1,bc:muted %%",
-			"%% col-break:b:alt,sb:1,bc:gray %%",
-			"### Backlog",
-			"- [ ] Task 1",
-			"- [ ] Task 2",
-			"%% col-break:b:cyan-soft,sb:1,bc:cyan %%",
-			"### In Progress",
-			"- [ ] Task 3",
-			"%% col-break:b:yellow-soft,sb:1,bc:yellow %%",
-			"### Review",
-			"- [ ] Task 4",
-			"%% col-break:b:green-soft,sb:1,bc:green %%",
-			"### Done",
-			"- [x] Task 5",
-			"%% col-end %%",
-		]);
-	}
-
-	private insertInfoCardTemplate(editor: Editor): void {
-		this.insertTemplate(editor, [
-			"%% col-start:sb:1,bc:muted %%",
-			"%% col-break:35,b:accent-soft,sb:1,bc:accent,sep:1,sc:accent %%",
-			"### Subject Name",
-			"",
-			"| | |",
-			"| --- | --- |",
-			"| **Field** | Value |",
-			"| **Category** | Type |",
-			"| **Date** | 2025-01 |",
-			"%% col-break:65 %%",
-			"### Details",
-			"",
-			"Main content and description.",
-			"%% col-end %%",
-		]);
-	}
-
-	private insertTemplate(editor: Editor, lines: string[]): void {
-		editor.replaceSelection("\n" + lines.join("\n") + "\n");
+	private insertLayout(editor: Editor, layout: LayoutTemplate): void {
+		editor.replaceSelection("\n" + layout.lines(this.settings).join("\n") + "\n");
 	}
 
 	async loadSettings() {
@@ -282,6 +213,12 @@ export default class ColumnsPlugin extends Plugin {
 			s.narrowBreakpointPx = DEFAULT_SETTINGS.narrowBreakpointPx;
 		}
 		s.narrowBreakpointPx = Math.max(300, Math.min(1200, Math.round(s.narrowBreakpointPx)));
+		const rawTemplates: unknown = s.mocTemplates;
+		s.mocTemplates = Array.isArray(rawTemplates)
+			? rawTemplates.map(sanitizeMocTemplate).filter((t): t is MocTemplate => t !== null)
+			: DEFAULT_SETTINGS.mocTemplates.map((t) => ({...t}));
+		const rawNotes: unknown = s.mocNotes;
+		s.mocNotes = Array.isArray(rawNotes) ? rawNotes.filter((p): p is string => typeof p === "string") : [];
 	}
 
 	collapsePropertiesInOpenNotes(): void {

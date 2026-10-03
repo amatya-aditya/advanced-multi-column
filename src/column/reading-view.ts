@@ -360,7 +360,7 @@ async function renderMarkdownSegment(
 	await MarkdownRenderer.render(plugin.app, markdown, host, sourcePath, component);
 }
 
-async function renderColumnsRegion(
+export async function renderColumnsRegion(
 	plugin: ColumnsPlugin,
 	component: Component,
 	parent: HTMLElement,
@@ -383,14 +383,19 @@ async function renderColumnsRegion(
 	for (let gi = 0; gi < groups.length; gi++) {
 		const group = groups[gi]!;
 
+		// `sep:0` on the column before this group hides the global divider.
+		let hideDividerBefore = false;
 		if (gi > 0) {
 			const prevGroup = groups[gi - 1]!;
-			buildSeparatorElement(containerEl, region.columns[prevGroup.indices[prevGroup.indices.length - 1]!]!);
+			const prevCol = region.columns[prevGroup.indices[prevGroup.indices.length - 1]!]!;
+			buildSeparatorElement(containerEl, prevCol);
+			hideDividerBefore = prevCol.style?.separator === false;
 		}
 
 		let groupParent: HTMLElement;
 		if (group.isStack && !isContainerStacked && group.indices.length > 0) {
 			const stackGroupEl = containerEl.createDiv({cls: "columns-stack-group"});
+			stackGroupEl.toggleClass("amc-no-divider-before", hideDividerBefore);
 			const maxWidth = Math.max(...group.indices.map((idx) => region.columns[idx]!.widthPercent));
 			if (maxWidth > 0) {
 				const sepTotal = (groups.length - 1) * 8;
@@ -412,6 +417,7 @@ async function renderColumnsRegion(
 
 			const colEl = groupParent.createDiv({cls: "column-item"});
 			colEl.dataset.colIndex = String(ci);
+			if (gi2 === 0 && groupParent === containerEl) colEl.toggleClass("amc-no-divider-before", hideDividerBefore);
 			applyColumnStyle(colEl, col.style);
 
 			if (group.isStack) {

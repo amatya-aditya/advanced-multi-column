@@ -90,6 +90,8 @@ export function buildResizeHandle(
 	// Apply separator styling from the left column
 	const leftCol = columns[resizeIndex];
 	const sepStyle = leftCol?.style;
+	// An explicit `sep:0` also hides the global vertical divider.
+	handle.toggleClass("no-separator", sepStyle?.separator === false);
 	if (sepStyle?.separator) {
 		handle.classList.add("has-separator");
 		const color = COLOR_CSS[sepStyle.separatorColor as StyleColorOption ?? "gray"] ?? COLOR_CSS.gray;

@@ -140,7 +140,7 @@ export function moveColumnBetweenBlocks(
 	const sourceReplacement =
 		nextSourceRoot === null
 			? ""
-			: serializeColumns(nextSourceRoot, sourceRegion.containerStyle, sourceRegion.layout);
+			: serializeColumns(nextSourceRoot, sourceRegion.containerStyle, sourceRegion.layout, sourceRegion.mocId);
 
 	const changes = [
 		{
@@ -151,7 +151,12 @@ export function moveColumnBetweenBlocks(
 		{
 			from: destinationRegion.from,
 			to: destinationRegion.to,
-			insert: serializeColumns(nextDestinationRoot, destinationRegion.containerStyle, destinationRegion.layout),
+			insert: serializeColumns(
+				nextDestinationRoot,
+				destinationRegion.containerStyle,
+				destinationRegion.layout,
+				destinationRegion.mocId,
+			),
 		},
 	].sort((a, b) => a.from - b.from);
 
@@ -188,7 +193,7 @@ export function moveColumnToCursorBlock(sourceDrag: ActiveDragState, view: Edito
 	const sourceReplacement =
 		nextSourceRoot === null
 			? ""
-			: serializeColumns(nextSourceRoot, sourceRegion.containerStyle, sourceRegion.layout);
+			: serializeColumns(nextSourceRoot, sourceRegion.containerStyle, sourceRegion.layout, sourceRegion.mocId);
 
 	const changes = [
 		{

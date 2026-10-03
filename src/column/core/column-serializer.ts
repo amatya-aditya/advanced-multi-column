@@ -5,11 +5,19 @@ import type {ContainerPath} from "./widget-types";
 import {getPluginInstance} from "./plugin-ref";
 import {refreshRegionPosition} from "./region-position";
 
-/** Copy the neighbor's style if the "Inherit style on add" setting is on. */
-function inheritedStyle(neighbor: ColumnData): ColumnStyleData | undefined {
+/** Style of a newly added column that does not inherit one. */
+function defaultNewColumnStyle(): ColumnStyleData {
+	return {background: "primary"};
+}
+
+/**
+ * Copy the neighbor's style if the "Inherit style on add" setting is on,
+ * otherwise use the default (primary background).
+ */
+function inheritedStyle(neighbor: ColumnData): ColumnStyleData {
 	const plugin = getPluginInstance();
-	if (!plugin.settings.inheritStyleOnAdd) return undefined;
-	return neighbor.style ? {...neighbor.style} : undefined;
+	if (plugin.settings.inheritStyleOnAdd && neighbor.style) return {...neighbor.style};
+	return defaultNewColumnStyle();
 }
 
 export function insertColumnAfter(columns: ColumnData[], index: number): ColumnData[] {
@@ -111,11 +119,11 @@ export function addChildColumnToContent(content: string): string {
 		const region = nestedRegions[nestedRegions.length - 1]!;
 		const nextChildren = [
 			...region.columns.map((child) => ({...child, widthPercent: 0})),
-			{content: "", widthPercent: 0},
+			{content: "", widthPercent: 0, style: defaultNewColumnStyle()},
 		];
 		return (
 			content.slice(0, region.from) +
-			serializeColumns(nextChildren, region.containerStyle, region.layout) +
+			serializeColumns(nextChildren, region.containerStyle, region.layout, region.mocId) +
 			content.slice(region.to)
 		);
 	}
@@ -123,7 +131,7 @@ export function addChildColumnToContent(content: string): string {
 	const trailingWhitespace = content.match(/\s*$/)?.[0] ?? "";
 	const withoutTrailing = content.slice(0, content.length - trailingWhitespace.length);
 	const separator = withoutTrailing.length > 0 ? "\n\n" : "";
-	const nestedBlock = serializeColumns([{content: "", widthPercent: 0}]);
+	const nestedBlock = serializeColumns([{content: "", widthPercent: 0, style: defaultNewColumnStyle()}]);
 	return `${withoutTrailing}${separator}${nestedBlock}${trailingWhitespace}`;
 }
 
@@ -162,7 +170,7 @@ export function removeColumnAtPath(
 			? parentColumn.content.slice(0, region.from) +
 			  parentColumn.content.slice(region.to)
 			: parentColumn.content.slice(0, region.from) +
-			  serializeColumns(nestedResult.nextColumns, region.containerStyle, region.layout) +
+			  serializeColumns(nestedResult.nextColumns, region.containerStyle, region.layout, region.mocId) +
 			  parentColumn.content.slice(region.to);
 
 	const nextColumns = columns.map((column, index) =>
@@ -226,7 +234,7 @@ export function updateColumnsAtPath(
 		const nextRegionColumns = updateColumnsAtPath(region.columns, rest, updater);
 		const nextContent =
 			col.content.slice(0, region.from) +
-			serializeColumns(nextRegionColumns, region.containerStyle, region.layout) +
+			serializeColumns(nextRegionColumns, region.containerStyle, region.layout, region.mocId) +
 			col.content.slice(region.to);
 		return {...col, content: nextContent};
 	});
@@ -259,7 +267,7 @@ export function dispatchUpdate(
 ): void {
 	const effectiveStyle = containerStyle !== undefined ? containerStyle : region.containerStyle;
 	const effectiveLayout = layout !== undefined ? layout : region.layout;
-	const insert = serializeColumns(columns, effectiveStyle, effectiveLayout);
+	const insert = serializeColumns(columns, effectiveStyle, effectiveLayout, region.mocId);
 
 	if (captureSink) {
 		captureSink(insert);

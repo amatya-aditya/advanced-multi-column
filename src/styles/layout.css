@@ -362,6 +362,14 @@
 	margin-bottom: 0;
 }
 
+/* A nested block and the text around it are separate blocks in the source
+   (markers need their own lines), so keep a paragraph-sized gap between
+   them. Must outrank the div margin reset below. */
+.columns-container .column-item .column-preview.markdown-rendered > .columns-nested:not(:first-child),
+.columns-container .column-item .column-preview.markdown-rendered > .columns-nested + * {
+	margin-top: 1em;
+}
+
 /* Live preview uses compact spacing (gaps come from .amc-block-gap); reading
    view keeps Obsidian's normal block spacing, like the rest of the note. */
 .columns-container:where(:not(.columns-reading)) .column-item .column-preview.markdown-rendered :is(p, h1, h2, h3, h4, h5, h6, blockquote, hr, table, pre),
@@ -824,7 +832,7 @@
 }
 
 /* Global vertical divider (Appearance settings) when no per-column separator is set */
-.columns-container .column-resize-handle:not(.has-separator)::before {
+.columns-container .column-resize-handle:not(.has-separator):not(.no-separator)::before {
 	content: "";
 	position: absolute;
 	left: 50%;
@@ -929,7 +937,7 @@
 	position: relative;
 }
 
-.columns-container.columns-reading:not(.columns-stacked) > :is(.column-item, .columns-stack-group) + :is(.column-item, .columns-stack-group)::before {
+.columns-container.columns-reading:not(.columns-stacked) > :is(.column-item, .columns-stack-group) + :is(.column-item, .columns-stack-group):not(.amc-no-divider-before)::before {
 	content: "";
 	position: absolute;
 	left: -5px;

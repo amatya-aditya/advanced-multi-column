@@ -5,7 +5,10 @@ All styling actions are available from the right-click popover.
 ## Open style popover
 
 1. Right-click a column in Live Preview.
-2. Use sections in the popover to style column and parent container.
+2. The header names the column and has quick actions: edit, add column, add nested columns, delete.
+3. Switch between the **Column** and **Block** tabs to style the column or the whole column block.
+
+The popover always shows what is currently rendered, including values that come from the global **Appearance** settings (block border, background, vertical dividers). Changing a value writes it to the markers; picking the default again removes it, so the block follows the global settings again.
 
 ## Apply style to one or multiple columns
 
@@ -13,32 +16,26 @@ All styling actions are available from the right-click popover.
 2. Right-click one selected column.
 3. Style changes apply to selected set.
 
-## Column style options
+## Column tab
 
-1. `Stacked` toggle.
-2. `Border` toggle + color.
-3. `Background`.
-4. `Text color` — also applies to links (internal, external, tags) within the column.
+1. `Background`.
+2. `Text color` — also applies to links (internal, external, tags) within the column.
+3. `Border` toggle + color.
+4. `Accent stripe` (callout-style left border).
+5. `Stacked` toggle.
+6. `Separator after` (or `Separator below` inside a stack) — toggle; when on, choose line style (`solid`, `dashed`, `dotted`, `double`, or a custom `Character`), color and width. Turning it off also hides the global vertical divider after this column (`sep:0`). Not shown for the last column.
 
-## Separator options
+## Block tab
 
-1. `Show separator`.
-2. `Style` (`solid`, `dashed`, `dotted`, `double`, `custom`).
-3. `Color`.
-4. `Width`.
-5. `Character` (shown when style is `custom`).
-
-## Parent/container options
-
-1. `Layout` (`Row` or `Stack`).
-2. Parent border toggle + color.
-3. Parent background.
-4. Parent text color.
+1. `Layout` (`Side by side` or `Stacked`).
+2. `Background`.
+3. `Text color`.
+4. `Border` toggle + color.
 
 ## Reset and clear actions
 
-1. `Reset` in a section clears only that section's style fields.
-2. `Clear all` removes style tokens recursively from parent and nested blocks.
+1. `Reset column` / `Reset block` clears the styles of the current tab.
+2. `Clear all styles` removes style tokens recursively from the block and nested blocks.
 
 ## Custom palette colors (CSS snippet)
 

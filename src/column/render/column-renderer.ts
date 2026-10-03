@@ -906,6 +906,20 @@ function renderEditableTextSegment(
 	});
 }
 
+/**
+ * Replace the text between nested blocks. Markers only parse on their own
+ * line, so the edited text is always kept a blank line away from the
+ * neighbouring `%% col-end %%` / `%% col-start %%`; otherwise typing into an
+ * empty segment right before a nested block would merge its text into the
+ * `col-start` line and break the whole layout.
+ */
+function spliceTextSegment(content: string, from: number, to: number, text: string): string {
+	const before = content.slice(0, from).replace(/\s+$/, "");
+	const after = content.slice(to).replace(/^\s*\n/, "");
+	const middle = text.replace(/^\n+|\s+$/g, "");
+	return [before, middle, after].filter((part) => part.length > 0).join("\n\n");
+}
+
 // ── Column Content (recursive) ──────────────────────────────
 
 function renderColumnContent(
@@ -970,7 +984,7 @@ function renderColumnContent(
 				part.text,
 				sourcePath,
 				(nextText) => {
-					const nextContent = content.slice(0, part.from) + nextText + content.slice(part.to);
+					const nextContent = spliceTextSegment(content, part.from, part.to, nextText);
 					onContentChange(nextContent);
 				},
 				ctx,
@@ -992,7 +1006,7 @@ function renderColumnContent(
 			(nextRegionColumns, nextRegionContainerStyle) => {
 				const nextContent =
 					content.slice(0, region.from) +
-					serializeColumns(nextRegionColumns, nextRegionContainerStyle, region.layout) +
+					serializeColumns(nextRegionColumns, nextRegionContainerStyle, region.layout, region.mocId) +
 					content.slice(region.to);
 				onContentChange(nextContent);
 			},
@@ -1005,7 +1019,7 @@ function renderColumnContent(
 			(nextLayout) => {
 				const nextContent =
 					content.slice(0, region.from) +
-					serializeColumns(region.columns, region.containerStyle, nextLayout) +
+					serializeColumns(region.columns, region.containerStyle, nextLayout, region.mocId) +
 					content.slice(region.to);
 				onContentChange(nextContent);
 			},
@@ -1435,7 +1449,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 							changes: {
 								from: ctx.region.from,
 								to: ctx.region.to,
-								insert: serializeColumns(columns, ctx.region.containerStyle, nextLayout),
+								insert: serializeColumns(columns, ctx.region.containerStyle, nextLayout, ctx.region.mocId),
 							},
 						});
 					},

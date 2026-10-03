@@ -22,6 +22,13 @@ export default tseslint.config(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		plugins: {obsidianmd},
+		rules: {
+			// "MOC" (map of content) is a feature name, written in capitals.
+			"obsidianmd/ui/sentence-case": ["error", {ignoreWords: ["MOC"]}],
+		},
+	},
 	globalIgnores([
 		"node_modules",
 		"dist",

@@ -11,6 +11,8 @@ import {
 } from "obsidian";
 import {BACKGROUND_CSS, COLOR_CSS} from "./column/core/column-style";
 import type ColumnsPlugin from "./main";
+import {MocSettingsSection} from "./moc/settings-section";
+import {createMocTemplate, MocTemplate} from "./moc/types";
 
 const BACKGROUND_CSS_MAP: Record<string, string> = BACKGROUND_CSS;
 const COLOR_CSS_MAP: Record<string, string> = COLOR_CSS;
@@ -35,6 +37,7 @@ export type StyleColorOption =
 	| "accent"
 	| "muted"
 	| "text"
+	| "secondary"
 	| "red"
 	| "orange"
 	| "yellow"
@@ -86,6 +89,9 @@ export interface ColumnsPluginSettings {
 	headerTypes: HeaderTypeConfig[];
 	stackOnNarrowScreens: boolean;
 	narrowBreakpointPx: number;
+	mocTemplates: MocTemplate[];
+	/** Notes that contain MOC blocks (kept in sync automatically). */
+	mocNotes: string[];
 }
 
 export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
@@ -112,11 +118,13 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	headerTypes: [...DEFAULT_HEADER_TYPES],
 	stackOnNarrowScreens: true,
 	narrowBreakpointPx: 480,
+	mocTemplates: [{...createMocTemplate("moc-1", "Folder map")}],
+	mocNotes: [],
 };
 
 // ── Option maps ──────────────────────────────────────────────────────
 
-type SettingsTabId = "general" | "appearance" | "headers" | "about";
+type SettingsTabId = "general" | "appearance" | "headers" | "moc" | "about";
 
 const STYLE_TARGET_OPTIONS: Record<StyleTargetMode, string> = {
 	all: "All columns",
@@ -150,6 +158,7 @@ export const STYLE_COLOR_OPTIONS: Record<StyleColorOption, string> = {
 	accent: "Accent",
 	muted: "Muted text",
 	text: "Normal text",
+	secondary: "Secondary",
 	red: "Red",
 	orange: "Orange",
 	yellow: "Yellow",
@@ -196,10 +205,21 @@ class IconSuggest extends AbstractInputSuggest<string> {
 export class ColumnsSettingTab extends PluginSettingTab {
 	plugin: ColumnsPlugin;
 	private activeTab: SettingsTabId = "general";
+	private readonly mocSection: MocSettingsSection;
 
 	constructor(app: App, plugin: ColumnsPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+		this.mocSection = new MocSettingsSection(app, plugin);
+	}
+
+	/** Open the settings tab on a specific section. */
+	showTab(tab: SettingsTabId): void {
+		this.activeTab = tab;
+	}
+
+	hide(): void {
+		this.mocSection.dispose();
 	}
 
 	display(): void {
@@ -218,6 +238,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 			{id: "general", label: "General", render: (el) => this.renderGeneralTab(el)},
 			{id: "appearance", label: "Appearance", render: (el) => this.renderAppearanceTab(el)},
 			{id: "headers", label: "Headers", render: (el) => this.renderHeadersTab(el)},
+			{id: "moc", label: "MOC", render: (el) => this.mocSection.render(el)},
 			{id: "about", label: "About", render: (el) => this.renderAboutTab(el)},
 		];
 

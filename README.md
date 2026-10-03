@@ -66,6 +66,7 @@ You always see the full layout, making multi-column editing feel natural instead
 - **Style tokens** — portable styling via marker parameters (`b:`, `bc:`, `t:`, `sb:`, `hd:`)
 - **Quick add/remove** — `+` / `x` buttons in each column header
 - **Global settings** — default layout, colors, borders, dividers
+- **MOC (map of content)** — auto-updating columns of links to notes from a folder, tags or properties, grouped into columns you choose
 
 ## Quick Start
 
@@ -186,6 +187,13 @@ Right-click any column to:
 
 - **General** — enable/disable live preview and reading view, default column count, minimum column width, drag handles
 - **Appearance** — style target (all or specific column), container background/border/radius/text, vertical and horizontal divider configuration
+- **MOC** — templates for MOCs: sources (folder, tags, properties), grouping, columns, and a live preview
+
+## MOC (map of content)
+
+A MOC lists notes as links in columns and keeps itself up to date. Set up a template in **Settings → Advanced Multi Column → MOC** (pick a folder, tags and/or properties, how to group them and how many columns), then insert it with **Insert MOC** from the command palette or the editor context menu.
+
+The links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
 
 ## Installation
 

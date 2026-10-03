@@ -1,307 +1,190 @@
-/* Inline style popover (custom right-click menu) */
+/* Column style menu (custom right-click popover). Built from Obsidian's own
+   controls (toggle, dropdown, clickable icons) and its UI type scale. */
 .columns-style-popover {
 	position: fixed;
-	z-index: 2100;
-	min-width: 280px;
-	max-width: 320px;
-	max-height: min(78vh, 640px);
-	padding: 8px;
-	border-radius: 10px;
+	z-index: var(--layer-menu, 2100);
+	width: 300px;
+	max-width: calc(100vw - 16px);
+	max-height: min(80vh, 620px);
+	display: flex;
+	flex-direction: column;
+	border-radius: var(--radius-m);
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-primary);
-	box-shadow: var(--shadow-s);
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	overflow-y: auto;
-	overflow-x: hidden;
-	scrollbar-gutter: stable;
+	box-shadow: var(--shadow-l);
+	font-size: var(--font-ui-small);
+	color: var(--text-normal);
+	overflow: hidden;
 }
 
-.columns-style-popover-section {
-	padding: 4px 8px 2px;
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
-}
-
-.columns-style-popover-section-inline {
+/* ── Header: title + column actions ── */
+.columns-style-popover .amc-menu-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 8px;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-2) var(--size-4-2) var(--size-4-3);
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.columns-style-popover-section-inline .columns-style-popover-section {
-	padding-right: 0;
-}
-
-.columns-style-popover-mini-btn {
-	height: 22px;
-	padding: 0 8px;
-	border-radius: 6px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	font-size: var(--font-ui-smaller);
-	cursor: pointer;
-}
-
-.columns-style-popover-mini-btn:hover {
-	background: var(--background-modifier-hover);
-}
-
-.columns-style-popover-divider {
-	height: 1px;
-	margin: 4px 2px;
-	background: var(--background-modifier-border);
-}
-
-.columns-style-popover-row {
-	width: 100%;
-	background: transparent;
-	border-radius: 6px;
-	padding: 6px 8px;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 10px;
-	color: var(--text-normal);
-	cursor: pointer;
-	text-align: left;
-	font-size: var(--font-ui-small);
-}
-
-.columns-style-popover-row:hover {
-	background: var(--background-modifier-hover);
-}
-
-.columns-style-popover-checkbox {
-	width: 25px;
-    height: 25px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    background: var(--background-secondary);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 25px;
-    padding: 0 0 2px;
-}
-
-.columns-style-popover-checkbox-mark {
-	opacity: 0;
-	font-size: 13px;
-	line-height: 1;
-	color: var(--text-normal);
-}
-
-.columns-style-popover-row.is-checked .columns-style-popover-checkbox {
-	border-color: var(--interactive-accent);
-	background: var(--interactive-accent);
-}
-
-.columns-style-popover-row.is-checked .columns-style-popover-checkbox-mark {
-	opacity: 1;
-	color: var(--text-on-accent);
-}
-
-.columns-style-popover-row-label {
-	flex: 1 1 auto;
-}
-
-.columns-style-popover-inline-buttons {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 4px 8px;
-}
-
-.columns-style-popover-inline-btn {
-	flex: 1 1 0%;
-	min-height: 28px;
-	padding: 4px 8px;
-	border-radius: 6px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	font-size: var(--font-ui-small);
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.columns-style-popover-inline-btn .svg-icon {
-	width: 16px;
-	height: 16px;
-}
-
-.columns-style-popover-inline-btn:hover {
-	background: var(--background-modifier-hover);
-}
-
-.columns-style-popover-inline-btn-danger {
-	color: var(--text-error);
-	border-color: var(--text-error);
-}
-
-.columns-style-popover-inline-btn-danger:hover {
-	background: var(--text-error);
-	color: var(--text-on-accent);
-}
-
-.columns-style-popover-select-row {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 10px;
-	padding: 6px 8px;
-	border-radius: 6px;
-}
-
-.columns-style-popover-select-row:hover {
-	background: var(--background-modifier-hover);
-}
-
-.columns-style-popover-select-label {
-	font-size: var(--font-ui-small);
-	color: var(--text-normal);
-}
-
-.columns-style-popover-select {
-	min-width: 124px;
-	max-width: 156px;
-	height: 28px;
-}
-
-/* Collapsible sections */
-.columns-style-popover-collapsible {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-}
-
-.columns-style-popover-collapsible-header {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 8px 2px;
-	cursor: pointer;
-	border-radius: 6px;
-}
-
-.columns-style-popover-collapsible-header:hover {
-	background: var(--background-modifier-hover);
-}
-
-.columns-style-popover-chevron {
-	font-size: 8px;
-	color: var(--text-faint);
-	flex: 0 0 10px;
-	text-align: center;
-}
-
-.columns-style-popover-collapsible-label {
-	flex: 1 1 auto;
-	font-size: var(--font-ui-smaller);
-	color: var(--text-muted);
-	font-weight: 500;
-}
-
-.columns-style-popover-collapsible-header .columns-style-popover-mini-btn {
-	flex: 0 0 auto;
-}
-
-.columns-style-popover-collapsible-body {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	padding-left: 4px;
-}
-
-.columns-style-popover-collapsible-body.is-collapsed {
-	display: none;
-}
-
-/* Inline toggle + select row */
-.columns-style-popover-inline-toggle-select {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 6px 8px;
-	border-radius: 6px;
-}
-
-.columns-style-popover-inline-toggle-select:hover {
-	background: var(--background-modifier-hover);
-}
-
-.columns-style-popover-inline-toggle-select .columns-style-popover-select-label {
-	flex: 1 1 auto;
-}
-
-.columns-style-popover-inline-toggle-select .columns-style-popover-checkbox {
-	cursor: pointer;
-}
-
-.columns-style-popover-inline-toggle-select .columns-style-popover-checkbox.is-checked {
-	border-color: var(--interactive-accent);
-	background: var(--interactive-accent);
-}
-
-.columns-style-popover-inline-toggle-select .columns-style-popover-checkbox.is-checked .columns-style-popover-checkbox-mark {
-	opacity: 1;
-	color: var(--text-on-accent);
-}
-
-.columns-style-popover-inline-toggle-select .columns-style-popover-select {
-	min-width: 100px;
-	max-width: 120px;
-}
-
-/* Compact multi-select row (style + color + width inline) */
-.columns-style-popover-compact-row {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding: 6px 8px;
-	border-radius: 6px;
-}
-
-.columns-style-popover-compact-row:hover {
-	background: var(--background-modifier-hover);
-}
-
-.columns-style-popover-compact-row .columns-style-popover-select-label {
-	flex: 0 0 auto;
-}
-
-.columns-style-popover-compact-selects {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	flex: 1 1 auto;
-	justify-content: flex-end;
-}
-
-.columns-style-popover-compact-select {
-	height: 28px;
+.columns-style-popover .amc-menu-titles {
 	min-width: 0;
-	flex: 1 1 0%;
-	max-width: 80px;
-	font-size: var(--font-ui-smaller);
 }
 
-/* Text input for custom separator character */
-.columns-style-popover-text-input {
-	min-width: 60px;
-	max-width: 80px;
-	height: 28px;
-	padding: 2px 8px;
-	border-radius: 6px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
+.columns-style-popover .amc-menu-title {
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.columns-style-popover .amc-menu-subtitle {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.columns-style-popover .amc-menu-actions {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	flex-shrink: 0;
+}
+
+.columns-style-popover .amc-menu-icon-btn.mod-warning:hover {
+	color: var(--text-error);
+}
+
+/* ── Segmented controls (tabs, layout) ── */
+.columns-style-popover .amc-menu-segmented {
+	display: flex;
+	gap: var(--size-2-1);
+	padding: var(--size-2-1);
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+}
+
+.columns-style-popover .amc-menu-segmented > button {
+	flex: 1 1 0;
+	height: auto;
+	padding: var(--size-2-2) var(--size-4-2);
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+
+.columns-style-popover .amc-menu-segmented > button:hover {
 	color: var(--text-normal);
+}
+
+.columns-style-popover .amc-menu-segmented > button.is-active {
+	background: var(--background-primary);
+	color: var(--text-normal);
+	box-shadow: var(--shadow-s);
+}
+
+.columns-style-popover .amc-menu-tabs {
+	margin: var(--size-4-2) var(--size-4-3) 0;
+}
+
+/* ── Body rows: label left, controls right ── */
+.columns-style-popover .amc-menu-body {
+	display: flex;
+	flex-direction: column;
+	padding: var(--size-4-1) var(--size-4-3) var(--size-4-2);
+	overflow-y: auto;
+}
+
+.columns-style-popover .amc-menu-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--size-4-3);
+	min-height: 36px;
+}
+
+.columns-style-popover .amc-menu-row-group {
+	margin-top: var(--size-4-1);
+	padding-top: var(--size-4-1);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.columns-style-popover .amc-menu-label {
+	flex-shrink: 0;
+	color: var(--text-normal);
+}
+
+.columns-style-popover .amc-menu-row-sub .amc-menu-label {
+	padding-inline-start: var(--size-4-3);
+	color: var(--text-muted);
+}
+
+.columns-style-popover .amc-menu-controls {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--size-4-2);
+	min-width: 0;
+}
+
+.columns-style-popover .amc-menu-dropdown {
+	max-width: 140px;
+	font-size: var(--font-ui-small);
+}
+
+.columns-style-popover .amc-menu-row-sub .amc-menu-dropdown {
+	max-width: 76px;
+	padding-inline-end: var(--size-4-6);
+}
+
+.columns-style-popover .amc-menu-toggle {
+	flex-shrink: 0;
+}
+
+.columns-style-popover .amc-menu-layout {
+	min-width: 170px;
+}
+
+.columns-style-popover .amc-menu-text-input {
+	width: 76px;
 	font-size: var(--font-ui-small);
 	text-align: center;
+}
+
+/* ── Footer ── */
+.columns-style-popover .amc-menu-footer {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-3);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.columns-style-popover .amc-menu-text-btn {
+	height: auto;
+	padding: var(--size-2-2) var(--size-4-2);
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+
+.columns-style-popover .amc-menu-text-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.columns-style-popover .amc-menu-text-btn.mod-warning:hover {
+	color: var(--text-error);
+}
+
+.columns-style-popover .amc-menu-empty {
+	padding: var(--size-4-3);
+	color: var(--text-muted);
 }

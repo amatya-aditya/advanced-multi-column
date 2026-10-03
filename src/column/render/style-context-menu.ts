@@ -2,7 +2,8 @@ import {setIcon} from "obsidian";
 import type {ColumnBackgroundOption, StyleColorOption} from "../../settings";
 import type {ColumnData, ColumnLayout, ColumnStyleData, SeparatorLineStyle} from "../core/types";
 import {applyColumnStyle, applyContainerStyle} from "../core/column-style";
-import {getColumnElements} from "./column-renderer";
+import {getPluginInstance} from "../core/plugin-ref";
+import {getColumnElements, groupColumns} from "./column-renderer";
 
 interface SelectOption<T extends string> {
 	value: T;
@@ -56,21 +57,36 @@ interface PopoverRenderState {
 	layout?: ColumnLayout;
 }
 
-const DEFAULT_STYLE: Required<ColumnStyleData> = {
+/**
+ * Values a style field takes when it is not written in the marker. Fields
+ * equal to their default are dropped, so markers stay minimal and keep
+ * following the defaults (and the global Appearance settings) later.
+ */
+type StyleDefaults = Pick<
+	Required<ColumnStyleData>,
+	"background" | "borderColor" | "textColor"
+> & Partial<Pick<Required<ColumnStyleData>, "separatorColor" | "separatorStyle" | "separatorWidth" | "separatorCustomChar">>;
+
+/** How an unstyled column renders. */
+const COLUMN_DEFAULTS: Required<StyleDefaults> = {
 	background: "transparent",
 	borderColor: "gray",
 	textColor: "text",
-	showBorder: true,
-	leftBorder: false,
-	horizontalDividers: false,
-	separator: false,
 	separatorColor: "gray",
 	separatorStyle: "solid",
 	separatorWidth: 1,
 	separatorCustomChar: "|",
 };
 
-const ACTIVATION_KEYS = new Set(["Enter", " "]);
+/** How an unstyled block renders: the global Appearance settings. */
+function containerDefaults(): StyleDefaults {
+	const s = getPluginInstance().settings;
+	return {
+		background: s.containerBackground,
+		borderColor: s.containerBorderColor,
+		textColor: s.containerTextColor,
+	};
+}
 
 const BACKGROUND_OPTION_ITEMS: ReadonlyArray<SelectOption<ColumnBackgroundOption>> = [
 	{value: "transparent", label: "Transparent"},
@@ -92,6 +108,7 @@ const STYLE_COLOR_OPTION_ITEMS: ReadonlyArray<SelectOption<StyleColorOption>> = 
 	{value: "accent", label: "Accent"},
 	{value: "muted", label: "Muted text"},
 	{value: "text", label: "Normal text"},
+	{value: "secondary", label: "Secondary"},
 	{value: "red", label: "Red"},
 	{value: "orange", label: "Orange"},
 	{value: "yellow", label: "Yellow"},
@@ -106,27 +123,30 @@ const SEPARATOR_STYLE_ITEMS: ReadonlyArray<SelectOption<SeparatorLineStyle>> = [
 	{value: "dashed", label: "Dashed"},
 	{value: "dotted", label: "Dotted"},
 	{value: "double", label: "Double"},
-	{value: "custom", label: "Custom"},
+	{value: "custom", label: "Character"},
 ];
 
 const SEPARATOR_WIDTH_ITEMS: ReadonlyArray<SelectOption<string>> = [
-	{value: "1", label: "1px"},
-	{value: "2", label: "2px"},
-	{value: "3", label: "3px"},
-	{value: "4", label: "4px"},
-	{value: "5", label: "5px"},
-	{value: "6", label: "6px"},
-	{value: "8", label: "8px"},
+	{value: "1", label: "1 px"},
+	{value: "2", label: "2 px"},
+	{value: "3", label: "3 px"},
+	{value: "4", label: "4 px"},
+	{value: "5", label: "5 px"},
+	{value: "6", label: "6 px"},
+	{value: "8", label: "8 px"},
 ];
 
 type LayoutOption = "row" | "stack";
 
 const LAYOUT_OPTION_ITEMS: ReadonlyArray<SelectOption<LayoutOption>> = [
-	{value: "row", label: "Row"},
-	{value: "stack", label: "Stack"},
+	{value: "row", label: "Side by side"},
+	{value: "stack", label: "Stacked"},
 ];
 
-const collapsedSections = new Set<string>();
+type PopoverTab = "column" | "block";
+
+/** Last tab used; the menu re-opens on it. */
+let activeTab: PopoverTab = "column";
 
 let activePopover: HTMLDivElement | null = null;
 let cleanupActivePopover: (() => void) | null = null;
@@ -159,342 +179,141 @@ function closeActivePopover(): void {
 	}
 }
 
-function createSectionLabel(parent: HTMLElement, text: string): void {
-	parent.createDiv({cls: "columns-style-popover-section", text});
+function flushPending(): void {
+	if (!pendingFlush) return;
+	pendingFlush();
+	pendingFlush = null;
 }
 
-function createSectionHeader(
-	parent: HTMLElement,
-	config: {
-		label: string;
-		actionLabel?: string;
-		onAction?: () => void;
-	},
-): void {
-	const row = parent.createDiv({cls: "columns-style-popover-section-inline"});
+// ── UI building blocks ──────────────────────────────────────
+// Native Obsidian controls (toggle, dropdown, clickable icons) keep the menu
+// consistent with the rest of the app's settings UI.
 
-	row.createDiv({cls: "columns-style-popover-section", text: config.label});
-
-	const onAction = config.onAction;
-	if (config.actionLabel && onAction) {
-		const button = row.createEl("button");
-		button.type = "button";
-		button.className = "columns-style-popover-mini-btn";
-		button.textContent = config.actionLabel;
-		button.addEventListener("click", (evt) => {
-			evt.preventDefault();
-			evt.stopPropagation();
-			onAction();
-		});
-		row.appendChild(button);
-	}
-
+function stopMouse(el: HTMLElement): void {
+	el.addEventListener("click", (evt) => evt.stopPropagation());
+	el.addEventListener("mousedown", (evt) => evt.stopPropagation());
 }
 
-function createDivider(parent: HTMLElement): void {
-	parent.createDiv({cls: "columns-style-popover-divider"});
+function createRow(parent: HTMLElement, label: string, cls = ""): HTMLElement {
+	const row = parent.createDiv({cls: `amc-menu-row ${cls}`.trim()});
+	row.createSpan({cls: "amc-menu-label", text: label});
+	return row.createDiv({cls: "amc-menu-controls"});
 }
 
-function createActionRow(
-	parent: HTMLElement,
-	config: {
-		label: string;
-		checked?: boolean;
-		onClick: () => void;
-	},
-): void {
-	const row = parent.createDiv({cls: "columns-style-popover-row"});
-	row.tabIndex = 0;
-	row.setAttribute("role", "checkbox");
-	row.setAttribute("aria-checked", config.checked ? "true" : "false");
-	if (config.checked) row.classList.add("is-checked");
-
-	const text = row.createSpan({cls: "columns-style-popover-row-label", text: config.label});
-
-	const checkbox = row.createSpan({cls: "columns-style-popover-checkbox"});
-
-	const checkMark = checkbox.createSpan({cls: "columns-style-popover-checkbox-mark", text: "\u2713"});
-	checkbox.appendChild(checkMark);
-
-	row.appendChild(text);
-	row.appendChild(checkbox);
-	row.addEventListener("click", (evt) => {
+function createToggle(parent: HTMLElement, label: string, checked: boolean, onChange: () => void): void {
+	const toggle = parent.createDiv({cls: "checkbox-container amc-menu-toggle"});
+	toggle.toggleClass("is-enabled", checked);
+	toggle.setAttribute("role", "switch");
+	toggle.setAttribute("aria-checked", String(checked));
+	toggle.setAttribute("aria-label", label);
+	toggle.tabIndex = 0;
+	const input = toggle.createEl("input", {type: "checkbox"});
+	input.checked = checked;
+	input.tabIndex = -1;
+	const fire = (evt: Event) => {
 		evt.preventDefault();
 		evt.stopPropagation();
-		config.onClick();
-	});
-	row.addEventListener("keydown", (evt) => {
-		if (!ACTIVATION_KEYS.has(evt.key)) return;
-		evt.preventDefault();
-		evt.stopPropagation();
-		config.onClick();
+		onChange();
+	};
+	toggle.addEventListener("click", fire);
+	toggle.addEventListener("keydown", (evt) => {
+		if (evt.key === "Enter" || evt.key === " ") fire(evt);
 	});
 }
 
-function createInlineCommandButtons(
-	parent: HTMLElement,
-	items: ReadonlyArray<{
-		label: string;
-		icon?: string;
-		className?: string;
-		onClick: () => void;
-	}>,
-): void {
-	if (items.length === 0) return;
-
-	const row = parent.createDiv({cls: "columns-style-popover-inline-buttons"});
-
-	for (const item of items) {
-		const button = row.createEl("button");
-		button.type = "button";
-		button.className = "columns-style-popover-inline-btn" + (item.className ? ` ${item.className}` : "");
-		button.title = item.label;
-		if (item.icon) {
-			setIcon(button, item.icon);
-			button.setAttribute("aria-label", item.label);
-		} else {
-			button.textContent = item.label;
-		}
-		button.addEventListener("click", (evt) => {
-			evt.preventDefault();
-			evt.stopPropagation();
-			// Flush pending style changes before structural actions
-			if (pendingFlush) {
-				pendingFlush();
-				pendingFlush = null;
-			}
-			item.onClick();
-			closeActivePopover();
-		});
-	}
-}
-
-function createSelectRow<T extends string>(
+function createDropdown<T extends string>(
 	parent: HTMLElement,
 	config: {
 		label: string;
 		value: T;
 		options: ReadonlyArray<SelectOption<T>>;
 		onChange: (value: T) => void;
+		disabled?: boolean;
 	},
 ): void {
-	const row = parent.createDiv({cls: "columns-style-popover-select-row"});
-
-	const selectId = `amc-select-${config.label.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`;
-
-	const label = row.createEl("label", {
-		cls: "columns-style-popover-select-label",
-		text: config.label,
-	});
-	label.setAttribute("for", selectId);
-
-	const select = row.createEl("select", {cls: "columns-style-popover-select"});
-	select.id = selectId;
-
+	const select = parent.createEl("select", {cls: "dropdown amc-menu-dropdown"});
+	select.setAttribute("aria-label", config.label);
 	for (const item of config.options) {
-		const option = select.createEl("option");
-		option.value = item.value;
-		option.textContent = item.label;
+		select.createEl("option", {value: item.value, text: item.label});
 	}
-
 	select.value = config.value;
-	select.addEventListener("click", (evt) => evt.stopPropagation());
-	select.addEventListener("mousedown", (evt) => evt.stopPropagation());
+	select.disabled = !!config.disabled;
+	stopMouse(select);
 	select.addEventListener("change", () => {
 		const selected = config.options.find((item) => item.value === select.value);
-		if (!selected) return;
-		config.onChange(selected.value);
+		if (selected) config.onChange(selected.value);
 	});
-
 }
 
-function createCollapsibleSection(
+function createSegmented<T extends string>(
 	parent: HTMLElement,
 	config: {
-		id: string;
-		label: string;
-		actionLabel?: string;
-		onAction?: () => void;
-		render: (body: HTMLElement) => void;
+		value: T;
+		options: ReadonlyArray<SelectOption<T>>;
+		onChange: (value: T) => void;
+		cls?: string;
 	},
 ): void {
-	const wrapper = parent.createDiv({cls: "columns-style-popover-collapsible"});
-
-	const isCollapsed = collapsedSections.has(config.id);
-
-	const header = wrapper.createDiv({cls: "columns-style-popover-collapsible-header"});
-	if (isCollapsed) header.classList.add("is-collapsed");
-
-	const chevron = header.createSpan({
-		cls: "columns-style-popover-chevron",
-		text: isCollapsed ? "\u25B6" : "\u25BC",
-	});
-
-	header.createSpan({
-		cls: "columns-style-popover-collapsible-label",
-		text: config.label,
-	});
-
-	const onAction = config.onAction;
-	if (config.actionLabel && onAction) {
-		const btn = header.createEl("button");
-		btn.type = "button";
-		btn.className = "columns-style-popover-mini-btn";
-		btn.textContent = config.actionLabel;
-		btn.addEventListener("click", (evt) => {
+	const group = parent.createDiv({cls: `amc-menu-segmented ${config.cls ?? ""}`.trim()});
+	group.setAttribute("role", "tablist");
+	for (const item of config.options) {
+		const button = group.createEl("button", {text: item.label});
+		button.type = "button";
+		button.setAttribute("role", "tab");
+		button.setAttribute("aria-selected", String(item.value === config.value));
+		button.toggleClass("is-active", item.value === config.value);
+		button.addEventListener("click", (evt) => {
 			evt.preventDefault();
 			evt.stopPropagation();
-			onAction();
+			if (item.value !== config.value) config.onChange(item.value);
 		});
 	}
-
-	const body = wrapper.createDiv({cls: "columns-style-popover-collapsible-body"});
-	if (isCollapsed) body.classList.add("is-collapsed");
-
-	config.render(body);
-
-	header.addEventListener("click", (evt) => {
-		evt.preventDefault();
-		evt.stopPropagation();
-		const nowCollapsed = !collapsedSections.has(config.id);
-		if (nowCollapsed) {
-			collapsedSections.add(config.id);
-			body.classList.add("is-collapsed");
-			header.classList.add("is-collapsed");
-			chevron.textContent = "\u25B6";
-		} else {
-			collapsedSections.delete(config.id);
-			body.classList.remove("is-collapsed");
-			header.classList.remove("is-collapsed");
-			chevron.textContent = "\u25BC";
-		}
-	});
-}
-
-function createInlineToggleSelect<T extends string>(
-	parent: HTMLElement,
-	config: {
-		label: string;
-		checked: boolean;
-		onToggle: () => void;
-		selectValue: T;
-		selectOptions: ReadonlyArray<SelectOption<T>>;
-		onSelectChange: (value: T) => void;
-	},
-): void {
-	const row = parent.createDiv({cls: "columns-style-popover-inline-toggle-select"});
-
-	row.createSpan({cls: "columns-style-popover-select-label", text: config.label});
-
-	const toggle = row.createSpan({cls: "columns-style-popover-checkbox"});
-	toggle.tabIndex = 0;
-	toggle.setAttribute("role", "checkbox");
-	toggle.setAttribute("aria-checked", config.checked ? "true" : "false");
-	if (config.checked) toggle.classList.add("is-checked");
-
-	const checkMark = toggle.createSpan({cls: "columns-style-popover-checkbox-mark", text: "\u2713"});
-	toggle.appendChild(checkMark);
-
-	toggle.addEventListener("click", (evt) => {
-		evt.preventDefault();
-		evt.stopPropagation();
-		config.onToggle();
-	});
-	toggle.addEventListener("keydown", (evt) => {
-		if (!ACTIVATION_KEYS.has(evt.key)) return;
-		evt.preventDefault();
-		evt.stopPropagation();
-		config.onToggle();
-	});
-
-	const select = row.createEl("select", {cls: "columns-style-popover-select"});
-
-	for (const item of config.selectOptions) {
-		const option = select.createEl("option");
-		option.value = item.value;
-		option.textContent = item.label;
-	}
-	select.value = config.selectValue;
-	select.addEventListener("click", (evt) => evt.stopPropagation());
-	select.addEventListener("mousedown", (evt) => evt.stopPropagation());
-	select.addEventListener("change", () => {
-		const selected = config.selectOptions.find((item) => item.value === select.value);
-		if (!selected) return;
-		config.onSelectChange(selected.value);
-	});
-
 }
 
 function createTextInput(
 	parent: HTMLElement,
-	config: {
-		label: string;
-		value: string;
-		placeholder?: string;
-		maxLength?: number;
-		onChange: (value: string) => void;
-	},
+	config: {label: string; value: string; placeholder?: string; maxLength?: number; onChange: (value: string) => void},
 ): void {
-	const row = parent.createDiv({cls: "columns-style-popover-select-row"});
-
-	row.createEl("label", {
-		cls: "columns-style-popover-select-label",
-		text: config.label,
-	});
-
-	const input = row.createEl("input");
-	input.type = "text";
-	input.className = "columns-style-popover-text-input";
+	const input = parent.createEl("input", {type: "text", cls: "amc-menu-text-input"});
+	input.setAttribute("aria-label", config.label);
 	input.value = config.value;
 	if (config.placeholder) input.placeholder = config.placeholder;
 	if (config.maxLength) input.maxLength = config.maxLength;
-
-	input.addEventListener("click", (evt) => evt.stopPropagation());
-	input.addEventListener("mousedown", (evt) => evt.stopPropagation());
-	input.addEventListener("change", () => {
-		config.onChange(input.value);
-	});
-
+	stopMouse(input);
+	input.addEventListener("change", () => config.onChange(input.value));
 }
 
-interface CompactSelectDef<T extends string> {
-	value: T;
-	options: ReadonlyArray<SelectOption<T>>;
-	onChange: (value: T) => void;
-	title?: string;
-}
-
-function createCompactSelectRow<A extends string, B extends string, C extends string>(
+function createIconAction(
 	parent: HTMLElement,
-	config: {
-		label: string;
-		selects: [CompactSelectDef<A>, CompactSelectDef<B>, CompactSelectDef<C>];
-	},
+	config: {label: string; icon: string; danger?: boolean; onClick: () => void},
 ): void {
-	const row = parent.createDiv({cls: "columns-style-popover-compact-row"});
+	const button = parent.createEl("button", {cls: "clickable-icon amc-menu-icon-btn"});
+	button.type = "button";
+	button.setAttribute("aria-label", config.label);
+	button.toggleClass("mod-warning", !!config.danger);
+	setIcon(button, config.icon);
+	button.addEventListener("click", (evt) => {
+		evt.preventDefault();
+		evt.stopPropagation();
+		// Flush pending style changes before structural actions.
+		flushPending();
+		config.onClick();
+		closeActivePopover();
+	});
+}
 
-	row.createSpan({cls: "columns-style-popover-select-label", text: config.label});
-
-	const selectsWrap = row.createDiv({cls: "columns-style-popover-compact-selects"});
-
-	for (const def of config.selects) {
-		const select = selectsWrap.createEl("select", {cls: "columns-style-popover-compact-select"});
-		if (def.title) select.title = def.title;
-
-		for (const item of def.options) {
-			const option = select.createEl("option");
-			option.value = item.value;
-			option.textContent = item.label;
-		}
-		select.value = def.value;
-		select.addEventListener("click", (evt) => evt.stopPropagation());
-		select.addEventListener("mousedown", (evt) => evt.stopPropagation());
-		select.addEventListener("change", () => {
-			const selected = def.options.find((item) => item.value === select.value);
-			if (!selected) return;
-			(def.onChange as (v: string) => void)(selected.value);
-		});
-	}
+function createTextAction(
+	parent: HTMLElement,
+	config: {label: string; danger?: boolean; onClick: () => void},
+): void {
+	const button = parent.createEl("button", {cls: "amc-menu-text-btn", text: config.label});
+	button.type = "button";
+	button.toggleClass("mod-warning", !!config.danger);
+	button.addEventListener("click", (evt) => {
+		evt.preventDefault();
+		evt.stopPropagation();
+		config.onClick();
+	});
 }
 
 function positionPopover(popover: HTMLDivElement, evt: MouseEvent): void {
@@ -515,63 +334,38 @@ function positionPopover(popover: HTMLDivElement, evt: MouseEvent): void {
 	popover.style.top = `${Math.max(padding, top)}px`;
 }
 
-function readStyleValue<K extends keyof ColumnStyleData>(
-	column: ColumnData,
-	key: K,
-	fallback: Required<ColumnStyleData>[K],
-): Required<ColumnStyleData>[K] {
-	const value = column.style?.[key];
-	if (value === undefined) return fallback;
-	return value as Required<ColumnStyleData>[K];
-}
-
-function readStyleField<K extends keyof ColumnStyleData>(
+function normalizeStyle(
 	style: ColumnStyleData | undefined,
-	key: K,
-	fallback: Required<ColumnStyleData>[K],
-): Required<ColumnStyleData>[K] {
-	const value = style?.[key];
-	if (value === undefined) return fallback;
-	return value as Required<ColumnStyleData>[K];
-}
-
-function normalizeStyle(style: ColumnStyleData | undefined): ColumnStyleData | undefined {
+	defaults: StyleDefaults,
+): ColumnStyleData | undefined {
 	if (!style) return undefined;
 
 	const next: ColumnStyleData = {};
-	if (style.background !== undefined && style.background !== DEFAULT_STYLE.background) {
-		next.background = style.background;
-	}
-	if (style.borderColor !== undefined && style.borderColor !== DEFAULT_STYLE.borderColor) {
-		next.borderColor = style.borderColor;
-	}
-	if (style.textColor !== undefined && style.textColor !== DEFAULT_STYLE.textColor) {
-		next.textColor = style.textColor;
-	}
+	const differs = <K extends keyof StyleDefaults>(key: K): boolean =>
+		style[key] !== undefined && style[key] !== defaults[key];
+	if (differs("background")) next.background = style.background;
+	if (differs("borderColor")) next.borderColor = style.borderColor;
+	if (differs("textColor")) next.textColor = style.textColor;
 	if (style.showBorder !== undefined) next.showBorder = style.showBorder;
 	if (style.leftBorder !== undefined) next.leftBorder = style.leftBorder;
 	if (style.horizontalDividers !== undefined) {
 		next.horizontalDividers = style.horizontalDividers;
 	}
 	if (style.separator !== undefined) next.separator = style.separator;
-	if (style.separatorColor !== undefined && style.separatorColor !== DEFAULT_STYLE.separatorColor) {
-		next.separatorColor = style.separatorColor;
-	}
-	if (style.separatorStyle !== undefined && style.separatorStyle !== DEFAULT_STYLE.separatorStyle) {
-		next.separatorStyle = style.separatorStyle;
-	}
-	if (style.separatorWidth !== undefined && style.separatorWidth !== DEFAULT_STYLE.separatorWidth) {
-		next.separatorWidth = style.separatorWidth;
-	}
-	if (style.separatorCustomChar !== undefined && style.separatorCustomChar !== DEFAULT_STYLE.separatorCustomChar) {
-		next.separatorCustomChar = style.separatorCustomChar;
-	}
+	if (differs("separatorColor")) next.separatorColor = style.separatorColor;
+	if (differs("separatorStyle")) next.separatorStyle = style.separatorStyle;
+	if (differs("separatorWidth")) next.separatorWidth = style.separatorWidth;
+	if (differs("separatorCustomChar")) next.separatorCustomChar = style.separatorCustomChar;
 
 	if (Object.keys(next).length === 0) return undefined;
 	return next;
 }
 
-function patchStyleData(currentStyle: ColumnStyleData | undefined, patch: StylePatch): ColumnStyleData | undefined {
+function patchStyleData(
+	currentStyle: ColumnStyleData | undefined,
+	patch: StylePatch,
+	defaults: StyleDefaults,
+): ColumnStyleData | undefined {
 	const style: ColumnStyleData = {...(currentStyle ?? {})};
 	let changed = false;
 
@@ -644,11 +438,11 @@ function patchStyleData(currentStyle: ColumnStyleData | undefined, patch: StyleP
 	}
 
 	if (!changed) return currentStyle;
-	return normalizeStyle(style);
+	return normalizeStyle(style, defaults);
 }
 
 function patchColumnStyle(column: ColumnData, patch: StylePatch): ColumnData {
-	const nextStyle = patchStyleData(column.style, patch);
+	const nextStyle = patchStyleData(column.style, patch, COLUMN_DEFAULTS);
 	if (nextStyle === column.style) return column;
 	return {
 		...column,
@@ -791,7 +585,7 @@ function patchContainerStyleAndRerender(
 	state: PopoverRenderState,
 	patch: StylePatch,
 ): void {
-	const updated = patchStyleData(state.containerStyle, patch);
+	const updated = patchStyleData(state.containerStyle, patch, containerDefaults());
 	if (updated === state.containerStyle) return;
 	state.containerStyle = updated;
 	markDirty(menuData, state);
@@ -912,283 +706,339 @@ function stripMarkerStylesFromContent(content: string): {
 	};
 }
 
+// ── Effective (rendered) values ─────────────────────────────
+// The menu shows what the block actually looks like: values written in the
+// markers, falling back to how unstyled columns render and to the global
+// Appearance settings (container look, vertical dividers).
+
+/** Whether the global vertical divider is drawn after `index`. */
+function hasGlobalDividerAfter(state: PopoverRenderState, index: number): boolean {
+	const s = getPluginInstance().settings;
+	if (s.verticalDividerWidthPx <= 0 || state.layout === "stack") return false;
+	if (s.styleTargetMode === "specific" && index !== s.styleTargetColumnIndex - 1) return false;
+	const groups = groupColumns(state.columns);
+	const groupIndex = groups.findIndex((g) => g.indices.includes(index));
+	const group = groups[groupIndex];
+	if (!group || groupIndex === groups.length - 1) return false;
+	return group.indices[group.indices.length - 1] === index;
+}
+
+interface EffectiveColumnStyle {
+	background: ColumnBackgroundOption;
+	textColor: StyleColorOption;
+	showBorder: boolean;
+	borderColor: StyleColorOption;
+	leftBorder: boolean;
+	separator: boolean;
+	/** The separator shown comes from the global divider setting. */
+	separatorFromGlobal: boolean;
+	globalDivider: boolean;
+	separatorStyle: SeparatorLineStyle;
+	separatorColor: StyleColorOption;
+	separatorWidth: number;
+	separatorCustomChar: string;
+}
+
+function effectiveColumnStyle(state: PopoverRenderState, index: number): EffectiveColumnStyle {
+	const s = getPluginInstance().settings;
+	const style = state.columns[index]?.style ?? {};
+	const globalDivider = hasGlobalDividerAfter(state, index);
+	const separatorFromGlobal = style.separator === undefined && globalDivider;
+	return {
+		background: style.background ?? COLUMN_DEFAULTS.background,
+		textColor: style.textColor ?? COLUMN_DEFAULTS.textColor,
+		showBorder: style.showBorder ?? style.borderColor !== undefined,
+		borderColor: style.borderColor ?? COLUMN_DEFAULTS.borderColor,
+		leftBorder: style.leftBorder ?? false,
+		separator: style.separator ?? globalDivider,
+		separatorFromGlobal,
+		globalDivider,
+		separatorStyle: style.separatorStyle
+			?? (separatorFromGlobal ? s.verticalDividerStyle : COLUMN_DEFAULTS.separatorStyle),
+		separatorColor: style.separatorColor
+			?? (separatorFromGlobal ? s.verticalDividerColor : COLUMN_DEFAULTS.separatorColor),
+		separatorWidth: style.separatorWidth
+			?? (separatorFromGlobal ? s.verticalDividerWidthPx : COLUMN_DEFAULTS.separatorWidth),
+		separatorCustomChar: style.separatorCustomChar ?? COLUMN_DEFAULTS.separatorCustomChar,
+	};
+}
+
+interface EffectiveContainerStyle {
+	background: ColumnBackgroundOption;
+	textColor: StyleColorOption;
+	showBorder: boolean;
+	borderColor: StyleColorOption;
+	globalBorder: boolean;
+}
+
+function effectiveContainerStyle(state: PopoverRenderState): EffectiveContainerStyle {
+	const s = getPluginInstance().settings;
+	const style = state.containerStyle ?? {};
+	const globalBorder = s.showContainerBorder && s.containerBorderWidthPx > 0;
+	return {
+		background: style.background ?? s.containerBackground,
+		textColor: style.textColor ?? s.containerTextColor,
+		showBorder: style.showBorder ?? (style.borderColor !== undefined || globalBorder),
+		borderColor: style.borderColor ?? s.containerBorderColor,
+		globalBorder,
+	};
+}
+
+function widthOptions(current: number): ReadonlyArray<SelectOption<string>> {
+	if (SEPARATOR_WIDTH_ITEMS.some((item) => item.value === String(current))) return SEPARATOR_WIDTH_ITEMS;
+	return [...SEPARATOR_WIDTH_ITEMS, {value: String(current), label: `${current} px`}]
+		.sort((a, b) => Number(a.value) - Number(b.value));
+}
+
+// ── Popover ─────────────────────────────────────────────────
+
+function toggleStacked(
+	menuData: ColumnStyleContextMenuData,
+	state: PopoverRenderState,
+	indices: Set<number>,
+	allStacked: boolean,
+): void {
+	if (allStacked) {
+		const split = splitStackGroup(state.columns, indices);
+		state.columns = split ?? state.columns.map((col, idx) =>
+			indices.has(idx) ? {...col, stacked: undefined} : col,
+		);
+	} else {
+		const usedIds = new Set(
+			state.columns
+				.filter((col) => col.stacked && col.stacked > 0)
+				.map((col) => col.stacked!),
+		);
+		let nextId = 1;
+		while (usedIds.has(nextId)) nextId++;
+		state.columns = state.columns.map((col, idx) =>
+			indices.has(idx) ? {...col, stacked: nextId} : col,
+		);
+	}
+	pendingFlush = null;
+	menuData.onChange(state.columns, state.containerStyle);
+	closeActivePopover();
+}
+
+function renderColumnTab(
+	body: HTMLElement,
+	menuData: ColumnStyleContextMenuData,
+	state: PopoverRenderState,
+	indices: Set<number>,
+	index: number,
+): void {
+	const eff = effectiveColumnStyle(state, index);
+	const patch = (p: StylePatch) => patchStylesAndRerender(menuData, state, p);
+
+	createDropdown(createRow(body, "Background"), {
+		label: "Background",
+		value: eff.background,
+		options: BACKGROUND_OPTION_ITEMS,
+		onChange: (value) => patch({background: value}),
+	});
+	createDropdown(createRow(body, "Text color"), {
+		label: "Text color",
+		value: eff.textColor,
+		options: STYLE_COLOR_OPTION_ITEMS,
+		onChange: (value) => patch({textColor: value}),
+	});
+
+	const border = createRow(body, "Border");
+	createDropdown(border, {
+		label: "Border color",
+		value: eff.borderColor,
+		options: STYLE_COLOR_OPTION_ITEMS,
+		disabled: !eff.showBorder,
+		onChange: (value) => patch({borderColor: value, showBorder: true}),
+	});
+	createToggle(border, "Border", eff.showBorder, () => patch({showBorder: !eff.showBorder}));
+
+	createToggle(createRow(body, "Accent stripe"), "Accent stripe", eff.leftBorder, () =>
+		patch({leftBorder: eff.leftBorder ? undefined : true}),
+	);
+
+	const allStacked = [...indices].every((i) => (state.columns[i]?.stacked ?? 0) > 0);
+	createToggle(createRow(body, "Stacked"), "Stacked", allStacked, () =>
+		toggleStacked(menuData, state, indices, allStacked),
+	);
+
+	// A separator is drawn after a column, so the last column has none.
+	const isLast = indices.size === 1 && index === state.columns.length - 1;
+	if (isLast) return;
+
+	const col = state.columns[index];
+	const next = state.columns[index + 1];
+	const below = state.layout === "stack" || (!!col?.stacked && col.stacked === next?.stacked);
+	const sepLabel = below ? "Separator below" : "Separator after";
+	createToggle(createRow(body, sepLabel, "amc-menu-row-group"), sepLabel, eff.separator, () => {
+		if (eff.separator) {
+			// An explicit "off" is only needed to hide the global divider.
+			patch({separator: eff.globalDivider ? false : undefined});
+		} else {
+			patch({separator: eff.globalDivider ? undefined : true});
+		}
+	});
+	if (!eff.separator) return;
+
+	// Editing a globally drawn divider pins its current look on this column.
+	const sepPatch = (p: StylePatch) => patch(eff.separatorFromGlobal
+		? {
+			separator: true,
+			separatorStyle: eff.separatorStyle,
+			separatorColor: eff.separatorColor,
+			separatorWidth: eff.separatorWidth,
+			...p,
+		}
+		: {separator: true, ...p});
+
+	const options = createRow(body, "Line", "amc-menu-row-sub");
+	createDropdown(options, {
+		label: "Separator style",
+		value: eff.separatorStyle,
+		options: SEPARATOR_STYLE_ITEMS,
+		onChange: (value) => sepPatch({separatorStyle: value}),
+	});
+	createDropdown(options, {
+		label: "Separator color",
+		value: eff.separatorColor,
+		options: STYLE_COLOR_OPTION_ITEMS,
+		onChange: (value) => sepPatch({separatorColor: value}),
+	});
+	if (eff.separatorStyle !== "custom") {
+		createDropdown(options, {
+			label: "Separator width",
+			value: String(eff.separatorWidth),
+			options: widthOptions(eff.separatorWidth),
+			onChange: (value) => sepPatch({separatorWidth: parseInt(value, 10)}),
+		});
+	} else {
+		createTextInput(options, {
+			label: "Separator character",
+			value: eff.separatorCustomChar,
+			placeholder: "|",
+			maxLength: 3,
+			onChange: (value) => sepPatch({separatorCustomChar: value || undefined}),
+		});
+	}
+}
+
+function renderBlockTab(
+	body: HTMLElement,
+	menuData: ColumnStyleContextMenuData,
+	state: PopoverRenderState,
+): void {
+	const eff = effectiveContainerStyle(state);
+	const patch = (p: StylePatch) => patchContainerStyleAndRerender(menuData, state, p);
+
+	if (menuData.onLayoutChange) {
+		createSegmented(createRow(body, "Layout"), {
+			value: state.layout ?? "row",
+			options: LAYOUT_OPTION_ITEMS,
+			cls: "amc-menu-layout",
+			onChange: (value) => {
+				const nextLayout = value === "row" ? undefined : value;
+				state.layout = nextLayout;
+				flushPending();
+				menuData.onLayoutChange?.(nextLayout);
+				closeActivePopover();
+			},
+		});
+	}
+
+	createDropdown(createRow(body, "Background"), {
+		label: "Block background",
+		value: eff.background,
+		options: BACKGROUND_OPTION_ITEMS,
+		onChange: (value) => patch({background: value}),
+	});
+	createDropdown(createRow(body, "Text color"), {
+		label: "Block text color",
+		value: eff.textColor,
+		options: STYLE_COLOR_OPTION_ITEMS,
+		onChange: (value) => patch({textColor: value}),
+	});
+
+	const border = createRow(body, "Border");
+	createDropdown(border, {
+		label: "Block border color",
+		value: eff.borderColor,
+		options: STYLE_COLOR_OPTION_ITEMS,
+		disabled: !eff.showBorder,
+		onChange: (value) => patch({borderColor: value}),
+	});
+	createToggle(border, "Block border", eff.showBorder, () => {
+		const nextShow = !eff.showBorder;
+		// Matching the global setting again means "follow the global setting".
+		const followsGlobal = nextShow === eff.globalBorder && state.containerStyle?.borderColor === undefined;
+		patch({showBorder: followsGlobal ? undefined : nextShow});
+	});
+}
+
 function renderPopoverContent(
 	popover: HTMLDivElement,
 	menuData: ColumnStyleContextMenuData,
 	state: PopoverRenderState,
 ): void {
+	popover.empty();
 	const indices = getTargetIndices(menuData);
-	const selectedIndex = Math.max(1, Math.min(menuData.columnIndex + 1, state.columns.length));
-	const selectedColumn = state.columns[Math.max(0, selectedIndex - 1)] ?? state.columns[0];
-	if (!selectedColumn) {
-		popover.textContent = "";
-		createSectionLabel(popover, "No columns available");
+	const index = Math.max(0, Math.min(menuData.columnIndex, state.columns.length - 1));
+	if (!state.columns[index]) {
+		popover.createDiv({cls: "amc-menu-empty", text: "No columns available"});
 		return;
 	}
 
-	const isMultiSelect = indices.size > 1;
-	const sectionLabel = isMultiSelect
-		? `Columns ${[...indices].map((i) => i + 1).sort((a, b) => a - b).join(", ")}`
-		: `Column ${selectedIndex}`;
-
-	popover.textContent = "";
-	createSectionHeader(popover, {
-		label: "Style settings",
-		actionLabel: "Clear all",
-		onAction: () => clearAllStylesAndRerender(menuData, state),
+	// Header: what is being edited, plus column actions.
+	const header = popover.createDiv({cls: "amc-menu-header"});
+	const titles = header.createDiv({cls: "amc-menu-titles"});
+	const sorted = [...indices].sort((a, b) => a - b);
+	titles.createDiv({
+		cls: "amc-menu-title",
+		text: sorted.length > 1 ? `Columns ${sorted.map((i) => i + 1).join(", ")}` : `Column ${index + 1}`,
 	});
-
-	if (
-		menuData.actions?.editColumn
-		|| menuData.actions?.addColumn
-		|| menuData.actions?.addChild
-		|| menuData.actions?.deleteColumn
-	) {
-		createDivider(popover);
-		createInlineCommandButtons(popover, [
-			...(menuData.actions.editColumn
-				? [{label: "Edit column", icon: "pencil", onClick: menuData.actions.editColumn}]
-				: []),
-			...(menuData.actions.addColumn
-				? [{label: "Add column", icon: "plus", onClick: menuData.actions.addColumn}]
-				: []),
-			...(menuData.actions.addChild
-				? [{label: "Add child column", icon: "git-branch-plus", onClick: menuData.actions.addChild}]
-				: []),
-			...(menuData.actions.deleteColumn
-				? [{label: "Delete column", icon: "trash-2", className: "columns-style-popover-inline-btn-danger", onClick: menuData.actions.deleteColumn}]
-				: []),
-		]);
+	if (menuData.parentIndex !== undefined) {
+		titles.createDiv({cls: "amc-menu-subtitle", text: `Nested in column ${menuData.parentIndex}`});
+	}
+	const actions = header.createDiv({cls: "amc-menu-actions"});
+	const a = menuData.actions;
+	if (a?.editColumn) createIconAction(actions, {label: "Edit column", icon: "pencil", onClick: a.editColumn});
+	if (a?.addColumn) createIconAction(actions, {label: "Add column", icon: "plus", onClick: a.addColumn});
+	if (a?.addChild) createIconAction(actions, {label: "Add nested columns", icon: "git-branch-plus", onClick: a.addChild});
+	if (a?.deleteColumn) {
+		createIconAction(actions, {label: "Delete column", icon: "trash-2", danger: true, onClick: a.deleteColumn});
 	}
 
-	// ── Column style section ──
-	createDivider(popover);
-	createCollapsibleSection(popover, {
-		id: "col-style",
-		label: sectionLabel,
-		actionLabel: "Reset",
-		onAction: () => patchStylesAndRerender(menuData, state, CLEAR_STYLE_PATCH),
-		render: (body) => {
-			const allStacked = [...indices].every((i) => {
-				const s = state.columns[i]?.stacked;
-				return s !== undefined && s > 0;
-			});
-			createActionRow(body, {
-				label: "Stacked",
-				checked: allStacked,
-				onClick: () => {
-					if (allStacked) {
-						const split = splitStackGroup(state.columns, indices);
-						if (split) {
-							state.columns = split;
-						} else {
-							// Un-stack: clear stacked flag
-							state.columns = state.columns.map((col, idx) =>
-								indices.has(idx)
-									? {...col, stacked: undefined}
-									: col,
-							);
-						}
-					} else {
-						// Stack: find next available group ID
-						const usedIds = new Set(
-							state.columns
-								.filter((col) => col.stacked && col.stacked > 0)
-								.map((col) => col.stacked!),
-						);
-						let nextId = 1;
-						while (usedIds.has(nextId)) nextId++;
-						state.columns = state.columns.map((col, idx) =>
-							indices.has(idx)
-								? {...col, stacked: nextId}
-								: col,
-						);
-					}
-					if (pendingFlush) {
-						pendingFlush();
-						pendingFlush = null;
-					}
-					menuData.onChange(state.columns, state.containerStyle);
-					closeActivePopover();
-				},
-			});
-			createInlineToggleSelect<StyleColorOption>(body, {
-				label: "Border",
-				checked: readStyleValue(selectedColumn, "showBorder", false),
-				onToggle: () => {
-					const current = readStyleValue(selectedColumn, "showBorder", false);
-					patchStylesAndRerender(menuData, state, {showBorder: !current});
-				},
-				selectValue: readStyleValue(selectedColumn, "borderColor", DEFAULT_STYLE.borderColor),
-				selectOptions: STYLE_COLOR_OPTION_ITEMS,
-				onSelectChange: (value) => {
-					patchStylesAndRerender(menuData, state, {
-						borderColor: value === DEFAULT_STYLE.borderColor ? undefined : value,
-					});
-				},
-			});
-			createActionRow(body, {
-				label: "Left border",
-				checked: readStyleValue(selectedColumn, "leftBorder", false),
-				onClick: () => {
-					const current = readStyleValue(selectedColumn, "leftBorder", false);
-					patchStylesAndRerender(menuData, state, {leftBorder: !current});
-				},
-			});
-			createSelectRow<ColumnBackgroundOption>(body, {
-				label: "Background",
-				value: readStyleValue(selectedColumn, "background", DEFAULT_STYLE.background),
-				options: BACKGROUND_OPTION_ITEMS,
-				onChange: (value) => {
-					patchStylesAndRerender(menuData, state, {
-						background: value === DEFAULT_STYLE.background ? undefined : value,
-					});
-				},
-			});
-			createSelectRow<StyleColorOption>(body, {
-				label: "Text color",
-				value: readStyleValue(selectedColumn, "textColor", DEFAULT_STYLE.textColor),
-				options: STYLE_COLOR_OPTION_ITEMS,
-				onChange: (value) => {
-					patchStylesAndRerender(menuData, state, {
-						textColor: value === DEFAULT_STYLE.textColor ? undefined : value,
-					});
-				},
-			});
+	createSegmented(popover, {
+		value: activeTab,
+		options: [
+			{value: "column", label: sorted.length > 1 ? "Columns" : "Column"},
+			{value: "block", label: menuData.parentIndex !== undefined ? "Nested block" : "Block"},
+		],
+		cls: "amc-menu-tabs",
+		onChange: (value) => {
+			activeTab = value;
+			renderPopoverContent(popover, menuData, state);
 		},
 	});
 
-	// ── Separator section ──
-	createDivider(popover);
-	createCollapsibleSection(popover, {
-		id: "col-separator",
-		label: "Separator",
-		render: (body) => {
-			createActionRow(body, {
-				label: "Show separator",
-				checked: readStyleValue(selectedColumn, "separator", false),
-				onClick: () => {
-					const current = readStyleValue(selectedColumn, "separator", false);
-					patchStylesAndRerender(menuData, state, {separator: !current});
-				},
-			});
-			createCompactSelectRow<SeparatorLineStyle, StyleColorOption, string>(body, {
-				label: "Options",
-				selects: [
-					{
-						value: readStyleValue(selectedColumn, "separatorStyle", DEFAULT_STYLE.separatorStyle),
-						options: SEPARATOR_STYLE_ITEMS,
-						onChange: (value) => {
-							patchStylesAndRerender(menuData, state, {
-								separatorStyle: value === DEFAULT_STYLE.separatorStyle ? undefined : value,
-							});
-						},
-						title: "Line style",
-					},
-					{
-						value: readStyleValue(selectedColumn, "separatorColor", DEFAULT_STYLE.separatorColor),
-						options: STYLE_COLOR_OPTION_ITEMS,
-						onChange: (value) => {
-							patchStylesAndRerender(menuData, state, {
-								separatorColor: value === DEFAULT_STYLE.separatorColor ? undefined : value,
-							});
-						},
-						title: "Color",
-					},
-					{
-						value: String(readStyleValue(selectedColumn, "separatorWidth", DEFAULT_STYLE.separatorWidth)),
-						options: SEPARATOR_WIDTH_ITEMS,
-						onChange: (value) => {
-							const w = parseInt(value, 10);
-							patchStylesAndRerender(menuData, state, {
-								separatorWidth: w === DEFAULT_STYLE.separatorWidth ? undefined : w,
-							});
-						},
-						title: "Width",
-					},
-				],
-			});
+	const body = popover.createDiv({cls: "amc-menu-body"});
+	if (activeTab === "column") {
+		renderColumnTab(body, menuData, state, indices, index);
+	} else {
+		renderBlockTab(body, menuData, state);
+	}
 
-			const currentSepStyle = readStyleValue(selectedColumn, "separatorStyle", DEFAULT_STYLE.separatorStyle);
-			if (currentSepStyle === "custom") {
-				createTextInput(body, {
-					label: "Character",
-					value: readStyleValue(selectedColumn, "separatorCustomChar", DEFAULT_STYLE.separatorCustomChar),
-					placeholder: "|",
-					maxLength: 3,
-					onChange: (value) => {
-						patchStylesAndRerender(menuData, state, {
-							separatorCustomChar: value || undefined,
-						});
-					},
-				});
-			}
+	const footer = popover.createDiv({cls: "amc-menu-footer"});
+	createTextAction(footer, {
+		label: activeTab === "column" ? "Reset column" : "Reset block",
+		onClick: () => {
+			if (activeTab === "column") patchStylesAndRerender(menuData, state, CLEAR_STYLE_PATCH);
+			else patchContainerStyleAndRerender(menuData, state, CLEAR_STYLE_PATCH);
 		},
 	});
-
-	// ── Parent style section ──
-	createDivider(popover);
-	createCollapsibleSection(popover, {
-		id: "parent-style",
-		label: menuData.parentIndex !== undefined
-			? `Parent ${menuData.parentIndex}`
-			: "Parent",
-		actionLabel: "Reset",
-		onAction: () => patchContainerStyleAndRerender(menuData, state, CLEAR_STYLE_PATCH),
-		render: (body) => {
-			createSelectRow<LayoutOption>(body, {
-				label: "Layout",
-				value: state.layout ?? "row",
-				options: LAYOUT_OPTION_ITEMS,
-				onChange: (value) => {
-					const nextLayout = value === "row" ? undefined : value;
-					state.layout = nextLayout;
-					if (menuData.onLayoutChange) {
-						if (pendingFlush) {
-							pendingFlush();
-							pendingFlush = null;
-						}
-						menuData.onLayoutChange(nextLayout);
-						closeActivePopover();
-					}
-				},
-			});
-			createInlineToggleSelect<StyleColorOption>(body, {
-				label: "Border",
-				checked: readStyleField(state.containerStyle, "showBorder", false),
-				onToggle: () => {
-					const current = readStyleField(state.containerStyle, "showBorder", false);
-					patchContainerStyleAndRerender(menuData, state, {showBorder: !current});
-				},
-				selectValue: readStyleField(state.containerStyle, "borderColor", DEFAULT_STYLE.borderColor),
-				selectOptions: STYLE_COLOR_OPTION_ITEMS,
-				onSelectChange: (value) => {
-					patchContainerStyleAndRerender(menuData, state, {
-						borderColor: value === DEFAULT_STYLE.borderColor ? undefined : value,
-					});
-				},
-			});
-			createSelectRow<ColumnBackgroundOption>(body, {
-				label: "Background",
-				value: readStyleField(state.containerStyle, "background", DEFAULT_STYLE.background),
-				options: BACKGROUND_OPTION_ITEMS,
-				onChange: (value) => {
-					patchContainerStyleAndRerender(menuData, state, {
-						background: value === DEFAULT_STYLE.background ? undefined : value,
-					});
-				},
-			});
-			createSelectRow<StyleColorOption>(body, {
-				label: "Text color",
-				value: readStyleField(state.containerStyle, "textColor", DEFAULT_STYLE.textColor),
-				options: STYLE_COLOR_OPTION_ITEMS,
-				onChange: (value) => {
-					patchContainerStyleAndRerender(menuData, state, {
-						textColor: value === DEFAULT_STYLE.textColor ? undefined : value,
-					});
-				},
-			});
-		},
+	createTextAction(footer, {
+		label: "Clear all styles",
+		danger: true,
+		onClick: () => clearAllStylesAndRerender(menuData, state),
 	});
 }
 
@@ -1229,7 +1079,7 @@ export function openColumnStyleContextMenu(
 	};
 	const onViewportResize = () => closeActivePopover();
 
-	window.setTimeout(() => {
+	win.setTimeout(() => {
 		doc.addEventListener("mousedown", onPointerDown, true);
 	}, 0);
 	doc.addEventListener("keydown", onKeyDown, true);

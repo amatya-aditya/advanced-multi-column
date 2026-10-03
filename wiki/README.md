@@ -13,9 +13,11 @@ This wiki is split by complexity so you can learn fast and only read what you ne
 7. [07 - Commands and templates](https://github.com/amatya-aditya/advanced-multi-column/wiki/07-commands-and-templates)
 8. [08 - Settings guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/08-settings-guide)
 9. [09 - Troubleshooting and FAQ](https://github.com/amatya-aditya/advanced-multi-column/wiki/09-troubleshooting-and-faq)
+10. [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content)
 
 ## Suggested learning path
 
 1. New users: `01` -> `02` -> `03`
 2. Power users: `04` -> `05` -> `06`
 3. Configuration and maintenance: `07` -> `08` -> `09`
+4. Auto-updating note lists: `10`

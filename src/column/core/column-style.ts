@@ -37,6 +37,7 @@ export const COLOR_CSS = {
 	accent: "var(--amc-color-accent, var(--interactive-accent))",
 	muted: "var(--amc-color-muted, var(--text-muted))",
 	text: "var(--amc-color-text, var(--text-normal))",
+	secondary: "var(--amc-color-secondary, var(--background-secondary))",
 	red: "var(--amc-color-red, #ef4444)",
 	orange: "var(--amc-color-orange, #f59e0b)",
 	yellow: "var(--amc-color-yellow, #eab308)",
@@ -200,20 +201,17 @@ function buildContainerCssProps(parsed: ColumnStyleData): Record<string, string>
 		cssProps["--columns-block-text"] = COLOR_CSS[parsed.textColor];
 	}
 
-	const hasBorderSignals =
-		parsed.showBorder !== undefined ||
-		parsed.horizontalDividers !== undefined ||
-		parsed.borderColor !== undefined;
-
-	if (hasBorderSignals) {
-		const effectiveBorderColor = COLOR_CSS[parsed.borderColor ?? "gray"];
-		const showBorder = parsed.showBorder ?? parsed.borderColor !== undefined;
-		const showHorizontal = parsed.horizontalDividers ?? false;
-
-		cssProps["--columns-block-border-color"] = effectiveBorderColor;
-		cssProps["--columns-block-border-width"] = showBorder ? "1px" : "0px";
-		if (showHorizontal) cssProps["--columns-block-horizontal-width"] = "1px";
+	// Unset color/width fall back to the global Appearance settings.
+	if (parsed.borderColor) {
+		cssProps["--columns-block-border-color"] = COLOR_CSS[parsed.borderColor];
 	}
+	const showBorder = parsed.showBorder ?? (parsed.borderColor !== undefined ? true : undefined);
+	if (showBorder !== undefined) {
+		cssProps["--columns-block-border-width"] = showBorder
+			? "max(1px, var(--amc-container-border-width, 1px))"
+			: "0px";
+	}
+	if (parsed.horizontalDividers) cssProps["--columns-block-horizontal-width"] = "1px";
 
 	return cssProps;
 }

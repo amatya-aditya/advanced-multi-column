@@ -22,6 +22,7 @@ const STYLE_COLOR_OPTION_VALUES = [
 	"accent",
 	"muted",
 	"text",
+	"secondary",
 	"red",
 	"orange",
 	"yellow",
@@ -65,6 +66,7 @@ type ColumnRegion = {
 	columns: ColumnData[];
 	containerStyle?: ColumnStyleData;
 	layout?: ColumnLayout;
+	mocId?: string;
 	lineStart: number;
 	lineEnd: number;
 	columnLineRanges: [number, number][];
@@ -235,6 +237,7 @@ function isColumnLayout(value: string): value is ColumnLayout {
 function parseStartPayload(payload: string | undefined): {
 	containerStyle?: ColumnStyleData;
 	layout?: ColumnLayout;
+	mocId?: string;
 } {
 	if (!payload) return {};
 	const tokens = payload
@@ -244,17 +247,21 @@ function parseStartPayload(payload: string | undefined): {
 	if (tokens.length === 0) return {};
 
 	let layout: ColumnLayout | undefined;
+	let mocId: string | undefined;
 	const styleTokens: string[] = [];
 	for (const token of tokens) {
 		if (token.startsWith("l:")) {
 			const value = token.slice(2).trim();
 			if (isColumnLayout(value)) layout = value;
+		} else if (token.startsWith("moc:")) {
+			const value = token.slice(4).trim();
+			if (/^[\w-]+$/.test(value)) mocId = value;
 		} else {
 			styleTokens.push(token);
 		}
 	}
 	const containerStyle = parseStyleTokens(styleTokens);
-	return {containerStyle, layout};
+	return {containerStyle, layout, mocId};
 }
 
 function serializeStyleTokens(style: ColumnStyleData | undefined): string[] {
@@ -287,8 +294,13 @@ function serializeBreakPayload(column: ColumnData): string {
 	return tokens.length > 0 ? `:${tokens.join(",")}` : "";
 }
 
-function serializeStartPayload(style: ColumnStyleData | undefined, layout?: ColumnLayout): string {
+function serializeStartPayload(
+	style: ColumnStyleData | undefined,
+	layout?: ColumnLayout,
+	mocId?: string,
+): string {
 	const tokens: string[] = [];
+	if (mocId) tokens.push(`moc:${mocId}`);
 	if (layout && layout !== "row") tokens.push(`l:${layout}`);
 	tokens.push(...serializeStyleTokens(style));
 	return tokens.length > 0 ? `:${tokens.join(",")}` : "";
@@ -325,6 +337,7 @@ export function findColumnRegions(doc: string): ColumnRegion[] {
 	let nestedDepth = 0;
 	let containerStyle: ColumnStyleData | undefined;
 	let regionLayout: ColumnLayout | undefined;
+	let regionMocId: string | undefined;
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i]!;
@@ -346,6 +359,7 @@ export function findColumnRegions(doc: string): ColumnRegion[] {
 				const startParsed = parseStartPayload(startMatch[1]);
 				containerStyle = startParsed.containerStyle;
 				regionLayout = startParsed.layout;
+				regionMocId = startParsed.mocId;
 			}
 		} else {
 			// Nested blocks inside a column should stay as column content
@@ -410,6 +424,7 @@ export function findColumnRegions(doc: string): ColumnRegion[] {
 							})),
 							containerStyle,
 							layout: regionLayout,
+							...(regionMocId ? {mocId: regionMocId} : {}),
 							lineStart: regionStartLine,
 							lineEnd: i,
 							columnLineRanges,
@@ -425,6 +440,7 @@ export function findColumnRegions(doc: string): ColumnRegion[] {
 					nestedDepth = 0;
 					containerStyle = undefined;
 					regionLayout = undefined;
+					regionMocId = undefined;
 				} else if (seenFirstBreak) {
 					curLines.push(line);
 				}
@@ -444,8 +460,9 @@ export function serializeColumns(
 	columns: ReadonlyArray<ColumnData>,
 	containerStyle?: ColumnStyleData,
 	layout?: ColumnLayout,
+	mocId?: string,
 ): string {
-	const parts: string[] = [`%% col-start${serializeStartPayload(containerStyle, layout)} %%`];
+	const parts: string[] = [`%% col-start${serializeStartPayload(containerStyle, layout, mocId)} %%`];
 	for (const col of columns) {
 		parts.push(`%% col-break${serializeBreakPayload(col)} %%`);
 		if (col.content.trim().length > 0) {

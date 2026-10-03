@@ -116,6 +116,14 @@ Notes:
 2. Duplicate names are made unique automatically.
 3. Built-in rows do not show the delete button while their original ID is unchanged.
 
+## MOC tab
+
+Create and edit MOC templates — saved queries that list notes by folder, tags and/or properties, grouped into columns. Each template shows a live preview from your vault, and inserted MOCs update automatically when the template changes.
+
+Settings per template: name; **Sources** (folder, include subfolders, tags, properties, combine sources); **Layout** (group by, group property, columns, sort notes by, show group headings, show bullets, notes per group); **Column for each group**; **Preview**.
+
+See [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for what each setting does.
+
 ## About tab
 
 Contains:
