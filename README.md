@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://github.com/amatya-aditya/obsidian-rss-dashboard" target="_blank">
+  <a href="https://community.obsidian.md/plugins/advanced-multi-column" target="_blank">
     <img src="https://github.com/amatya-aditya/advanced-multi-column/blob/master/assets/amclogo.png" alt="AMC Logo" width="50%" />
   </a>
 </div>
@@ -26,6 +26,13 @@ Create interactive, nested multi-column layouts — without losing sibling colum
     <img src="https://img.shields.io/github/license/amatya-aditya/advanced-multi-column">
   </a>
   <img src="https://img.shields.io/github/downloads/amatya-aditya/advanced-multi-column/total">
+  <a href="https://community.obsidian.md/plugins/advanced-multi-column">
+    <img src="https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=obsidian%20downloads&query=%24%5B%22advanced-multi-column%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://community.obsidian.md/plugins/advanced-multi-column"><strong>Install from Obsidian Community Plugins</strong></a>
 </p>
 
 <p align="center">
@@ -197,14 +204,25 @@ The links are written into the note, so they show in graph view and backlinks. W
 
 ## Installation
 
-### Community Plugins (Not Available now)
+### Community plugins (recommended)
 
-1. Open **Settings → Community Plugins**.
-2. Disable **Restricted mode**.
-3. Search for **Advanced Multi Column**.
-4. Install and enable.
+Advanced Multi Column is in the official Obsidian community plugin list.
 
-### USing BRAT Plugin
+- **Open in Obsidian:** [https://community.obsidian.md/plugins/advanced-multi-column](https://community.obsidian.md/plugins/advanced-multi-column) — select **Install** there. To jump straight to the plugin inside Obsidian instead, paste this link into your browser's address bar:
+
+  ```
+  obsidian://show-plugin?id=advanced-multi-column
+  ```
+
+- **Or from inside Obsidian:**
+  1. Open **Settings → Community plugins**.
+  2. Turn off **Restricted mode** if it is on.
+  3. Select **Browse** and search for **Advanced Multi Column**.
+  4. Select **Install**, then **Enable**.
+
+Updates arrive through **Settings → Community plugins → Check for updates**.
+
+### Beta versions with BRAT
 
 1. Install the [BRAT plugin](https://github.com/TfTHacker/obsidian42-brat) if you haven't already.
 2. Open **Settings → BRAT → Add Beta Plugin**.

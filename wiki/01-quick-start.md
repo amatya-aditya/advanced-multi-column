@@ -6,6 +6,13 @@ This page gets you from zero to a working layout in a few minutes.
 
 Create, edit, resize, and style your first column block.
 
+## Step 0: Install the plugin
+
+Install **Advanced Multi Column** from the official community plugin list:
+
+- Open the [plugin page](https://community.obsidian.md/plugins/advanced-multi-column) and select **Install**, or open `obsidian://show-plugin?id=advanced-multi-column` to jump straight to it in Obsidian.
+- Or in Obsidian: **Settings → Community plugins → Browse**, search for **Advanced Multi Column**, then **Install** and **Enable**.
+
 ## Step 1: Insert a layout
 
 1. Open Command Palette.
