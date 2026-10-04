@@ -15,6 +15,8 @@ Right
 %% col-end %%
 ```
 
+![Row layout: three columns, one with an image](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-plain-image.png)
+
 ## B. Container stack layout (`l:stack`)
 
 All top-level columns render vertically.
@@ -29,6 +31,8 @@ Row 2
 Row 3
 %% col-end %%
 ```
+
+![Container stack layout: every column on its own row](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-stack-layout.png)
 
 ## C. Per-group stacking (`stk:<id>`)
 
@@ -46,6 +50,10 @@ Stacked bottom
 Wide column
 %% col-end %%
 ```
+
+![Per-group stacking: three stacked rows beside a wide column](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-stacked.png)
+
+![Cornell notes built with a stacked group](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-cornell.png)
 
 ## D. Nested columns inside a column
 
@@ -69,6 +77,8 @@ Child 2
 More parent content
 %% col-end %%
 ```
+
+![Nested columns inside the right column](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-nested.png)
 
 ## E. Split stacked subset into separate group
 

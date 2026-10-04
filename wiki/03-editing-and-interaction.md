@@ -11,6 +11,8 @@ This page covers daily editing behavior in Live Preview.
 5. Click outside the active editor.
 6. Press `Tab` to commit and move to next column.
 
+![Editing a column in Live Preview while the other column stays rendered](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-live-edit.png)
+
 ## Keyboard shortcuts in column editor
 
 | Shortcut | Action |

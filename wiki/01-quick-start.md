@@ -6,6 +6,8 @@ This page gets you from zero to a working layout in a few minutes.
 
 Create, edit, resize, and style your first column block.
 
+![A finished column layout with headers](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-headers.png)
+
 ## Step 0: Install the plugin
 
 Install **Advanced Multi Column** from the official community plugin list:
@@ -28,6 +30,10 @@ Column 1
 Column 2
 %% col-end %%
 ```
+
+A new layout starts with empty columns:
+
+![Blank two-column, three-column, sidebar and stacked layouts](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-blank.png)
 
 ## Step 2: Edit content in place
 

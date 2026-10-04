@@ -45,8 +45,36 @@ Create interactive, nested multi-column layouts — without losing sibling colum
   <a href="#troubleshooting">Troubleshooting</a>
 </p>
 
-<!-- Replace with actual screenshots once captured from docs/releases/usage.md examples -->
-<!-- ## Screenshots -->
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-headers.png" alt="Column headers and coloured backgrounds"><br><sub>Column headers and coloured backgrounds</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-live-edit.png" alt="Editing a column in place — the other columns stay rendered"><br><sub>Editing a column in place — the other columns stay rendered</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-sidebar-image.png" alt="Sidebar with an image, headers in Reading view"><br><sub>Sidebar with an image, headers in Reading view</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-nested.png" alt="Nested (child) columns"><br><sub>Nested (child) columns</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-stacked.png" alt="Stacked rows beside a wide column"><br><sub>Stacked rows beside a wide column</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-cornell.png" alt="Cornell notes layout"><br><sub>Cornell notes layout</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-moc.png" alt="MOC: auto-updating map of notes, by subfolder and by property"><br><sub>MOC: auto-updating map of notes, by subfolder and by property</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-separator.png" alt="Dashed separator between columns"><br><sub>Dashed separator between columns</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-context-menu.png" alt="Right-click in a note: insert columns, layouts and MOCs"><br><sub>Right-click in a note: insert columns, layouts and MOCs</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-column-menu.png" alt="Right-click a column: style it, add, edit or delete"><br><sub>Right-click a column: style it, add, edit or delete</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-moc-dialog-preview.png" alt="New MOC dialog with a live preview"><br><sub>New MOC dialog with a live preview</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-blank.png" alt="Blank layouts, ready to fill"><br><sub>Blank layouts, ready to fill</sub></td>
+  </tr>
+</table>
+
+<sub>Demo notes use text from Wikipedia (CC BY-SA 4.0) and images from Wikimedia Commons (each under its own free licence; see the linked articles).</sub>
 
 
 ## Why this plugin?
@@ -193,14 +221,25 @@ Right-click any column to:
 **Settings → Community Plugins → Advanced Multi Column**
 
 - **General** — enable/disable live preview and reading view, default column count, minimum column width, drag handles
+- **MOC** — reusable MOC templates: sources (a fixed folder or the note's own folder, tags, properties), grouping, columns, and a live preview
 - **Appearance** — style target (all or specific column), container background/border/radius/text, vertical and horizontal divider configuration
-- **MOC** — templates for MOCs: sources (folder, tags, properties), grouping, columns, and a live preview
 
 ## MOC (map of content)
 
-A MOC lists notes as links in columns and keeps itself up to date. Set up a template in **Settings → Advanced Multi Column → MOC** (pick a folder, tags and/or properties, how to group them and how many columns), then insert it with **Insert MOC** from the command palette or the editor context menu.
+A MOC lists notes as links in columns and keeps itself up to date. Right-click in a note and choose **Insert MOC → New MOC…**: pick the folder (by default the note's own folder, with its subfolders as columns), tags and/or properties from your vault, see a live preview, and insert. Save options you reuse as templates in **Settings → Advanced Multi Column → MOC**; right-click a MOC → **Edit MOC** to change it later.
 
 The links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
+
+## Privacy and vault access
+
+Advanced Multi Column works entirely offline: it makes no network requests and collects no data.
+
+What it accesses, and why:
+
+- **Notes you open** are read to render columns in Reading view and when exporting to PDF.
+- **The list of notes and their metadata** (file paths, tags, properties — from Obsidian's metadata cache) is used only by **MOC** to find the notes a MOC lists. MOC can be turned off in **Settings → Advanced Multi Column → MOC**.
+- **Notes are written** only when you edit columns, insert a layout or MOC, or when an inserted MOC updates its own list of links.
+- **Pasted images** in a column editor are saved in the note's folder; pasting reads only what you paste.
 
 ## Installation
 

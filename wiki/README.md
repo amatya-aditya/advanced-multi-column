@@ -2,6 +2,8 @@
 
 This wiki is split by complexity so you can learn fast and only read what you need.
 
+![Columns with headers](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-headers.png)
+
 ## Start here
 
 1. [01 - Quick start](https://github.com/amatya-aditya/advanced-multi-column/wiki/01-quick-start)

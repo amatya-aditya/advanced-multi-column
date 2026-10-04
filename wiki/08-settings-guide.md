@@ -48,6 +48,16 @@ Open `Settings -> Community Plugins -> Advanced multi column`.
 2. Useful for visually distinguishing column blocks from surrounding content.
 3. Default: **On**.
 
+## MOC tab
+
+**Enable MOC** (on by default) turns the MOC features on or off: the **Insert MOC** menu, the MOC commands, **Edit MOC** and automatic updates. When off, inserted MOCs stay in your notes as ordinary columns and are not updated; turning it back on updates them.
+
+Create and edit reusable MOC templates — saved queries that list notes by folder (fixed, or relative to the note the MOC is in), tags and/or properties, grouped into columns. One-off MOCs built with **Insert MOC → New MOC…** are edited from the note instead (right-click → **Edit MOC**). Each template shows a live preview from your vault, and inserted MOCs update automatically when the template changes.
+
+Settings per template: name; **Sources** (folder: this note's folder, its parent, a specific folder or any; include subfolders; tags; properties; combine sources); **Layout** (group by, group property, columns, sort notes by, show group headings, show bullets, notes per group); **Column for each group**; **Preview**.
+
+See [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for what each setting does.
+
 ## Appearance tab
 
 Sections in UI:
@@ -115,14 +125,6 @@ Notes:
 1. Header names are normalized for marker use.
 2. Duplicate names are made unique automatically.
 3. Built-in rows do not show the delete button while their original ID is unchanged.
-
-## MOC tab
-
-Create and edit MOC templates — saved queries that list notes by folder, tags and/or properties, grouped into columns. Each template shows a live preview from your vault, and inserted MOCs update automatically when the template changes.
-
-Settings per template: name; **Sources** (folder, include subfolders, tags, properties, combine sources); **Layout** (group by, group property, columns, sort notes by, show group headings, show bullets, notes per group); **Column for each group**; **Preview**.
-
-See [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for what each setting does.
 
 ## About tab
 

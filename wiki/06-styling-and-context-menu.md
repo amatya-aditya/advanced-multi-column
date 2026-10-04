@@ -10,6 +10,10 @@ All styling actions are available from the right-click popover.
 
 The popover always shows what is currently rendered, including values that come from the global **Appearance** settings (block border, background, vertical dividers). Changing a value writes it to the markers; picking the default again removes it, so the block follows the global settings again.
 
+![Column menu: Column tab](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-column-menu.png)
+
+![Column menu: Block tab](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-column-menu-block.png)
+
 ## Apply style to one or multiple columns
 
 1. For multi-select: `Ctrl/Cmd` click columns first.
@@ -24,6 +28,8 @@ The popover always shows what is currently rendered, including values that come 
 4. `Accent stripe` (callout-style left border).
 5. `Stacked` toggle.
 6. `Separator after` (or `Separator below` inside a stack) — toggle; when on, choose line style (`solid`, `dashed`, `dotted`, `double`, or a custom `Character`), color and width. Turning it off also hides the global vertical divider after this column (`sep:0`). Not shown for the last column.
+
+![Dashed separator in the accent colour](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-separator.png)
 
 ## Block tab
 
@@ -50,6 +56,10 @@ body {
 ```
 
 Names match the style tokens (`b:blue-soft` → `--amc-bg-blue-soft`, `bc:red` → `--amc-color-red`).
+
+## Example: headers, backgrounds and images
+
+![Sidebar with an image and coloured headers in Reading view](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-sidebar-image.png)
 
 ## Example: style by markers (portable)
 
