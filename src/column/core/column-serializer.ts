@@ -295,7 +295,7 @@ export function dispatchUpdate(
 	};
 	scrollDOM.addEventListener("wheel", markUserScroll, {passive: true});
 	scrollDOM.addEventListener("touchmove", markUserScroll, {passive: true});
-	requestAnimationFrame(() => {
+	activeWindow.requestAnimationFrame(() => {
 		scrollDOM.removeEventListener("wheel", markUserScroll);
 		scrollDOM.removeEventListener("touchmove", markUserScroll);
 		if (!userScrolled) scrollDOM.scrollTop = savedScrollTop;

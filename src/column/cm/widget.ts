@@ -59,9 +59,7 @@ export class ColumnWidget extends WidgetType {
 	}
 
 	toDOM(view: EditorView): HTMLElement {
-		const doc = view.dom.doc;
-		const host = doc.createElement("div");
-		host.className = "amc-columns-host";
+		const host = createDiv({cls: "amc-columns-host"});
 		const container = host.createDiv({cls: "columns-container columns-ui"});
 		applyContainerStyle(container, this.region.containerStyle);
 

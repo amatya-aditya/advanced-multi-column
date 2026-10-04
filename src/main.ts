@@ -8,6 +8,7 @@ import {buildRuntimeStyles} from "./column/runtime-styles";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
 import {LAYOUT_TEMPLATES, LayoutTemplate} from "./layouts";
 import {MocSync} from "./moc/sync";
+import {openMocEditor, openNewMocBuilder} from "./moc/builder-modal";
 import {generateMocBlock} from "./moc/generate";
 import {MocTemplate, sanitizeMocTemplate} from "./moc/types";
 
@@ -72,13 +73,27 @@ export default class ColumnsPlugin extends Plugin {
 		this.mocSync = new MocSync(this);
 		this.mocSync.register();
 		this.addCommand({
+			id: "create-moc",
+			name: "New MOC",
+			icon: "list-plus",
+			editorCheckCallback: (checking: boolean, editor: Editor, ctx: MarkdownView | MarkdownFileInfo) => {
+				if (!this.settings.enableMoc) return false;
+				if (!checking) openNewMocBuilder(this, editor, ctx.file);
+				return true;
+			},
+		});
+		this.addCommand({
 			id: "insert-moc",
-			name: "Insert MOC",
+			name: "Insert MOC from template",
 			icon: "list-tree",
-			editorCallback: (editor: Editor, ctx: MarkdownView | MarkdownFileInfo) => {
-				new MocTemplateModal(this.app, this.settings.mocTemplates, (template) => {
-					this.insertMoc(editor, template, ctx.file);
-				}).open();
+			editorCheckCallback: (checking: boolean, editor: Editor, ctx: MarkdownView | MarkdownFileInfo) => {
+				if (!this.settings.enableMoc) return false;
+				if (!checking) {
+					new MocTemplateModal(this.app, this.mocTemplates(), (template) => {
+						this.insertMoc(editor, template, ctx.file);
+					}).open();
+				}
+				return true;
 			},
 		});
 
@@ -107,13 +122,20 @@ export default class ColumnsPlugin extends Plugin {
 							.onClick(() => this.insertLayout(editor, layout)));
 					}
 				});
+				if (!this.settings.enableMoc) return;
 				menu.addItem((item) => {
 					item
 						.setSection("insert")
 						.setTitle("Insert MOC")
 						.setIcon("list-tree");
 					const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
-					for (const template of this.settings.mocTemplates) {
+					sub.addItem((s: MenuItem) => s
+						.setTitle("New MOC…")
+						.setIcon("list-plus")
+						.onClick(() => openNewMocBuilder(this, editor, info.file)));
+					const templates = this.mocTemplates();
+					if (templates.length > 0) sub.addSeparator();
+					for (const template of templates) {
 						sub.addItem((s: MenuItem) => s
 							.setTitle(template.name || template.id)
 							.setIcon("list-tree")
@@ -146,6 +168,16 @@ export default class ColumnsPlugin extends Plugin {
 		const block = generateMocBlock(this.app, template, file.path);
 		editor.replaceSelection("\n" + block + "\n");
 		void this.mocSync.track(file.path);
+	}
+
+	/** Reusable MOC templates (excludes single-MOC options). */
+	private mocTemplates(): MocTemplate[] {
+		return this.settings.mocTemplates.filter((t) => !t.inline);
+	}
+
+	/** Open the MOC builder for an inserted MOC block. */
+	editMoc(mocId: string, sourcePath: string): void {
+		openMocEditor(this, mocId, sourcePath);
 	}
 
 	private openMocSettings(): void {
@@ -208,6 +240,7 @@ export default class ColumnsPlugin extends Plugin {
 		if (typeof s.enableSlashSuggest !== "boolean") s.enableSlashSuggest = DEFAULT_SETTINGS.enableSlashSuggest;
 		if (typeof s.inheritStyleOnAdd !== "boolean") s.inheritStyleOnAdd = DEFAULT_SETTINGS.inheritStyleOnAdd;
 		if (typeof s.showContainerBorder !== "boolean") s.showContainerBorder = DEFAULT_SETTINGS.showContainerBorder;
+		if (typeof s.enableMoc !== "boolean") s.enableMoc = DEFAULT_SETTINGS.enableMoc;
 		if (typeof s.stackOnNarrowScreens !== "boolean") s.stackOnNarrowScreens = DEFAULT_SETTINGS.stackOnNarrowScreens;
 		if (typeof s.narrowBreakpointPx !== "number" || !Number.isFinite(s.narrowBreakpointPx)) {
 			s.narrowBreakpointPx = DEFAULT_SETTINGS.narrowBreakpointPx;
@@ -274,7 +307,7 @@ export default class ColumnsPlugin extends Plugin {
 	/** Document to attach runtime styles to. Tolerates a missing activeDocument
 	 *  so plugin load can never throw on environments where it is unavailable. */
 	private getStyleDocument(): Document {
-		return (window.activeDocument as Document | undefined) ?? window.document;
+		return activeDocument;
 	}
 
 	private ensureRuntimeStyleSheet(): CSSStyleSheet | null {
@@ -303,9 +336,8 @@ export default class ColumnsPlugin extends Plugin {
 	private ensureRuntimeStyleEl(): HTMLStyleElement {
 		if (this.runtimeStyleEl?.isConnected) return this.runtimeStyleEl;
 		const doc = this.getStyleDocument();
-		const el = doc.createElement("style");
+		const el = (doc.head ?? doc.documentElement).createEl("style");
 		el.id = "amc-runtime-styles";
-		(doc.head ?? doc.documentElement).appendChild(el);
 		this.runtimeStyleEl = el;
 		return el;
 	}

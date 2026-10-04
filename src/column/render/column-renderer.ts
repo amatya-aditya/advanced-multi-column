@@ -779,7 +779,7 @@ function wireTopLevelEditToggle(
 				}
 				return true;
 			}
-			requestAnimationFrame(() => {
+			activeWindow.requestAnimationFrame(() => {
 				const iState = getInteractionState(ctx.view);
 				if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${index}`) {
 					iState.activeEdit.cursorStart = textarea.selectionStart;
@@ -1429,6 +1429,9 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						dispatchUpdate(ctx.region, nextColumns, ctx.view, nextContainerStyle);
 					},
 					{
+						editMoc: ctx.region.mocId && plugin.settings.enableMoc
+							? () => plugin.editMoc(ctx.region.mocId!, ctx.sourcePath)
+							: undefined,
 						editColumn: liveEdit ? () => liveEdit?.enterEdit() : undefined,
 						addColumn: () => {
 							const updated = insertColumnAfter(columns, i);

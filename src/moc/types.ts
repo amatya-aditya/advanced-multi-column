@@ -8,6 +8,11 @@
 export type MocGroupBy = "none" | "subfolder" | "tag" | "property";
 export type MocSort = "name" | "modified" | "created";
 export type MocMatch = "all" | "any";
+/**
+ * Where the folder source points: a fixed folder, or relative to the note
+ * that contains the MOC (so one template works in every folder).
+ */
+export type MocFolderMode = "none" | "fixed" | "note" | "parent";
 
 export interface MocPropertyFilter {
 	key: string;
@@ -18,7 +23,13 @@ export interface MocPropertyFilter {
 export interface MocTemplate {
 	id: string;
 	name: string;
-	/** Folder path; "/" is the vault root, "" disables the folder source. */
+	/**
+	 * Settings of a single MOC built with "New MOC…" rather than a reusable
+	 * template; hidden from template lists and menus.
+	 */
+	inline: boolean;
+	folderMode: MocFolderMode;
+	/** Fixed folder path ("/" is the vault root); used when folderMode is "fixed". */
 	folder: string;
 	includeSubfolders: boolean;
 	/** Tags without "#". Nested tags match their parents (`a/b` matches `a`). */
@@ -47,7 +58,9 @@ export function createMocTemplate(id: string, name: string): MocTemplate {
 	return {
 		id,
 		name,
-		folder: "/",
+		inline: false,
+		folderMode: "note",
+		folder: "",
 		includeSubfolders: true,
 		tags: [],
 		properties: [],
@@ -83,7 +96,14 @@ export function sanitizeMocTemplate(raw: unknown): MocTemplate | null {
 	const pick = <K extends keyof MocTemplate>(key: K, ok: (v: unknown) => boolean): void => {
 		if (ok(raw[key])) (base as unknown as Record<string, unknown>)[key] = raw[key];
 	};
+	pick("inline", (v) => typeof v === "boolean");
 	pick("folder", (v) => typeof v === "string");
+	if (raw.folderMode === "none" || raw.folderMode === "fixed" || raw.folderMode === "note" || raw.folderMode === "parent") {
+		base.folderMode = raw.folderMode;
+	} else {
+		// Templates saved before folder modes existed used a fixed folder.
+		base.folderMode = base.folder.trim() === "" ? "none" : "fixed";
+	}
 	pick("includeSubfolders", (v) => typeof v === "boolean");
 	pick("tags", (v) => Array.isArray(v) && v.every((t) => typeof t === "string"));
 	pick("properties", (v) => Array.isArray(v) && v.every(
@@ -93,7 +113,7 @@ export function sanitizeMocTemplate(raw: unknown): MocTemplate | null {
 	pick("groupBy", (v) => v === "none" || v === "subfolder" || v === "tag" || v === "property");
 	pick("groupProperty", (v) => typeof v === "string");
 	pick("columns", (v) => typeof v === "number" && v >= 1 && v <= MAX_MOC_COLUMNS);
-	pick("assignments", (v) => isRecord(v) && Object.values(v).every((n) => typeof n === "number"));
+	pick("assignments", (v) => isRecord(v) && Object.keys(v).every((k) => typeof v[k] === "number"));
 	pick("sort", (v) => v === "name" || v === "modified" || v === "created");
 	pick("showHeadings", (v) => typeof v === "boolean");
 	pick("showBullets", (v) => typeof v === "boolean");

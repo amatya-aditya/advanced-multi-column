@@ -51,7 +51,7 @@
 	flex-shrink: 0;
 }
 
-.columns-style-popover .amc-menu-icon-btn.mod-warning:hover {
+.columns-style-popover .amc-menu-icon-btn.amc-menu-danger:hover {
 	color: var(--text-error);
 }
 
@@ -180,7 +180,7 @@
 	color: var(--text-normal);
 }
 
-.columns-style-popover .amc-menu-text-btn.mod-warning:hover {
+.columns-style-popover .amc-menu-text-btn.amc-menu-danger:hover {
 	color: var(--text-error);
 }
 

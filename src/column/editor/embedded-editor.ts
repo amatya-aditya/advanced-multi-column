@@ -77,7 +77,7 @@ function resolveEditorClass(app: App): InternalMarkdownEditorConstructor | null 
 		// Create a throwaway editable markdown embed just to grab the
 		// prototype of the internal MarkdownEditor class.
 		temp = createMdEmbed(
-			{app, containerEl: document.createElement("div"), state: {}},
+			{app, containerEl: createDiv(), state: {}},
 			null,
 			"",
 		);

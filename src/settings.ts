@@ -89,6 +89,8 @@ export interface ColumnsPluginSettings {
 	headerTypes: HeaderTypeConfig[];
 	stackOnNarrowScreens: boolean;
 	narrowBreakpointPx: number;
+	/** MOC features: menus, commands, Edit MOC and automatic updates. */
+	enableMoc: boolean;
 	mocTemplates: MocTemplate[];
 	/** Notes that contain MOC blocks (kept in sync automatically). */
 	mocNotes: string[];
@@ -118,7 +120,8 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	headerTypes: [...DEFAULT_HEADER_TYPES],
 	stackOnNarrowScreens: true,
 	narrowBreakpointPx: 480,
-	mocTemplates: [{...createMocTemplate("moc-1", "Folder map")}],
+	enableMoc: true,
+	mocTemplates: [{...createMocTemplate("moc-1", "This folder")}],
 	mocNotes: [],
 };
 
@@ -236,9 +239,9 @@ export class ColumnsSettingTab extends PluginSettingTab {
 			render: (panelEl: HTMLElement) => void;
 		}> = [
 			{id: "general", label: "General", render: (el) => this.renderGeneralTab(el)},
+			{id: "moc", label: "MOC", render: (el) => this.mocSection.render(el)},
 			{id: "appearance", label: "Appearance", render: (el) => this.renderAppearanceTab(el)},
 			{id: "headers", label: "Headers", render: (el) => this.renderHeadersTab(el)},
-			{id: "moc", label: "MOC", render: (el) => this.mocSection.render(el)},
 			{id: "about", label: "About", render: (el) => this.renderAboutTab(el)},
 		];
 

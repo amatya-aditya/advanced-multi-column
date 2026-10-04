@@ -180,7 +180,7 @@ export class ColumnEditorSuggest {
 		}
 
 		// Keep popup in viewport
-		requestAnimationFrame(() => {
+		activeWindow.requestAnimationFrame(() => {
 			if (!this.popup) return;
 			const rect = this.popup.getBoundingClientRect();
 			if (rect.bottom > this.textarea.win.innerHeight) {
@@ -455,7 +455,7 @@ export class SlashCommandSuggest {
 			});
 		}
 
-		requestAnimationFrame(() => {
+		activeWindow.requestAnimationFrame(() => {
 			if (!this.popup) return;
 			const rect = this.popup.getBoundingClientRect();
 			if (rect.bottom > this.textarea.win.innerHeight) {

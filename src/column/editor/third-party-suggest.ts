@@ -318,7 +318,7 @@ export class ThirdPartySuggestBridge {
 			});
 		}
 
-		requestAnimationFrame(() => {
+		activeWindow.requestAnimationFrame(() => {
 			if (!this.popup) return;
 			const rect = this.popup.getBoundingClientRect();
 			if (rect.bottom > this.textarea.win.innerHeight) {
@@ -354,8 +354,8 @@ export class ThirdPartySuggestBridge {
 		};
 
 		try {
-			const eventWindow = this.textarea.win as Window & typeof globalThis;
-			this.activeSuggest.selectSuggestion(item, new eventWindow.MouseEvent("click"));
+			const EventCtor = (this.textarea.win as unknown as {MouseEvent: typeof MouseEvent}).MouseEvent;
+			this.activeSuggest.selectSuggestion(item, new EventCtor("click"));
 		} catch {
 			// If selectSuggestion fails, fall back to no-op
 		}

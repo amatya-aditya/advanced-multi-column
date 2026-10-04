@@ -10,6 +10,29 @@ function normalizeFolder(folder: string): string {
 	return folder.trim().replace(/^\/+|\/+$/g, "");
 }
 
+function parentFolder(path: string): string {
+	const at = path.lastIndexOf("/");
+	return at < 0 ? "" : path.slice(0, at);
+}
+
+/**
+ * Folder the template lists, resolved for the note containing the MOC.
+ * Returns null when the template has no folder source ("" is the vault root).
+ * Note-relative modes need `sourcePath`; without one they select nothing.
+ */
+export function resolveMocFolder(template: MocTemplate, sourcePath?: string): string | null {
+	switch (template.folderMode) {
+		case "none":
+			return null;
+		case "fixed":
+			return normalizeFolder(template.folder);
+		case "note":
+			return sourcePath === undefined ? null : parentFolder(sourcePath);
+		case "parent":
+			return sourcePath === undefined ? null : parentFolder(parentFolder(sourcePath));
+	}
+}
+
 function normalizeTag(tag: string): string {
 	return tag.trim().replace(/^#/, "").toLowerCase();
 }
@@ -42,13 +65,23 @@ function inFolder(file: TFile, folder: string, includeSubfolders: boolean): bool
 	return parentPath === folder || (includeSubfolders && parentPath.startsWith(`${folder}/`));
 }
 
-/** Notes selected by the template's sources, excluding the MOC note itself. */
-export function queryMocFiles(app: App, template: MocTemplate, excludePath?: string): TFile[] {
-	const checks: Array<(file: TFile, cache: CachedMetadata | null) => boolean> = [];
+/**
+ * Query results shared within one refresh pass, keyed by template and resolved
+ * folder, so MOCs using the same template in the same folder scan the vault once.
+ */
+export type MocQueryCache = Map<string, TFile[]>;
 
-	if (template.folder.trim() !== "") {
-		const folder = normalizeFolder(template.folder);
+type FileCheck = (file: TFile, cache: CachedMetadata | null) => boolean;
+
+/** The template's source checks for a MOC in `sourcePath`; null matches nothing. */
+function buildChecks(template: MocTemplate, sourcePath?: string): FileCheck[] | null {
+	const checks: FileCheck[] = [];
+
+	const folder = resolveMocFolder(template, sourcePath);
+	if (folder !== null) {
 		checks.push((file) => inFolder(file, folder, template.includeSubfolders));
+	} else if (template.folderMode === "note" || template.folderMode === "parent") {
+		return null;
 	}
 	for (const tag of template.tags.map(normalizeTag).filter(Boolean)) {
 		checks.push((_file, cache) => hasTag(fileTags(cache), tag));
@@ -63,24 +96,56 @@ export function queryMocFiles(app: App, template: MocTemplate, excludePath?: str
 			return values.some((v) => v.toLowerCase() === wanted);
 		});
 	}
-	if (checks.length === 0) return [];
+	return checks.length > 0 ? checks : null;
+}
 
-	const every = template.match === "all";
-	return app.vault.getMarkdownFiles().filter((file) => {
-		if (file.path === excludePath) return false;
+function combine(app: App, checks: FileCheck[], match: MocTemplate["match"]): (file: TFile) => boolean {
+	const every = match === "all";
+	return (file) => {
 		const cache = app.metadataCache.getFileCache(file);
 		return every
 			? checks.every((check) => check(file, cache))
 			: checks.some((check) => check(file, cache));
-	});
+	};
 }
 
-function groupKeys(app: App, template: MocTemplate, file: TFile): string[] {
+/**
+ * Whether a single note belongs in the MOC in `sourcePath`. Cheap: used to
+ * decide which MOCs a change can affect without scanning the vault.
+ */
+export function createMocMatcher(app: App, template: MocTemplate, sourcePath?: string): (file: TFile) => boolean {
+	const checks = buildChecks(template, sourcePath);
+	if (!checks) return () => false;
+	const matches = combine(app, checks, template.match);
+	return (file) => file.path !== sourcePath && file.extension === "md" && matches(file);
+}
+
+/**
+ * Notes selected by the template's sources for the MOC in `sourcePath`
+ * (which is itself never listed).
+ */
+export function queryMocFiles(
+	app: App,
+	template: MocTemplate,
+	sourcePath?: string,
+	cache?: MocQueryCache,
+): TFile[] {
+	const checks = buildChecks(template, sourcePath);
+	if (!checks) return [];
+	const key = `${template.id}\u0000${resolveMocFolder(template, sourcePath) ?? ""}`;
+	let matched = cache?.get(key);
+	if (!matched) {
+		matched = app.vault.getMarkdownFiles().filter(combine(app, checks, template.match));
+		cache?.set(key, matched);
+	}
+	return matched.filter((file) => file.path !== sourcePath);
+}
+
+function groupKeys(app: App, template: MocTemplate, file: TFile, base: string): string[] {
 	switch (template.groupBy) {
 		case "none":
 			return [""];
 		case "subfolder": {
-			const base = normalizeFolder(template.folder);
 			const parent = file.parent?.path === "/" ? "" : file.parent?.path ?? "";
 			const rel = base === "" ? parent : parent.slice(base.length).replace(/^\//, "");
 			const first = rel.split("/")[0] ?? "";
@@ -121,12 +186,14 @@ function sortFiles(files: TFile[], template: MocTemplate): TFile[] {
 export function collectMocGroups(
 	app: App,
 	template: MocTemplate,
-	excludePath?: string,
+	sourcePath?: string,
 	limitOverride?: number,
+	cache?: MocQueryCache,
 ): MocGroup[] {
 	const groups = new Map<string, TFile[]>();
-	for (const file of queryMocFiles(app, template, excludePath)) {
-		for (const key of groupKeys(app, template, file)) {
+	const base = resolveMocFolder(template, sourcePath) ?? "";
+	for (const file of queryMocFiles(app, template, sourcePath, cache)) {
+		for (const key of groupKeys(app, template, file, base)) {
 			const list = groups.get(key) ?? [];
 			list.push(file);
 			groups.set(key, list);

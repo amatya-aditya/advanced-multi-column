@@ -8,6 +8,13 @@ export default tseslint.config(
 		languageOptions: {
 			globals: {
 				...globals.browser,
+				// DOM helpers and window globals Obsidian defines at runtime.
+				activeDocument: "readonly",
+				activeWindow: "readonly",
+				createDiv: "readonly",
+				createEl: "readonly",
+				createSpan: "readonly",
+				createFragment: "readonly",
 			},
 			parserOptions: {
 				projectService: {

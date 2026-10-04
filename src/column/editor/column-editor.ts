@@ -65,7 +65,7 @@ export function restoreEditState(textarea: HTMLTextAreaElement, view: EditorView
 	textarea.value = saved.value;
 	autoSize(textarea);
 
-	requestAnimationFrame(() => {
+	activeWindow.requestAnimationFrame(() => {
 		textarea.focus();
 		textarea.selectionStart = saved.cursorStart;
 		textarea.selectionEnd = saved.cursorEnd;
@@ -141,7 +141,7 @@ export function wireEditCore(config: EditWireConfig): void {
 
 		onEnterEdit?.();
 
-		requestAnimationFrame(() => {
+		activeWindow.requestAnimationFrame(() => {
 			textarea.focus();
 			textarea.selectionStart = textarea.value.length;
 			textarea.selectionEnd = textarea.value.length;

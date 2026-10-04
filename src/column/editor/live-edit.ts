@@ -1,4 +1,4 @@
-import {App, Component, editorInfoField, Notice, TFile} from "obsidian";
+import {App, Component, editorInfoField, Modal, TFile} from "obsidian";
 import {captureBlockUpdate} from "../core/column-serializer";
 import {getPluginInstance} from "../core/plugin-ref";
 import type {EditorView} from "@codemirror/view";
@@ -124,9 +124,29 @@ async function saveDraftToFile(
 		saved = true;
 		return data.slice(0, at) + newBlock + data.slice(at + oldBlock.length);
 	});
-	if (!saved) {
-		await navigator.clipboard.writeText(draft).catch(() => undefined);
-		new Notice("Could not save a column edit because the note changed. The text was copied to the clipboard.");
+	if (!saved) new UnsavedDraftModal(app, draft).open();
+}
+
+/** Shows a column edit that could not be saved, so it can be copied by hand. */
+class UnsavedDraftModal extends Modal {
+	constructor(app: App, private readonly draft: string) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.titleEl.setText("Column edit not saved");
+		this.contentEl.createEl("p", {
+			text: "The note changed before this column edit could be saved. Copy the text below and paste it back into the column.",
+		});
+		const text = this.contentEl.createEl("textarea", {cls: "amc-unsaved-draft"});
+		text.value = this.draft;
+		text.readOnly = true;
+		text.rows = 10;
+		activeWindow.setTimeout(() => text.select(), 0);
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }
 
@@ -310,7 +330,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			restore?.cursorStart ?? value.length,
 			restore?.cursorEnd ?? value.length,
 		);
-		requestAnimationFrame(() => {
+		activeWindow.requestAnimationFrame(() => {
 			if (active === handle) handle.focus();
 		});
 	};
@@ -338,7 +358,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 				restorePending();
 				return;
 			}
-			requestAnimationFrame(() => {
+			activeWindow.requestAnimationFrame(() => {
 				if (config.hostEl.isConnected) restorePending();
 				else clearEditState();
 			});

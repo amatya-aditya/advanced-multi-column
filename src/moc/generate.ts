@@ -1,7 +1,15 @@
 import type {App} from "obsidian";
 import {findColumnRegions, serializeColumns} from "../column/core/parser";
 import type {ColumnData, ColumnRegion} from "../column/core/types";
-import {collectMocGroups, MocGroup} from "./query";
+import {collectMocGroups, MocGroup, MocQueryCache} from "./query";
+
+/** What a MOC note currently lists, used to decide which changes affect it. */
+export interface MocNoteUsage {
+	/** Paths of all notes linked from the note's MOC blocks. */
+	listed: Set<string>;
+	/** Template ids used by the note's MOC blocks. */
+	templates: Set<string>;
+}
 import {MAX_MOC_COLUMNS, MocTemplate} from "./types";
 
 interface ColumnPlan {
@@ -87,8 +95,16 @@ export function generateMocBlock(
 	sourcePath: string,
 	existing?: ColumnRegion,
 	limitOverride?: number,
+	cache?: MocQueryCache,
+	usage?: MocNoteUsage,
 ): string {
-	const groups = collectMocGroups(app, template, sourcePath, limitOverride);
+	const groups = collectMocGroups(app, template, sourcePath, limitOverride, cache);
+	if (usage) {
+		usage.templates.add(template.id);
+		for (const group of groups) {
+			for (const file of group.files) usage.listed.add(file.path);
+		}
+	}
 	const plans = planMocColumns(template, groups);
 	const columns: ColumnData[] = plans.map((plan, i) => ({
 		content: renderColumnContent(app, template, plan, sourcePath),
@@ -108,6 +124,8 @@ export function updateMocBlocks(
 	text: string,
 	sourcePath: string,
 	templates: ReadonlyArray<MocTemplate>,
+	cache?: MocQueryCache,
+	usage?: MocNoteUsage,
 ): string {
 	if (!text.includes("moc:")) return text;
 	const regions = findColumnRegions(text).filter((r) => r.mocId);
@@ -115,7 +133,7 @@ export function updateMocBlocks(
 	for (const region of [...regions].sort((a, b) => b.from - a.from)) {
 		const template = templates.find((t) => t.id === region.mocId);
 		if (!template) continue;
-		const block = generateMocBlock(app, template, sourcePath, region);
+		const block = generateMocBlock(app, template, sourcePath, region, undefined, cache, usage);
 		if (next.slice(region.from, region.to) !== block) {
 			next = next.slice(0, region.from) + block + next.slice(region.to);
 		}

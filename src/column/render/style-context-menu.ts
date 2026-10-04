@@ -30,6 +30,7 @@ const CLEAR_STYLE_PATCH: StylePatch = {
 
 export interface ColumnContextActions {
 	editColumn?: () => void;
+	editMoc?: () => void;
 	addColumn?: () => void;
 	addChild?: () => void;
 	deleteColumn?: () => void;
@@ -290,7 +291,7 @@ function createIconAction(
 	const button = parent.createEl("button", {cls: "clickable-icon amc-menu-icon-btn"});
 	button.type = "button";
 	button.setAttribute("aria-label", config.label);
-	button.toggleClass("mod-warning", !!config.danger);
+	button.toggleClass("amc-menu-danger", !!config.danger);
 	setIcon(button, config.icon);
 	button.addEventListener("click", (evt) => {
 		evt.preventDefault();
@@ -308,7 +309,7 @@ function createTextAction(
 ): void {
 	const button = parent.createEl("button", {cls: "amc-menu-text-btn", text: config.label});
 	button.type = "button";
-	button.toggleClass("mod-warning", !!config.danger);
+	button.toggleClass("amc-menu-danger", !!config.danger);
 	button.addEventListener("click", (evt) => {
 		evt.preventDefault();
 		evt.stopPropagation();
@@ -1000,6 +1001,7 @@ function renderPopoverContent(
 	}
 	const actions = header.createDiv({cls: "amc-menu-actions"});
 	const a = menuData.actions;
+	if (a?.editMoc) createIconAction(actions, {label: "Edit MOC", icon: "list-tree", onClick: a.editMoc});
 	if (a?.editColumn) createIconAction(actions, {label: "Edit column", icon: "pencil", onClick: a.editColumn});
 	if (a?.addColumn) createIconAction(actions, {label: "Add column", icon: "plus", onClick: a.addColumn});
 	if (a?.addChild) createIconAction(actions, {label: "Add nested columns", icon: "git-branch-plus", onClick: a.addChild});

@@ -16,16 +16,55 @@
 	display: none;
 }
 
-/* Collapse the sizer's own height/padding so it wraps tightly around
-   the remaining visible children (banner, metadata, title, columns, backlinks).
-   An override priority flag is required here because Obsidian's virtual
-   scroller writes min-height / padding-bottom as inline styles on the
-   sizer, which a normal rule cannot beat. */
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
-	min-height: 0 !important;
-	height: auto !important;
-	padding-bottom: 0 !important;
+/* Hide Obsidian's rendered sections by class pattern as well, so a section
+   added while scrolling never takes space — not even until the observer tags
+   it. A momentary section above the column layer shifted it and made the
+   view jump. */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > :is([class^="el-"], [class*=" el-"], .markdown-preview-pusher) {
+	display: none;
 }
+
+/* Layout while columns are active: the sizer's own box is dissolved
+   (display: contents) so its visible children — banner, inline title,
+   properties (mod-header) and the backlinks footer — flow in the preview's
+   column next to the AMC host. `order` puts the host after the header and the
+   footer last, wherever Obsidian keeps the footer inside the sizer, so
+   Obsidian's virtual updates never move content and the view never jumps. */
+.markdown-preview-view.amc-reading-columns-active {
+	display: flex;
+	flex-direction: column;
+}
+
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
+	display: contents;
+}
+
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > *,
+.markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host {
+	flex-shrink: 0;
+}
+
+.markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host {
+	order: 1;
+}
+
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .mod-footer {
+	order: 2;
+}
+
+/* The sizer box no longer applies readable line width to its children. */
+.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > * {
+	width: 100%;
+	max-width: var(--file-line-width);
+	margin-inline: auto;
+}
+
+/* The column layer is static content; browser scroll anchoring would react
+   to Obsidian's hidden virtual sections changing and move the view. */
+.markdown-preview-view.amc-reading-columns-active {
+	overflow-anchor: none;
+}
+
 
 /* Host container: hidden by default, shown when columns are active.
    Inherit the sizer's readable-line-width constraints. */
@@ -111,8 +150,9 @@
 }
 
 .columns-container.columns-nested .column-item {
+	--amc-col-pad-block: 8px;
+	--amc-col-pad-inline: 10px;
 	min-height: 32px;
-	padding: 8px 10px;
 }
 
 .columns-container.columns-nested .column-toolbar {
@@ -137,7 +177,10 @@
 	position: relative;
 	flex: 1 1 0%;
 	min-width: 0;
-	padding: 10px 14px;
+	/* Header margins below cancel exactly this padding. */
+	--amc-col-pad-block: 10px;
+	--amc-col-pad-inline: 14px;
+	padding: var(--amc-col-pad-block) var(--amc-col-pad-inline);
 	border: 1px solid transparent;
 	border-radius: 6px;
 	transition: border-color 0.15s ease, background-color 0.15s ease;
@@ -225,7 +268,8 @@
 	align-items: center;
 	gap: 6px;
 	padding: 6px 10px;
-	margin: -10px -14px 6px;
+	/* Reach the column's edges: cancel its padding (both views, any nesting). */
+	margin: calc(var(--amc-col-pad-block, 10px) * -1) calc(var(--amc-col-pad-inline, 14px) * -1) 6px;
 	border-radius: 4px 4px 0 0;
 	-webkit-user-select: none;
 	user-select: none;
@@ -373,7 +417,7 @@
 /* Live preview uses compact spacing (gaps come from .amc-block-gap); reading
    view keeps Obsidian's normal block spacing, like the rest of the note. */
 .columns-container:where(:not(.columns-reading)) .column-item .column-preview.markdown-rendered :is(p, h1, h2, h3, h4, h5, h6, blockquote, hr, table, pre),
-.columns-container .column-item .column-preview.markdown-rendered div {
+.columns-container .column-item .column-preview.markdown-rendered div:not(.column-header) {
 	margin: 0;
 }
 
@@ -699,10 +743,11 @@
 	background: transparent;
 }
 
-/* Obsidian pads editors inside embeds with --file-margins; the priority
-   flag beats those rules regardless of the note's embed/pane context. */
-.columns-container .amc-embedded-editor .cm-editor .cm-scroller {
-	padding: 0 !important;
+/* Obsidian pads editors inside embeds with --file-margins. The extra
+   .markdown-source-view.mod-cm6 qualifiers outrank those rules (and theme
+   variants) in any embed or pane context without a priority flag. */
+.columns-container .amc-embedded-editor .markdown-source-view.mod-cm6 .cm-editor .cm-scroller {
+	padding: 0;
 	min-height: 0;
 }
 
@@ -719,13 +764,12 @@
 	min-height: 0;
 }
 
-/* The embedded editor inherits a full-note content inset (16px padding with
-   -16px side margins) from the editor theme and inline styles, which the
-   priority flag is needed to override; without it the text jumps inward
-   while editing and back when the column preview returns. */
-.columns-container .amc-embedded-editor .cm-editor .cm-content {
-	padding: 0 !important;
-	margin: 0 !important;
+/* Keep the editor's text exactly where the column preview shows it: themes
+   can give editor content a full-note inset (padding with negative margins),
+   which made the text jump while editing. */
+.columns-container .amc-embedded-editor .markdown-source-view.mod-cm6 .cm-editor .cm-content {
+	padding: 0;
+	margin: 0;
 }
 
 .columns-container .amc-embedded-editor .cm-editor .cm-contentContainer {
@@ -948,12 +992,6 @@
 	pointer-events: none;
 }
 
-/* Reset header negative margin in reading view — the container has no
-   padding so negative margins would bleed into adjacent columns. */
-.columns-container.columns-reading .column-header {
-	margin: 0 0 6px;
-	border-radius: 4px 4px 0 0;
-}
 
 .columns-container.columns-reading .column-item:not(.columns-custom-style):hover {
 	border: none;

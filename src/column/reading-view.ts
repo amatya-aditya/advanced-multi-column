@@ -12,6 +12,12 @@ import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
 import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
+import {
+	createLineIndex,
+	installReadingScrollMapping,
+	tagSourceLines,
+	uninstallReadingScrollMapping,
+} from "./reading-scroll";
 
 const RV_DEBUG = false;
 const RV_ACTIVE_CLASS = "amc-reading-columns-active";
@@ -172,27 +178,11 @@ function ensureWrapperHost(
 	return host;
 }
 
-/** Keep Obsidian's native footer after AMC's external host so embedded
- * backlinks remain below the rendered note. Obsidian still owns the footer;
- * we return it to the sizer whenever AMC tears down. */
-function relocateFooter(
-	sizer: HTMLElement,
-	previewEl: HTMLElement,
-	host: HTMLElement,
-): void {
-	const nestedFooter = sizer.querySelector(":scope > .mod-footer");
-	const externalFooter = previewEl.querySelector(":scope > .mod-footer");
-	const footer = nestedFooter?.instanceOf(HTMLElement)
-		? nestedFooter
-		: externalFooter?.instanceOf(HTMLElement)
-			? externalFooter
-			: null;
-	if (!footer) return;
-
-	if (footer.parentElement !== previewEl || host.nextSibling !== footer) {
-		previewEl.insertBefore(footer, host.nextSibling);
-	}
-}
+/* The backlinks footer (.mod-footer) is one of Obsidian's virtual sections and
+ * is re-inserted into the sizer on every virtual-display update, so it is never
+ * moved: CSS shows it after the AMC host instead (the sizer is display:contents
+ * and the footer is ordered last). Moving it fought Obsidian on every scroll and
+ * made the view jump. */
 
 function isScrollableElement(el: HTMLElement): boolean {
 	const style = window.getComputedStyle(el);
@@ -241,11 +231,28 @@ function restoreScrollSnapshotStable(
 	snapshots: ScrollSnapshot[],
 	shouldRestore: ScrollRestoreGuard,
 ): void {
-	restoreScrollSnapshot(snapshots, shouldRestore);
-	requestAnimationFrame(() => {
-		restoreScrollSnapshot(snapshots, shouldRestore);
-		requestAnimationFrame(() => {
-			restoreScrollSnapshot(snapshots, shouldRestore);
+	// Stop restoring as soon as the user scrolls: snapping back to the old
+	// position would fight their scroll direction.
+	let userScrolled = false;
+	const onUserScroll = () => {
+		userScrolled = true;
+	};
+	const events = ["wheel", "touchmove", "keydown", "mousedown"] as const;
+	for (const snap of snapshots) {
+		for (const type of events) snap.el.addEventListener(type, onUserScroll, {passive: true});
+	}
+	const guard = () => !userScrolled && shouldRestore();
+	const cleanup = () => {
+		for (const snap of snapshots) {
+			for (const type of events) snap.el.removeEventListener(type, onUserScroll);
+		}
+	};
+	restoreScrollSnapshot(snapshots, guard);
+	activeWindow.requestAnimationFrame(() => {
+		restoreScrollSnapshot(snapshots, guard);
+		activeWindow.requestAnimationFrame(() => {
+			restoreScrollSnapshot(snapshots, guard);
+			cleanup();
 		});
 	});
 }
@@ -353,11 +360,12 @@ async function renderMarkdownSegment(
 	parent: HTMLElement,
 	markdown: string,
 	sourcePath: string,
-): Promise<void> {
-	if (markdown.trim().length === 0) return;
+): Promise<HTMLElement | null> {
+	if (markdown.trim().length === 0) return null;
 
 	const host = parent.createDiv({cls: "columns-rv-segment"});
 	await MarkdownRenderer.render(plugin.app, markdown, host, sourcePath, component);
+	return host;
 }
 
 export async function renderColumnsRegion(
@@ -400,7 +408,8 @@ export async function renderColumnsRegion(
 			if (maxWidth > 0) {
 				const sepTotal = (groups.length - 1) * 8;
 				const shrink = sepTotal / groups.length;
-				stackGroupEl.style.flex = `0 0 calc(${maxWidth}% - ${shrink.toFixed(1)}px)`;
+				// Shrinkable: reading columns also have side margins the basis omits.
+				stackGroupEl.style.flex = `0 1 calc(${maxWidth}% - ${shrink.toFixed(1)}px)`;
 			}
 			groupParent = stackGroupEl;
 		} else {
@@ -425,7 +434,8 @@ export async function renderColumnsRegion(
 			} else if (!isContainerStacked && col.widthPercent > 0) {
 				const sepTotal = (groups.length - 1) * 8;
 				const shrink = sepTotal / groups.length;
-				colEl.style.flex = `0 0 calc(${col.widthPercent}% - ${shrink.toFixed(1)}px)`;
+				// Shrinkable: reading columns also have side margins the basis omits.
+				colEl.style.flex = `0 1 calc(${col.widthPercent}% - ${shrink.toFixed(1)}px)`;
 			}
 
 			let colContent = col.content;
@@ -532,19 +542,24 @@ async function buildWrapper(
 	regions: ColumnRegion[],
 	component: Component,
 ): Promise<HTMLElement> {
-	const wrapper = window.activeDocument.createElement("div");
-	wrapper.className = "columns-rv-wrapper";
+	const wrapper = createDiv({cls: "columns-rv-wrapper"});
 	wrapper.dataset.columnsSourcePath = sourcePath;
 
+	// Every top-level block records its source lines so scroll positions
+	// (stored by Obsidian as lines) map onto this layer — see reading-scroll.
+	const lineOf = createLineIndex(text);
 	let cursor = getFrontmatterEnd(text);
 	for (const region of regions) {
 		const before = text.slice(cursor, region.from);
-		await renderMarkdownSegment(plugin, component, wrapper, before, sourcePath);
+		const segment = await renderMarkdownSegment(plugin, component, wrapper, before, sourcePath);
+		tagSourceLines(segment, lineOf(cursor), lineOf(Math.max(cursor, region.from - 1)));
 		await renderColumnsRegion(plugin, component, wrapper, region, sourcePath);
+		tagSourceLines(wrapper.lastElementChild, region.lineStart, region.lineEnd);
 		cursor = region.to;
 	}
 	const after = text.slice(cursor);
-	await renderMarkdownSegment(plugin, component, wrapper, after, sourcePath);
+	const tail = await renderMarkdownSegment(plugin, component, wrapper, after, sourcePath);
+	tagSourceLines(tail, lineOf(cursor), lineOf(text.length));
 
 	// Keep internal links working even when the wrapper is rebuilt outside
 	// Obsidian's normal rendered block sequence.
@@ -762,10 +777,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				handleWrapperDisappearance(sizer, state, "sizer-observer");
 				return;
 			}
-			// Obsidian may add a fresh .mod-footer when backlinks are toggled or
-			// the reading view is refreshed. Keep it below the stable AMC host.
 			placeWrapperHost(state.previewEl, sizer, state.host);
-			relocateFooter(sizer, state.previewEl, state.host);
 		});
 		sizerObserver.observe(sizer, {childList: true});
 
@@ -963,8 +975,11 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			return;
 		}
 
-		const fallbackText = view?.getViewData() ?? "";
-		const text = await readSource(sourcePath, fallbackText);
+		installReadingScrollMapping((view?.previewMode as {renderer?: unknown} | undefined)?.renderer);
+		// The note's own view has the latest text (edits not yet saved); embeds
+		// and other notes are read from the vault.
+		const liveText = view && view.file?.path === sourcePath ? view.getViewData() : null;
+		const text = liveText ?? await readSource(sourcePath, view?.getViewData() ?? "");
 
 		if (!sizer.isConnected || renderTokens.get(sizer) !== token) {
 			rvWarn("render aborted: stale token or disconnected sizer", {
@@ -1076,8 +1091,9 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			host.appendChild(wrapper);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
+			// A footer moved out by an older version goes back to Obsidian.
+			restoreFooter(previewEl, sizer);
 			placeWrapperHost(previewEl, sizer, host);
-			relocateFooter(sizer, previewEl, host);
 			const state: RenderState = {
 				sourcePath,
 				fingerprint,
@@ -1160,6 +1176,20 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		},
 	);
 
+	const rescheduleForPath = (path: string | null, reason: string) => {
+		for (const sizer of activeSizers) {
+			if (!sizer.isConnected) {
+				activeSizers.delete(sizer);
+				continue;
+			}
+			const sizerPath = states.get(sizer)?.sourcePath ?? sourceHints.get(sizer);
+			if (path === null || sizerPath === path) scheduleRender(sizer, sizerPath ?? "", reason, 150);
+		}
+	};
+	plugin.registerEvent(plugin.app.vault.on("modify", (file) => rescheduleForPath(file.path, "file-modified")));
+	// Switching a pane from editing to reading shows the editor's latest text.
+	plugin.registerEvent(plugin.app.workspace.on("layout-change", () => rescheduleForPath(null, "layout-change")));
+
 	// When navigating to a different file (especially one without columns),
 	// the post-processor may never fire — clean up stale wrappers so the
 	// old file's content doesn't linger in the new file's pane.
@@ -1216,5 +1246,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		}
 		activeSizers.clear();
 		sourceReads.clear();
+		uninstallReadingScrollMapping();
 	};
 }

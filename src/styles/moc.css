@@ -1,0 +1,105 @@
+/* MOC templates (settings) and the MOC builder dialog */
+
+/* The template card is the only card: the settings tab draws every setting
+   row as a card, so rows inside a template become plain divided rows. */
+.amc-moc-card {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	background: var(--background-primary-alt);
+	padding: 0 12px;
+	margin-bottom: 8px;
+}
+
+.columns-settings-root .amc-moc-card .setting-item {
+	border: none;
+	border-radius: 0;
+	background: none;
+	margin: 0;
+	padding: 10px 0;
+}
+
+.columns-settings-root .amc-moc-card-body .setting-item {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.amc-moc-card-body {
+	padding-bottom: 12px;
+}
+
+/* Picked tags / properties */
+.amc-moc-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-2-2);
+	margin-top: var(--size-2-3);
+}
+
+.amc-moc-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	padding: var(--size-2-1) var(--size-2-1) var(--size-2-1) var(--size-4-2);
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+}
+
+.amc-moc-chip-remove {
+	display: inline-flex;
+	padding: 1px;
+	border-radius: var(--radius-s);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.amc-moc-chip-remove:hover {
+	background: var(--background-modifier-active-hover);
+	color: var(--text-normal);
+}
+
+.amc-moc-chip-remove .svg-icon {
+	width: 12px;
+	height: 12px;
+}
+
+/* Live preview of the generated block */
+.amc-moc-preview {
+	padding: var(--size-4-2) 0;
+}
+
+.amc-moc-preview-body {
+	max-height: 360px;
+	overflow-y: auto;
+	padding: var(--size-4-2);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.amc-moc-preview-empty {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+/* Builder dialog */
+.modal.amc-moc-builder {
+	width: min(760px, 92vw);
+}
+
+.amc-moc-builder .amc-moc-builder-form {
+	max-height: 62vh;
+	overflow-y: auto;
+	padding-inline-end: var(--size-4-2);
+}
+
+.amc-moc-builder .is-hidden {
+	display: none;
+}
+
+/* Unsaved column edit dialog */
+.amc-unsaved-draft {
+	width: 100%;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-small);
+	resize: vertical;
+}

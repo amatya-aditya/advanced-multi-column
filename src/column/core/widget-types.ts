@@ -2,6 +2,7 @@ import type {ColumnData} from "./types";
 
 export interface ColumnContextActions {
 	editColumn?: () => void;
+	editMoc?: () => void;
 	addColumn?: () => void;
 	addChild?: () => void;
 	deleteColumn?: () => void;
