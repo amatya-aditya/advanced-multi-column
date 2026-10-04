@@ -16,6 +16,13 @@
 	display: none;
 }
 
+/* While another note's columns are being built, the previous note's layer is
+   hidden instead of torn down: tearing it down first showed the new note's
+   raw text for a moment, which then collapsed into columns. */
+.amc-reading-columns-host.amc-rv-pending {
+	visibility: hidden;
+}
+
 /* Hide Obsidian's rendered sections by class pattern as well, so a section
    added while scrolling never takes space — not even until the observer tags
    it. A momentary section above the column layer shifted it and made the
@@ -118,15 +125,14 @@
 .columns-container {
 	--columns-block-default-border-width: var(--amc-container-border-width, 1px);
 	--columns-block-default-border-color: var(--amc-container-border-color, var(--background-modifier-border));
-	/* Structural flex layout. These rules sit in Obsidian's render tree where
-	   core/theme CSS (often with its own override flag) forces a div's display,
-	   so they need the priority flag to hold the row layout. Specificity alone
-	   is not enough here and CSS variables cannot change precedence. The
-	   .columns-stacked rule below re-flags flex-direction to beat this. */
+	/* Structural flex layout. Some themes force a div's display with their own
+	   priority flag, so only `display` needs one here; direction, wrapping and
+	   alignment are not forced and the stacked variants below override them
+	   by specificity. */
 	display: flex !important;
-	flex-direction: row !important;
-	flex-wrap: nowrap !important;
-	align-items: stretch !important;
+	flex-direction: row;
+	flex-wrap: nowrap;
+	align-items: stretch;
 	width: 100%;
 	margin: 12px 0;
 	/* Global appearance settings arrive as --amc-* variables (runtime styles). */
@@ -1007,17 +1013,17 @@
    ========================================================================== */
 
 .columns-container.columns-stacked {
-	flex-direction: column !important;
+	flex-direction: column;
 }
 
 .columns-container.columns-stacked > .column-item {
-	flex: none !important;
+	flex: none;
 	width: 100%;
 }
 
 /* Hide horizontal resize handles in stacked mode */
 .columns-container.columns-stacked > .column-resize-handle {
-	display: none !important;
+	display: none;
 }
 
 /* Separators become horizontal lines in stacked mode */
@@ -1061,7 +1067,7 @@
 
 .columns-container .columns-stack-group {
 	display: flex !important;
-	flex-direction: column !important;
+	flex-direction: column;
 	flex: 1 1 0%;
 	min-width: 0;
 	align-items: stretch;
@@ -1070,13 +1076,13 @@
 }
 
 .columns-container .columns-stack-group > .column-item {
-	flex: none !important;
+	flex: none;
 	width: 100%;
 }
 
 /* Hide vertical resize handles inside stack groups */
 .columns-container .columns-stack-group > .column-resize-handle {
-	display: none !important;
+	display: none;
 }
 
 /* Separators become horizontal lines inside stack groups */

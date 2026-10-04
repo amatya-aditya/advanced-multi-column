@@ -779,7 +779,7 @@ function wireTopLevelEditToggle(
 				}
 				return true;
 			}
-			activeWindow.requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
 				const iState = getInteractionState(ctx.view);
 				if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${index}`) {
 					iState.activeEdit.cursorStart = textarea.selectionStart;

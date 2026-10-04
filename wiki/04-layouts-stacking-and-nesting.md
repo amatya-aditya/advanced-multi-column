@@ -32,7 +32,7 @@ Row 3
 %% col-end %%
 ```
 
-![Container stack layout: every column on its own row](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-stack-layout.png)
+![Container stack layout: every column on its own row](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-stacked-layout.png)
 
 ## C. Per-group stacking (`stk:<id>`)
 

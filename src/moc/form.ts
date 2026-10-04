@@ -53,11 +53,15 @@ class VaultVocabulary {
 		for (const file of app.vault.getMarkdownFiles()) {
 			const cache = app.metadataCache.getFileCache(file);
 			if (!cache) continue;
-			for (const tag of getAllTags(cache) ?? []) tags.add(tag.replace(/^#/, ""));
-			for (const [key, raw] of Object.entries(cache.frontmatter ?? {})) {
+			const fileTags: string[] = getAllTags(cache) ?? [];
+			for (const tag of fileTags) tags.add(tag.replace(/^#/, ""));
+			const frontmatter: Record<string, unknown> = cache.frontmatter ?? {};
+			for (const key of Object.keys(frontmatter)) {
 				if (key === "position") continue;
+				const raw = frontmatter[key];
 				const set = this.values.get(key) ?? new Set<string>();
-				for (const value of Array.isArray(raw) ? raw : [raw]) {
+				const values: unknown[] = Array.isArray(raw) ? (raw as unknown[]) : [raw];
+				for (const value of values) {
 					if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
 						set.add(String(value).replace(/^\[\[|\]\]$/g, ""));
 					}
@@ -291,7 +295,6 @@ export class MocForm extends Component {
 			.addSlider((slider) => slider
 				.setLimits(1, MAX_MOC_COLUMNS, 1)
 				.setValue(template.columns)
-				.setDynamicTooltip()
 				.onChange(async (value) => {
 					template.columns = value;
 					await change();

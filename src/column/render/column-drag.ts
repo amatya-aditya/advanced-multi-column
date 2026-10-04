@@ -327,6 +327,15 @@ export function shouldInsertDraggedBlockAtCursor(event: DragEvent, view: EditorV
 	return true;
 }
 
+/**
+ * Drag events already handled by the innermost column. Nested columns use this
+ * instead of stopping propagation, because Obsidian's drag manager listens on
+ * the window: it attaches its dragend listener on dragstart and stops its edge
+ * auto-scroll on dragover/dragend. Swallowing those events left the editor
+ * scrolling by itself after a column drag.
+ */
+const handledDragEvents = new WeakSet<Event>();
+
 export function wireDragItem(
 	item: HTMLElement,
 	handle: HTMLElement,
@@ -349,7 +358,6 @@ export function wireDragItem(
 
 	item.addEventListener("dragstart", (e: DragEvent) => {
 		if (e.target !== item) return;
-		e.stopPropagation();
 		if (!e.dataTransfer) return;
 		e.dataTransfer.effectAllowed = "move";
 		e.dataTransfer.setData("text/plain", "");
@@ -365,9 +373,9 @@ export function wireDragItem(
 	});
 
 	item.addEventListener("dragover", (e: DragEvent) => {
-		if (!getInteractionState(view).activeDragState) return;
+		if (!getInteractionState(view).activeDragState || handledDragEvents.has(e)) return;
+		handledDragEvents.add(e);
 		e.preventDefault();
-		e.stopPropagation();
 		if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
 
 		const rect = item.getBoundingClientRect();
@@ -401,24 +409,28 @@ export function wireDragItem(
 		item.classList.remove("column-drag-over", "column-drop-before", "column-drop-after");
 		const source = dropIState.activeDragState;
 		source.dropHandled = true;
-		refreshRegionPosition(region);
-		if (source.sourceRegionFrom === region.from) {
-			moveColumnBetweenContainers(
-				region,
-				source.sourcePath,
-				source.sourceIndex,
-				containerPath,
-				dropIndex,
-				view,
-			);
-			return;
-		}
-		moveColumnBetweenBlocks(region, source, containerPath, dropIndex, view);
+		// Move after the drag has finished: the move re-renders the block, and a
+		// dragged element removed before dragend never receives it, which leaves
+		// both this drag state and Obsidian's edge auto-scroll running.
+		window.setTimeout(() => {
+			refreshRegionPosition(region);
+			if (source.sourceRegionFrom === region.from) {
+				moveColumnBetweenContainers(
+					region,
+					source.sourcePath,
+					source.sourceIndex,
+					containerPath,
+					dropIndex,
+					view,
+				);
+				return;
+			}
+			moveColumnBetweenBlocks(region, source, containerPath, dropIndex, view);
+		}, 0);
 	});
 
 	item.addEventListener("dragend", (e: DragEvent) => {
 		if (e.target !== item) return;
-		e.stopPropagation();
 		item.classList.remove("column-dragging", "column-drag-over", "column-drop-before", "column-drop-after");
 		item.setAttribute("draggable", "false");
 		const endIState = getInteractionState(view);

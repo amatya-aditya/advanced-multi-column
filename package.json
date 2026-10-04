@@ -1,6 +1,6 @@
 {
 	"name": "advanced-multi-column",
-	"version": "2.1.0",
+	"version": "2.2.0",
 	"description": "Allows you to create columns in Obsidian Markdown.",
 	"main": "main.js",
 	"type": "module",
@@ -24,7 +24,7 @@
 		"eslint-plugin-obsidianmd": "0.1.9",
 		"globals": "14.0.0",
 		"jiti": "2.6.1",
-		"obsidian": "1.10.3",
+		"obsidian": "^1.13.1",
 		"tslib": "2.4.0",
 		"typescript": "^5.8.3",
 		"typescript-eslint": "8.35.1"

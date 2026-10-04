@@ -318,7 +318,7 @@ export class ThirdPartySuggestBridge {
 			});
 		}
 
-		activeWindow.requestAnimationFrame(() => {
+		window.requestAnimationFrame(() => {
 			if (!this.popup) return;
 			const rect = this.popup.getBoundingClientRect();
 			if (rect.bottom > this.textarea.win.innerHeight) {

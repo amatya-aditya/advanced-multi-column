@@ -22,6 +22,8 @@ import {
 const RV_DEBUG = false;
 const RV_ACTIVE_CLASS = "amc-reading-columns-active";
 const RV_HOST_CLASS = "amc-reading-columns-host";
+/** Host whose layer belongs to the previous note while the next one builds. */
+const RV_PENDING_CLASS = "amc-rv-pending";
 
 interface RenderState {
 	sourcePath: string;
@@ -248,9 +250,9 @@ function restoreScrollSnapshotStable(
 		}
 	};
 	restoreScrollSnapshot(snapshots, guard);
-	activeWindow.requestAnimationFrame(() => {
+	window.requestAnimationFrame(() => {
 		restoreScrollSnapshot(snapshots, guard);
-		activeWindow.requestAnimationFrame(() => {
+		window.requestAnimationFrame(() => {
 			restoreScrollSnapshot(snapshots, guard);
 			cleanup();
 		});
@@ -289,6 +291,13 @@ function restoreSizerContent(sizer: HTMLElement): void {
 	}
 }
 
+function disconnectObservers(state: RenderState): void {
+	state.previewObserver?.disconnect();
+	state.hostObserver?.disconnect();
+	state.wrapperObserver?.disconnect();
+	state.sizerObserver?.disconnect();
+}
+
 function teardownSizer(
 	sizer: HTMLElement,
 	states: WeakMap<HTMLElement, RenderState>,
@@ -296,12 +305,10 @@ function teardownSizer(
 ): void {
 	const state = states.get(sizer);
 	if (state) {
-		state.previewObserver?.disconnect();
-		state.hostObserver?.disconnect();
-		state.wrapperObserver?.disconnect();
-		state.sizerObserver?.disconnect();
+		disconnectObservers(state);
 		state.component.unload();
 		state.wrapper.remove();
+		state.host.classList.remove(RV_PENDING_CLASS);
 		restoreFooter(state.previewEl, sizer);
 		restoreSizerContent(sizer);
 		state.previewEl.classList.remove(RV_ACTIVE_CLASS);
@@ -327,10 +334,7 @@ function teardownSizer(
 	if (!previewEl) return;
 	if (!previewEl.classList.contains(RV_ACTIVE_CLASS)) return;
 
-	const host = getWrapperHost(previewEl);
-	if (host) {
-		host.remove();
-	}
+	getWrapperHost(previewEl)?.remove();
 	restoreFooter(previewEl, sizer);
 	restoreSizerContent(sizer);
 	previewEl.classList.remove(RV_ACTIVE_CLASS);
@@ -354,17 +358,40 @@ function textFingerprint(sourcePath: string, text: string, regions: ColumnRegion
 	);
 }
 
-async function renderMarkdownSegment(
+/** Longest a new layer waits for its markdown renders before it is shown. */
+const LAYER_RENDER_WAIT_MS = 40;
+
+/**
+ * Markdown renders still running for a layer. The DOM of the layer is built
+ * synchronously, in order, with an empty element per markdown block; the
+ * blocks then render in parallel instead of one after another, which made
+ * opening a note with many columns slow.
+ */
+type RenderTasks = Promise<unknown>[];
+
+function renderMarkdownInto(
+	plugin: ColumnsPlugin,
+	component: Component,
+	el: HTMLElement,
+	markdown: string,
+	sourcePath: string,
+	tasks: RenderTasks,
+): void {
+	tasks.push(MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component));
+}
+
+function renderMarkdownSegment(
 	plugin: ColumnsPlugin,
 	component: Component,
 	parent: HTMLElement,
 	markdown: string,
 	sourcePath: string,
-): Promise<HTMLElement | null> {
+	tasks: RenderTasks,
+): HTMLElement | null {
 	if (markdown.trim().length === 0) return null;
 
 	const host = parent.createDiv({cls: "columns-rv-segment"});
-	await MarkdownRenderer.render(plugin.app, markdown, host, sourcePath, component);
+	renderMarkdownInto(plugin, component, host, markdown, sourcePath, tasks);
 	return host;
 }
 
@@ -374,8 +401,21 @@ export async function renderColumnsRegion(
 	parent: HTMLElement,
 	region: ColumnRegion,
 	sourcePath: string,
-	depth = 0,
 ): Promise<void> {
+	const tasks: RenderTasks = [];
+	buildColumnsRegion(plugin, component, parent, region, sourcePath, 0, tasks);
+	await Promise.all(tasks);
+}
+
+function buildColumnsRegion(
+	plugin: ColumnsPlugin,
+	component: Component,
+	parent: HTMLElement,
+	region: ColumnRegion,
+	sourcePath: string,
+	depth: number,
+	tasks: RenderTasks,
+): void {
 	if (depth > 8) return;
 
 	const containerEl = parent.createDiv({cls: "columns-container columns-ui columns-reading"});
@@ -474,31 +514,27 @@ export async function renderColumnsRegion(
 			const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 
 			if (colContent.trim().length > 0) {
-				await renderColumnContent(
-					plugin, component, previewEl, colContent, sourcePath, depth + 1,
+				buildColumnContent(
+					plugin, component, previewEl, colContent, sourcePath, depth + 1, tasks,
 				);
 			}
 		}
 	}
 }
 
-/** Render a column's content, recursively handling nested column regions. */
-async function renderColumnContent(
+/** Build a column's content, recursively handling nested column regions. */
+function buildColumnContent(
 	plugin: ColumnsPlugin,
 	component: Component,
 	parent: HTMLElement,
 	content: string,
 	sourcePath: string,
 	depth: number,
-): Promise<void> {
-	if (depth > 8) {
-		await MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component);
-		return;
-	}
-
-	const nested = findColumnRegions(content);
+	tasks: RenderTasks,
+): void {
+	const nested = depth > 8 ? [] : findColumnRegions(content);
 	if (nested.length === 0) {
-		await MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component);
+		renderMarkdownInto(plugin, component, parent, content, sourcePath, tasks);
 		return;
 	}
 
@@ -507,21 +543,15 @@ async function renderColumnContent(
 	for (const region of sorted) {
 		if (region.from > cursor) {
 			const text = content.slice(cursor, region.from).trim();
-			if (text) {
-				const div = parent.createDiv();
-				await MarkdownRenderer.render(plugin.app, text, div, sourcePath, component);
-			}
+			if (text) renderMarkdownInto(plugin, component, parent.createDiv(), text, sourcePath, tasks);
 		}
-		await renderColumnsRegion(plugin, component, parent, region, sourcePath, depth);
+		buildColumnsRegion(plugin, component, parent, region, sourcePath, depth, tasks);
 		cursor = region.to;
 	}
 
 	if (cursor < content.length) {
 		const text = content.slice(cursor).trim();
-		if (text) {
-			const div = parent.createDiv();
-			await MarkdownRenderer.render(plugin.app, text, div, sourcePath, component);
-		}
+		if (text) renderMarkdownInto(plugin, component, parent.createDiv(), text, sourcePath, tasks);
 	}
 }
 
@@ -548,18 +578,27 @@ async function buildWrapper(
 	// Every top-level block records its source lines so scroll positions
 	// (stored by Obsidian as lines) map onto this layer — see reading-scroll.
 	const lineOf = createLineIndex(text);
+	const tasks: RenderTasks = [];
 	let cursor = getFrontmatterEnd(text);
 	for (const region of regions) {
 		const before = text.slice(cursor, region.from);
-		const segment = await renderMarkdownSegment(plugin, component, wrapper, before, sourcePath);
+		const segment = renderMarkdownSegment(plugin, component, wrapper, before, sourcePath, tasks);
 		tagSourceLines(segment, lineOf(cursor), lineOf(Math.max(cursor, region.from - 1)));
-		await renderColumnsRegion(plugin, component, wrapper, region, sourcePath);
+		buildColumnsRegion(plugin, component, wrapper, region, sourcePath, 0, tasks);
 		tagSourceLines(wrapper.lastElementChild, region.lineStart, region.lineEnd);
 		cursor = region.to;
 	}
 	const after = text.slice(cursor);
-	const tail = await renderMarkdownSegment(plugin, component, wrapper, after, sourcePath);
+	const tail = renderMarkdownSegment(plugin, component, wrapper, after, sourcePath, tasks);
 	tagSourceLines(tail, lineOf(cursor), lineOf(text.length));
+	// Text is rendered synchronously; what the promises wait for is mostly
+	// slow embeds and other plugins' post-processors. Wait briefly so the
+	// layer usually appears complete, but never hold the whole note back for
+	// one slow block: it finishes in place, as in Obsidian's own view.
+	await Promise.race([
+		Promise.all(tasks),
+		new Promise((resolve) => window.setTimeout(resolve, LAYER_RENDER_WAIT_MS)),
+	]);
 
 	// Keep internal links working even when the wrapper is rebuilt outside
 	// Obsidian's normal rendered block sequence.
@@ -618,7 +657,7 @@ function renderForExport(
 
 export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const states = new WeakMap<HTMLElement, RenderState>();
-	const timers = new WeakMap<HTMLElement, number>();
+	const timers = new WeakMap<HTMLElement, {id: number; due: number}>();
 	const renderTokens = new WeakMap<HTMLElement, number>();
 	const sourceReads = new Map<string, Promise<string | null>>();
 	const sourceHints = new WeakMap<HTMLElement, string>();
@@ -693,23 +732,25 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		delayMs = 50,
 	): void {
 		sourceHints.set(sizer, sourcePath);
+		const due = Date.now() + delayMs;
 		const existingTimer = timers.get(sizer);
-		if (existingTimer !== undefined) {
-			window.clearTimeout(existingTimer);
-		}
-
 		rvWarn("schedule render", {
 			reason,
 			sourcePath,
 			hadPendingTimer: existingTimer !== undefined,
 			sizerChildren: sizer.children.length,
 		});
+		// A render already due sooner stays: a later request (e.g. the
+		// layout-change that follows opening a note) must not postpone it.
+		// The render reads the latest source hint when it runs.
+		if (existingTimer && existingTimer.due <= due) return;
+		if (existingTimer) window.clearTimeout(existingTimer.id);
 
-		const timer = window.setTimeout(() => {
+		const id = window.setTimeout(() => {
 			timers.delete(sizer);
 			void renderSizer(sizer, reason);
 		}, delayMs);
-		timers.set(sizer, timer);
+		timers.set(sizer, {id, due});
 	}
 
 	function handleWrapperDisappearance(
@@ -894,7 +935,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		// Race with a 10s timeout to prevent hanging promises
 		const withTimeout = Promise.race([
 			read,
-			new Promise<null>((resolve) => window.activeWindow.setTimeout(() => resolve(null), 10_000)),
+			new Promise<null>((resolve) => window.window.setTimeout(() => resolve(null), 10_000)),
 		]);
 
 		sourceReads.set(sourcePath, withTimeout);
@@ -1026,6 +1067,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				});
 			}
 			existing.previewEl.classList.add(RV_ACTIVE_CLASS);
+			existing.host.classList.remove(RV_PENDING_CLASS);
 			hideSizerContent(sizer);
 			rvWarn("render reused existing wrapper", sizerSnapshot(sizer, existing));
 			return;
@@ -1046,14 +1088,17 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			return;
 		}
 
-		if (existing) {
-			if (!existing.wrapper.isConnected || existing.wrapper.parentElement !== existing.host) {
-				rvError("existing wrapper missing before rebuild", sizerSnapshot(sizer, existing));
-			}
-			teardownSizer(sizer, states, "refresh");
+		// Keep the current layer on screen while the new one builds and swap
+		// them in one step: tearing it down first showed the raw note text
+		// until the build finished. Another note's layer is hidden meanwhile.
+		const previous = existing?.host.isConnected && existing.previewEl === previewEl ? existing : null;
+		if (existing && !previous) teardownSizer(sizer, states, "refresh");
+		if (previous) {
+			disconnectObservers(previous);
+			if (previous.sourcePath !== sourcePath) previous.host.classList.add(RV_PENDING_CLASS);
 		}
 
-		const host = ensureWrapperHost(previewEl, sizer);
+		const host = previous?.host ?? ensureWrapperHost(previewEl, sizer);
 
 		const component = new Component();
 		component.load();
@@ -1077,9 +1122,14 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			inFlightBuilds.delete(sizer);
 
+			if (previous && states.get(sizer) === previous) {
+				previous.component.unload();
+				states.delete(sizer);
+			}
 			while (host.firstChild) {
 				host.removeChild(host.firstChild);
 			}
+			host.classList.remove(RV_PENDING_CLASS);
 			wrapper.dataset.columnsRenderId = String(renderId);
 			// Recovery renders must not force a scroll position captured after the
 			// DOM was damaged. That position may already be stale and was the source
@@ -1123,6 +1173,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				inFlightBuilds.delete(sizer);
 			}
 			component.unload();
+			teardownSizer(sizer, states, "render failed");
 			previewEl.classList.remove(RV_ACTIVE_CLASS);
 			restoreSizerContent(sizer);
 			if (scrollSnapshot.length > 0) {
@@ -1163,6 +1214,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				return;
 			}
 
+			const sourcePath = ctx.sourcePath ?? "";
 			const existing = states.get(sizer);
 			if (existing) {
 				if (!existing.wrapper.isConnected || existing.wrapper.parentElement !== existing.host) {
@@ -1172,9 +1224,25 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				}
 			}
 
-			scheduleRender(sizer, ctx.sourcePath ?? "", "postprocessor");
+			// Another note is now shown in this pane: hide the previous note's
+			// columns right away and build the new ones without the debounce
+			// (the build reads the whole note, not the section being rendered).
+			const switched = !existing || existing.sourcePath !== sourcePath;
+			if (existing && switched) existing.host.classList.add(RV_PENDING_CLASS);
+			scheduleRender(sizer, sourcePath, "postprocessor", switched ? 0 : 50);
 		},
 	);
+
+	/** Note a sizer currently shows: the view's file for a reading view's own
+	 * sizer (it changes when another note opens in the pane), else the path the
+	 * sizer was rendered from (embeds, canvas cards). */
+	const currentPathForSizer = (sizer: HTMLElement): string => {
+		const view = resolveViewForSizer(sizer, plugin);
+		if (view?.file && view.previewMode.containerEl.querySelector(".markdown-preview-sizer") === sizer) {
+			return view.file.path;
+		}
+		return states.get(sizer)?.sourcePath ?? sourceHints.get(sizer) ?? "";
+	};
 
 	const rescheduleForPath = (path: string | null, reason: string) => {
 		for (const sizer of activeSizers) {
@@ -1182,13 +1250,29 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				activeSizers.delete(sizer);
 				continue;
 			}
-			const sizerPath = states.get(sizer)?.sourcePath ?? sourceHints.get(sizer);
-			if (path === null || sizerPath === path) scheduleRender(sizer, sizerPath ?? "", reason, 150);
+			// Re-render the note the sizer shows now. Using the path of the
+			// previous render rebuilt the old note after a note switch, because
+			// opening a note also fires layout-change.
+			const sizerPath = currentPathForSizer(sizer);
+			if (path === null || sizerPath === path) scheduleRender(sizer, sizerPath, reason, 150);
 		}
 	};
 	plugin.registerEvent(plugin.app.vault.on("modify", (file) => rescheduleForPath(file.path, "file-modified")));
 	// Switching a pane from editing to reading shows the editor's latest text.
 	plugin.registerEvent(plugin.app.workspace.on("layout-change", () => rescheduleForPath(null, "layout-change")));
+
+	// Opening another note in a pane: hide the previous note's columns before
+	// the first frame of the new note, so they never show over it.
+	plugin.registerEvent(
+		plugin.app.workspace.on("file-open", () => {
+			for (const sizer of activeSizers) {
+				const state = states.get(sizer);
+				if (state && sizer.isConnected && currentPathForSizer(sizer) !== state.sourcePath) {
+					state.host.classList.add(RV_PENDING_CLASS);
+				}
+			}
+		}),
+	);
 
 	// When navigating to a different file (especially one without columns),
 	// the post-processor may never fire — clean up stale wrappers so the
@@ -1217,12 +1301,14 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 						wrapperPath,
 						currentPath,
 					});
-					// Find the sizer for this view and tear down properly
+					// Hide the old note's columns and render the new note; the
+					// render tears the layer down if the new note has none.
 					const sizer = previewEl.querySelector(
 						".markdown-preview-sizer",
 					);
 					if (sizer?.instanceOf(HTMLElement)) {
-						teardownSizer(sizer, states, "file-changed");
+						host.classList.add(RV_PENDING_CLASS);
+						scheduleRender(sizer, currentPath, "file-changed", 0);
 					} else {
 						// No sizer — manual cleanup
 						host.remove();
@@ -1240,7 +1326,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			teardownSizer(sizer, states, "plugin-unload");
 			const timer = timers.get(sizer);
 			if (timer !== undefined) {
-				window.clearTimeout(timer);
+				window.clearTimeout(timer.id);
 				timers.delete(sizer);
 			}
 		}

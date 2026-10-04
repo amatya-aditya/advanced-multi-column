@@ -1,75 +1,26 @@
 /* Settings tab UI */
-.columns-settings-root .columns-settings-tab-bar {
-	display: flex;
-	gap: 8px;
+/* Expandable cards (MOC templates, header types): the row keeps its name and
+   buttons, and the editor opens underneath it across the full width. */
+.amc-settings-card {
 	flex-wrap: wrap;
-	padding-bottom: 12px;
-	margin-bottom: 16px;
-	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.columns-settings-root .columns-settings-tab-btn {
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-muted);
-	border-radius: 8px;
-	padding: 6px 12px;
-	font-size: 0.85rem;
-	font-weight: 600;
-	line-height: 1;
-	cursor: pointer;
+.amc-settings-card > .amc-settings-card-body {
+	flex: 1 0 100%;
+	margin-top: var(--size-4-2);
+	padding-top: var(--size-4-1);
+	border-top: 1px solid var(--background-modifier-border);
 }
 
-.columns-settings-root .columns-settings-tab-btn:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
+.amc-settings-card-body .setting-item {
+	padding-inline: 0;
 }
 
-.columns-settings-root .columns-settings-tab-btn.is-active {
-	border-color: var(--interactive-accent);
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-}
-
-.columns-settings-root .columns-settings-panel {
-	display: none;
-}
-
-.columns-settings-root .columns-settings-panel.is-active {
+/* About */
+.columns-settings-about-item {
 	display: block;
 }
 
-.columns-settings-root .columns-settings-section-title {
-	margin: 20px 0 8px;
-	font-size: 0.82rem;
-	font-weight: 700;
-	color: var(--text-muted);
-	text-transform: uppercase;
-	letter-spacing: 0.04em;
-}
-
-.columns-settings-root .columns-settings-section-title:first-child {
-	margin-top: 0;
-}
-
-.columns-settings-root .setting-item {
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-primary-alt);
-	border-radius: 10px;
-	padding: 10px 12px;
-	margin-bottom: 8px;
-}
-
-.columns-settings-root .setting-item-control .slider {
-	width: 130px;
-}
-
-.columns-settings-root .columns-settings-number-input {
-	width: 64px;
-	text-align: center;
-}
-
-/* About tab */
 .columns-settings-about {
 	display: flex;
 	flex-direction: column;
@@ -134,18 +85,9 @@
 
 /* ── Header types list ── */
 
-.columns-header-types-list {
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-}
-
-.columns-header-type-row {
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 10px;
-	overflow: hidden;
-	display: grid;
-	align-items: stretch;
+.columns-header-type-info {
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .columns-header-type-preview {
@@ -153,8 +95,12 @@
 	align-items: center;
 	gap: 6px;
 	padding: 6px 10px;
+	border-radius: var(--radius-s);
 	line-height: 1.4;
-	height: 100%;
+	background: var(--amc-header-preview-bg, transparent);
+	color: var(--amc-header-preview-color, var(--text-muted));
+	font-size: var(--amc-header-preview-size, 0.85em);
+	font-weight: var(--amc-header-preview-weight, 600);
 }
 
 .columns-header-type-preview-icon {
@@ -181,54 +127,19 @@
 	letter-spacing: 0.04em;
 }
 
-.columns-header-type-delete-btn {
-	display: inline-flex;
-	align-items: center;
-	cursor: pointer;
-	opacity: 0.5;
-	margin-left: 6px;
-	color: var(--text-error);
-}
-
-.columns-header-type-delete-btn:hover {
-	opacity: 1;
-}
-
-.columns-header-type-delete-btn .svg-icon {
-	width: 14px;
-	height: 14px;
-}
-
 .columns-header-type-controls {
-	padding: 8px 12px;
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 	gap: 0 16px;
 }
 
-.columns-header-type-controls .setting-item.columns-header-type-setting {
+.columns-header-type-controls .setting-item {
 	border: none;
-	background: none;
-	border-radius: 0;
-	padding: 6px 0;
-	margin-bottom: 0;
-	min-width: 0;
-}
-
-.columns-header-type-controls .setting-item.columns-header-type-setting .setting-item-info,
-.columns-header-type-controls .setting-item.columns-header-type-setting .setting-item-control {
 	min-width: 0;
 }
 
 .columns-header-type-controls .columns-settings-number-input {
 	width: 96px;
-	text-align: left;
-}
-
-@media (max-width: 900px) {
-	.columns-header-type-row {
-		grid-template-columns: 1fr;
-	}
 }
 
 /* ── Icon suggest dropdown ── */

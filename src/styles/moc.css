@@ -1,31 +1,5 @@
 /* MOC templates (settings) and the MOC builder dialog */
 
-/* The template card is the only card: the settings tab draws every setting
-   row as a card, so rows inside a template become plain divided rows. */
-.amc-moc-card {
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 10px;
-	background: var(--background-primary-alt);
-	padding: 0 12px;
-	margin-bottom: 8px;
-}
-
-.columns-settings-root .amc-moc-card .setting-item {
-	border: none;
-	border-radius: 0;
-	background: none;
-	margin: 0;
-	padding: 10px 0;
-}
-
-.columns-settings-root .amc-moc-card-body .setting-item {
-	border-top: 1px solid var(--background-modifier-border);
-}
-
-.amc-moc-card-body {
-	padding-bottom: 12px;
-}
-
 /* Picked tags / properties */
 .amc-moc-chips {
 	display: flex;

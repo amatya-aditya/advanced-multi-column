@@ -69,7 +69,7 @@ function activeBlocks(previewEl: HTMLElement): Block[] | null {
 	const originTop = previewEl.getBoundingClientRect().top - previewEl.scrollTop;
 	const blocks: Block[] = [];
 	for (const child of Array.from(wrapper.children)) {
-		if (!(child instanceof HTMLElement)) continue;
+		if (!child.instanceOf(HTMLElement)) continue;
 		const from = Number(child.dataset[LINE_FROM]);
 		const to = Number(child.dataset[LINE_TO]);
 		if (!Number.isFinite(from) || !Number.isFinite(to)) continue;

@@ -1,6 +1,7 @@
 import {App, Editor, MarkdownFileInfo, MarkdownView, Menu, MenuItem, Notice, Plugin, SuggestModal, TFile} from "obsidian";
 import type {EditorView} from "@codemirror/view";
-import {ColumnsPluginSettings, ColumnsSettingTab, DEFAULT_SETTINGS} from "./settings";
+import {ColumnsPluginSettings, DEFAULT_SETTINGS} from "./settings";
+import {ColumnsSettingTab, MOC_PAGE_NAME} from "./settings-tab";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
@@ -182,12 +183,17 @@ export default class ColumnsPlugin extends Plugin {
 
 	private openMocSettings(): void {
 		const setting = (this.app as App & {
-			setting?: {open(): void; openTabById(id: string): void};
+			setting?: {
+				open(): void;
+				openTabById(id: string): unknown;
+				openPagePath?(id: string, path: string[]): unknown;
+			};
 		}).setting;
 		if (!setting) return;
-		this.settingTab.showTab("moc");
 		setting.open();
-		setting.openTabById(this.manifest.id);
+		if (!setting.openPagePath?.(this.manifest.id, [MOC_PAGE_NAME])) {
+			setting.openTabById(this.manifest.id);
+		}
 	}
 
 	private insertLayout(editor: Editor, layout: LayoutTemplate): void {

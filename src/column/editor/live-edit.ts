@@ -142,7 +142,7 @@ class UnsavedDraftModal extends Modal {
 		text.value = this.draft;
 		text.readOnly = true;
 		text.rows = 10;
-		activeWindow.setTimeout(() => text.select(), 0);
+		window.setTimeout(() => text.select(), 0);
 	}
 
 	onClose(): void {
@@ -330,7 +330,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			restore?.cursorStart ?? value.length,
 			restore?.cursorEnd ?? value.length,
 		);
-		activeWindow.requestAnimationFrame(() => {
+		window.requestAnimationFrame(() => {
 			if (active === handle) handle.focus();
 		});
 	};
@@ -358,7 +358,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 				restorePending();
 				return;
 			}
-			activeWindow.requestAnimationFrame(() => {
+			window.requestAnimationFrame(() => {
 				if (config.hostEl.isConnected) restorePending();
 				else clearEditState();
 			});
