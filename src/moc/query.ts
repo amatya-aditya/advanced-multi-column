@@ -169,13 +169,14 @@ function groupKeys(app: App, template: MocTemplate, file: TFile, base: string): 
 
 function sortFiles(files: TFile[], template: MocTemplate): TFile[] {
 	const byName = (a: TFile, b: TFile) => a.basename.localeCompare(b.basename, undefined, {numeric: true});
+	const direction = template.sortReverse ? -1 : 1;
 	switch (template.sort) {
 		case "modified":
-			return files.sort((a, b) => b.stat.mtime - a.stat.mtime || byName(a, b));
+			return files.sort((a, b) => direction * (b.stat.mtime - a.stat.mtime || byName(a, b)));
 		case "created":
-			return files.sort((a, b) => b.stat.ctime - a.stat.ctime || byName(a, b));
+			return files.sort((a, b) => direction * (b.stat.ctime - a.stat.ctime || byName(a, b)));
 		default:
-			return files.sort(byName);
+			return files.sort((a, b) => direction * byName(a, b));
 	}
 }
 

@@ -46,6 +46,7 @@ The note that contains the MOC is never listed in its own MOC. A template with n
 | **Group property** | Shown when grouping by property value — the property key to group by. |
 | **Columns** | 1–6. Groups are placed into columns; if there are fewer groups than columns, fewer columns are used. With **No grouping**, the list is split evenly across the columns. |
 | **Sort notes by** | **Name** (A–Z, numbers in natural order), **Last modified** or **Created** (newest first). Groups are always sorted by name. |
+| **Reverse sort order** | Lists notes in the opposite order: **Name** Z–A, **Last modified** and **Created** oldest first. **Notes per group** then keeps the oldest notes instead of the newest. |
 | **Show group headings** | Writes each group's name as a `###` heading above its links. |
 | **Show bullets** | On: links are a bulleted list (`- [[Note]]`). Off: one plain link per line. Plain lines rely on Obsidian's default line breaks; with **Settings → Editor → Strict line breaks** turned on they run together on one line, so keep bullets on in that case. |
 | **Notes per group** | Lists at most this many notes per group (`0` = all). Useful with **Last modified** to show only recent notes. |

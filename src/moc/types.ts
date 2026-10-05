@@ -45,6 +45,8 @@ export interface MocTemplate {
 	/** Group name → 0-based column index; unassigned groups are placed automatically. */
 	assignments: Record<string, number>;
 	sort: MocSort;
+	/** List in the opposite order: Z–A by name, oldest first by date. */
+	sortReverse: boolean;
 	showHeadings: boolean;
 	/** List links as a bulleted list; otherwise one plain link per line. */
 	showBullets: boolean;
@@ -70,6 +72,7 @@ export function createMocTemplate(id: string, name: string): MocTemplate {
 		columns: 3,
 		assignments: {},
 		sort: "name",
+		sortReverse: false,
 		showHeadings: true,
 		showBullets: true,
 		maxPerGroup: 0,
@@ -115,6 +118,7 @@ export function sanitizeMocTemplate(raw: unknown): MocTemplate | null {
 	pick("columns", (v) => typeof v === "number" && v >= 1 && v <= MAX_MOC_COLUMNS);
 	pick("assignments", (v) => isRecord(v) && Object.keys(v).every((k) => typeof v[k] === "number"));
 	pick("sort", (v) => v === "name" || v === "modified" || v === "created");
+	pick("sortReverse", (v) => typeof v === "boolean");
 	pick("showHeadings", (v) => typeof v === "boolean");
 	pick("showBullets", (v) => typeof v === "boolean");
 	pick("maxPerGroup", (v) => typeof v === "number" && v >= 0);

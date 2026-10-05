@@ -35,6 +35,13 @@ const SORT_OPTIONS: Record<MocSort, string> = {
 	created: "Created",
 };
 
+/** What the reverse toggle does for each sort, shown under it. */
+const REVERSE_SORT_DESC: Record<MocSort, string> = {
+	name: "Off: A to Z. On: Z to A.",
+	modified: "Off: most recently modified first. On: least recently modified first.",
+	created: "Off: newest first. On: oldest first.",
+};
+
 const MATCH_OPTIONS: Record<MocMatch, string> = {
 	all: "Match all sources",
 	any: "Match any source",
@@ -299,11 +306,22 @@ export class MocForm extends Component {
 					template.columns = value;
 					await change();
 				}));
-		new Setting(body).setName("Sort notes by").addDropdown((dd) => dd
+		const sortSetting = new Setting(body).setName("Sort notes by");
+		const reverseSetting = new Setting(body)
+			.setName("Reverse sort order")
+			.setDesc(REVERSE_SORT_DESC[template.sort])
+			.addToggle((toggle) => toggle
+				.setValue(template.sortReverse)
+				.onChange(async (value) => {
+					template.sortReverse = value;
+					await change();
+				}));
+		sortSetting.addDropdown((dd) => dd
 			.addOptions(SORT_OPTIONS)
 			.setValue(template.sort)
 			.onChange(async (value) => {
 				template.sort = value as MocSort;
+				reverseSetting.setDesc(REVERSE_SORT_DESC[template.sort]);
 				await change();
 			}));
 		if (template.groupBy !== "none") {
