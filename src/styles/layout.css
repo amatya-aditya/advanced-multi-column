@@ -59,10 +59,16 @@
 	order: 2;
 }
 
-/* The sizer box no longer applies readable line width to its children. */
+/* The sizer box no longer applies readable line width to its children.
+   Themes that size content with their own variable (Minimal sets
+   --content-line-width from its line width settings) set it here too. */
+.markdown-preview-view.amc-reading-columns-active.is-readable-line-width {
+	--amc-reading-line-width: var(--content-line-width, var(--file-line-width));
+}
+
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > * {
 	width: 100%;
-	max-width: var(--file-line-width);
+	max-width: var(--amc-reading-line-width);
 	margin-inline: auto;
 }
 
@@ -94,12 +100,12 @@
 	box-sizing: border-box;
 }
 
-/* When readable line width is on, cap host and footer to the file line width */
+/* When readable line width is on, cap host and footer to the note line width */
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > .amc-reading-columns-host,
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .markdown-preview-sizer > .mod-footer,
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .amc-reading-columns-host,
 .markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .mod-footer {
-	max-width: var(--file-line-width);
+	max-width: var(--amc-reading-line-width);
 	margin: 0 auto;
 }
 
