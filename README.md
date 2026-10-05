@@ -78,27 +78,34 @@ You always see the full layout, making multi-column editing feel natural instead
 <table>
   <tr>
     <td width="50%" valign="top"><img src="assets/demo-headers.png" alt="Column headers and coloured backgrounds"><br><sub>Column headers and coloured backgrounds</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-separator.png" alt="Dashed separator between columns"><br><sub>Dashed separator between columns</sub></td>
+  </tr>
+  <tr>
     <td width="50%" valign="top"><img src="assets/demo-live-edit.png" alt="Editing a column in place — the other columns stay rendered"><br><sub>Editing a column in place — the other columns stay rendered</sub></td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top"><img src="assets/demo-sidebar-image.png" alt="Sidebar with an image, headers in Reading view"><br><sub>Sidebar with an image, headers in Reading view</sub></td>
-    <td width="50%" valign="top"><img src="assets/demo-nested.png" alt="Nested (child) columns"><br><sub>Nested (child) columns</sub></td>
-  </tr>
-  <tr>
     <td width="50%" valign="top"><img src="assets/demo-stacked.png" alt="Stacked rows beside a wide column"><br><sub>Stacked rows beside a wide column</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/columnwithheader.png" alt="Coloured column headers with icons"><br><sub>Coloured column headers with icons</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-context-menu_2.png" alt="Right-click → Insert layout: ready-made layouts"><br><sub>Right-click → Insert layout: ready-made layouts</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-nested.png" alt="Nested (child) columns"><br><sub>Nested (child) columns</sub></td>
     <td width="50%" valign="top"><img src="assets/demo-cornell.png" alt="Cornell notes layout"><br><sub>Cornell notes layout</sub></td>
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="assets/demo-moc.png" alt="MOC: auto-updating map of notes, by subfolder and by property"><br><sub>MOC: auto-updating map of notes, by subfolder and by property</sub></td>
-    <td width="50%" valign="top"><img src="assets/demo-separator.png" alt="Dashed separator between columns"><br><sub>Dashed separator between columns</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-moc-dialog-preview.png" alt="New MOC dialog with a live preview"><br><sub>New MOC dialog with a live preview</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top"><img src="assets/demo-sidebar-image.png" alt="Sidebar with an image, headers in Reading view"><br><sub>Sidebar with an image, headers in Reading view</sub></td>
+    <td width="50%" valign="top"><img src="assets/demo-blank.png" alt="Blank layouts, ready to fill"><br><sub>Blank layouts, ready to fill</sub></td>
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="assets/demo-context-menu.png" alt="Right-click in a note: insert columns, layouts and MOCs"><br><sub>Right-click in a note: insert columns, layouts and MOCs</sub></td>
     <td width="50%" valign="top"><img src="assets/demo-column-menu.png" alt="Right-click a column: style it, add, edit or delete"><br><sub>Right-click a column: style it, add, edit or delete</sub></td>
   </tr>
   <tr>
-    <td width="50%" valign="top"><img src="assets/demo-moc-dialog-preview.png" alt="New MOC dialog with a live preview"><br><sub>New MOC dialog with a live preview</sub></td>
-    <td width="50%" valign="top"><img src="assets/blank-column.png" alt="Blank layouts, ready to fill"><br><sub>Blank layouts, ready to fill</sub></td>
+    <td colspan="2" align="center"><img src="assets/blank-column.png" alt="Nested blank columns — edit one while the rest stay rendered" width="60%"><br><sub>Nested blank columns — edit one while the rest stay rendered</sub></td>
   </tr>
 </table>
 
