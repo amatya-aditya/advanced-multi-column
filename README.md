@@ -45,6 +45,34 @@ Create interactive, nested multi-column layouts — without losing sibling colum
   <a href="#troubleshooting">Troubleshooting</a>
 </p>
 
+## Why this plugin?
+
+The problem with existing multi-column plugin? In **Live Preview**, when you click into one column to edit it, Obsidian collapses the entire block — **sibling columns disappear**, replaced by raw markup. You lose all visual context of the layout while editing.
+
+**Advanced Multi Column** fixes this. 
+It uses lightweight comment markers (`%% col-start %%`, `%% col-break %%`, `%% col-end %%`) instead of wrapping content in a single callout or codeblock. 
+This means when you edit one column, **the other columns stay rendered**. 
+You always see the full layout, making multi-column editing feel natural instead of fighting the editor.
+
+
+## Features
+
+- **Marker-based syntax** — `%% col-start %%`, `%% col-break %%`, `%% col-end %%`
+- **Live Preview + Reading View** — renders in both modes, toggleable independently
+- **Nested columns** — columns inside columns, unlimited depth
+- **Drag to reorder** — grab handle or Alt+drag to rearrange columns
+- **Resize by dragging** — drag the vertical divider between columns
+- **Right-click style popover** — per-column and container styling
+- **Inline editing** — click to edit with live markdown preview
+- **Wikilink autocomplete** — `[[` triggers file suggestions inside column editors
+- **Image paste** — paste images to auto-save and insert `![[image.png]]`
+- **Colored column headers** — start a column with `!tip: Title` for a colored header bar with an icon; built-in `note`, `info`, `tip`, `warning` and `danger` types, plus your own custom types (icon, background, text color, size, weight)
+- **PDF export** — **Export to PDF** keeps your column layout, styles and headers instead of flattening them
+- **Style tokens** — portable styling via marker parameters (`b:`, `bc:`, `t:`, `sb:`, `hd:`)
+- **Quick add/remove** — `+` / `x` buttons in each column header
+- **Global settings** — default layout, colors, borders, dividers
+- **MOC (map of content)** — auto-updating columns of links to notes from a folder, tags or properties, grouped into columns you choose
+
 ## Screenshots
 
 <table>
@@ -70,38 +98,13 @@ Create interactive, nested multi-column layouts — without losing sibling colum
   </tr>
   <tr>
     <td width="50%" valign="top"><img src="assets/demo-moc-dialog-preview.png" alt="New MOC dialog with a live preview"><br><sub>New MOC dialog with a live preview</sub></td>
-    <td width="50%" valign="top"><img src="assets/demo-blank.png" alt="Blank layouts, ready to fill"><br><sub>Blank layouts, ready to fill</sub></td>
+    <td width="50%" valign="top"><img src="assets/blank-column.png" alt="Blank layouts, ready to fill"><br><sub>Blank layouts, ready to fill</sub></td>
   </tr>
 </table>
 
 <sub>Demo notes use text from Wikipedia (CC BY-SA 4.0) and images from Wikimedia Commons (each under its own free licence; see the linked articles).</sub>
 
 
-## Why this plugin?
-
-The problem with existing multi-column plugin? In **Live Preview**, when you click into one column to edit it, Obsidian collapses the entire block — **sibling columns disappear**, replaced by raw markup. You lose all visual context of the layout while editing.
-
-**Advanced Multi Column** fixes this. 
-It uses lightweight comment markers (`%% col-start %%`, `%% col-break %%`, `%% col-end %%`) instead of wrapping content in a single callout or codeblock. 
-This means when you edit one column, **the other columns stay rendered**. 
-You always see the full layout, making multi-column editing feel natural instead of fighting the editor.
-
-
-## Features
-
-- **Marker-based syntax** — `%% col-start %%`, `%% col-break %%`, `%% col-end %%`
-- **Live Preview + Reading View** — renders in both modes, toggleable independently
-- **Nested columns** — columns inside columns, unlimited depth
-- **Drag to reorder** — grab handle or Alt+drag to rearrange columns
-- **Resize by dragging** — drag the vertical divider between columns
-- **Right-click style popover** — per-column and container styling
-- **Inline editing** — click to edit with live markdown preview
-- **Wikilink autocomplete** — `[[` triggers file suggestions inside column editors
-- **Image paste** — paste images to auto-save and insert `![[image.png]]`
-- **Style tokens** — portable styling via marker parameters (`b:`, `bc:`, `t:`, `sb:`, `hd:`)
-- **Quick add/remove** — `+` / `x` buttons in each column header
-- **Global settings** — default layout, colors, borders, dividers
-- **MOC (map of content)** — auto-updating columns of links to notes from a folder, tags or properties, grouped into columns you choose
 
 ## Quick Start
 
@@ -222,6 +225,7 @@ Right-click any column to:
 
 - **General** — enable/disable live preview and reading view, default column count, minimum column width, drag handles
 - **MOC** — reusable MOC templates: sources (a fixed folder or the note's own folder, tags, properties), grouping, columns, and a live preview
+- **Column headers** — turn column headers on or off, edit the built-in header types and add your own
 - **Appearance** — style target (all or specific column), container background/border/radius/text, vertical and horizontal divider configuration
 
 ## MOC (map of content)
