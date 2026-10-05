@@ -4,6 +4,15 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.3.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.3.0) - 2026-10-05
+
+### Added
+- MOC: a **Reverse sort order** toggle under **Sort notes by**. It lists notes Z to A by name, or oldest first by **Last modified** or **Created** ([#26](https://github.com/amatya-aditya/advanced-multi-column/issues/26)).
+
+### Fixed
+- Live Preview: text typed in a column is now saved when you switch to another note without clicking outside the column first. Before, if the other note also had columns, the unsaved text could open in that note's column instead ([#25](https://github.com/amatya-aditya/advanced-multi-column/issues/25)).
+- Reading view: with the Minimal theme, notes with columns now follow Minimal's line width settings and line up with the properties block and the rest of the note ([#6](https://github.com/amatya-aditya/advanced-multi-column/issues/6)).
+
 ## [2.2.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.2.0) - 2026-10-03
 
 **Requires Obsidian 1.13.0 or newer.**
