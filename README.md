@@ -67,6 +67,7 @@ You always see the full layout, making multi-column editing feel natural instead
 - **Wikilink autocomplete** — `[[` triggers file suggestions inside column editors
 - **Image paste** — paste images to auto-save and insert `![[image.png]]`
 - **Colored column headers** — start a column with `!tip: Title` for a colored header bar with an icon; built-in `note`, `info`, `tip`, `warning` and `danger` types, plus your own custom types (icon, background, text color, size, weight)
+- **Footnotes in columns** — `[^1]` and inline `^[...]` footnotes work inside columns and tables in columns, numbered with the rest of the note and listed at the end of it
 - **PDF export** — **Export to PDF** keeps your column layout, styles and headers instead of flattening them
 - **Style tokens** — portable styling via marker parameters (`b:`, `bc:`, `t:`, `sb:`, `hd:`)
 - **Quick add/remove** — `+` / `x` buttons in each column header

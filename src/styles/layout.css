@@ -1248,3 +1248,19 @@
 	align-items: center;
 	gap: 8px;
 }
+
+/* Live Preview: footnote references in columns show their source, styled
+   like Obsidian's editor does (see render/footnote-render.ts). */
+.amc-columns-host sup.footnote-ref.amc-footref-source a.footnote-link {
+	color: var(--text-muted);
+	text-decoration: none;
+}
+
+.amc-columns-host sup.footnote-ref.amc-footref-source .amc-footref-mark {
+	color: var(--text-faint);
+}
+
+/* Footnote preview shown when a reference in a column is hovered. */
+.popover.hover-popover .amc-footnote-popover {
+	padding: var(--size-4-3) var(--size-4-4);
+}

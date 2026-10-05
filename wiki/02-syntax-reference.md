@@ -8,6 +8,27 @@ This is the exact marker syntax used by the plugin.
 2. A block starts at `%% col-start %%` and ends at `%% col-end %%`.
 3. Content before the first `%% col-break %%` in a block is ignored.
 
+## Footnotes
+
+Footnotes work in columns as in the rest of the note, including in tables inside columns:
+
+```markdown
+%% col-start %%
+%% col-break %%
+A claim that needs a source.[^1] An aside.^[Inline footnotes work too.]
+%% col-break %%
+| Item | Note |
+| ---- | ---- |
+| Row  | Cell with a footnote[^2] |
+%% col-end %%
+
+[^1]: Put definitions anywhere in the note, usually at the end.
+[^2]: A footnote used inside a table.
+```
+
+- **Reading view**: footnotes are numbered across the whole note in the order they first appear, and listed at the end of the note, as in Obsidian. Click a number to jump to its footnote, and ↩︎ to jump back.
+- **Live Preview**: references show as `[^label]` and `^[text]`, as in the editor. Hover one to preview the footnote; click a `[^label]` to move the cursor to its definition.
+
 ## Core markers
 
 | Marker | Purpose |

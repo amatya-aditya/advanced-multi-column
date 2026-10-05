@@ -17,6 +17,7 @@ import {isInteractivePreviewTarget} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
 import {refreshRegionPosition} from "../core/region-position";
 import {buildResizeHandle} from "./column-resizer";
+import {applyNoteFootnotes, livePreviewFootnotes, wireLivePreviewFootnotes} from "./footnote-render";
 import {wireDragItem} from "./column-drag";
 import {
 	insertColumnAfter,
@@ -229,7 +230,13 @@ export function renderMarkdown(
 		const component = new Component();
 		component.load();
 		ctx.components.push(component);
-		void MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component).then(() => {
+		// Columns render on their own; bring in the note's footnote
+		// definitions and numbers (see core/footnotes).
+		const footnotes = livePreviewFootnotes(ctx);
+		const piece = footnotes?.locate(content);
+		const markdown = footnotes ? footnotes.prepare(content, true) : content;
+		void MarkdownRenderer.render(plugin.app, markdown, parent, sourcePath, component).then(() => {
+			if (footnotes && piece) applyNoteFootnotes(parent, footnotes, piece, "live");
 			// Unwrap <p> inside <li> (loose lists) so parent items render
 			// identically to child items without block-level spacing artifacts.
 			unwrapLooseListParagraphs(parent);
@@ -1260,6 +1267,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 		iStateInit.selectionContainerEl = null;
 	}
 	ensureSelectionClearOnNormalClick(ctx.view);
+	wireLivePreviewFootnotes(container, ctx.view, getPluginInstance().app, ctx.sourcePath);
 
 	// Clear column selection on regular (non-Ctrl/Meta) clicks anywhere in the container
 	container.addEventListener("click", (e: MouseEvent) => {
