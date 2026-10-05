@@ -671,6 +671,7 @@ function wireTopLevelEditToggle(
 		onEnterEdit: () => {
 			plugin.app.keymap.pushScope(editScope);
 			getInteractionState(ctx.view).activeEdit = {
+				filePath: ctx.sourcePath,
 				regionFrom: ctx.region.from,
 				key: `c${index}`,
 				cursorStart: textarea.value.length,
@@ -781,7 +782,7 @@ function wireTopLevelEditToggle(
 			}
 			window.requestAnimationFrame(() => {
 				const iState = getInteractionState(ctx.view);
-				if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${index}`) {
+				if (iState.activeEdit && iState.activeEdit.filePath === ctx.sourcePath && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${index}`) {
 					iState.activeEdit.cursorStart = textarea.selectionStart;
 					iState.activeEdit.cursorEnd = textarea.selectionEnd;
 					iState.activeEdit.scrollTop = textarea.scrollTop;
@@ -794,7 +795,7 @@ function wireTopLevelEditToggle(
 
 	textarea.addEventListener("input", () => {
 		const iStateInput = getInteractionState(ctx.view);
-		if (iStateInput.activeEdit && iStateInput.activeEdit.regionFrom === ctx.region.from && iStateInput.activeEdit.key === `c${index}`) {
+		if (iStateInput.activeEdit && iStateInput.activeEdit.filePath === ctx.sourcePath && iStateInput.activeEdit.regionFrom === ctx.region.from && iStateInput.activeEdit.key === `c${index}`) {
 			iStateInput.activeEdit.value = textarea.value;
 		}
 	});
@@ -1412,7 +1413,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						wireTopLevelEditToggle(container, previewEl, textarea, i, suggest, slashSuggest, tpSuggest, ctx);
 
 						const iState = getInteractionState(ctx.view);
-						if (iState.activeEdit && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${i}`) {
+						if (iState.activeEdit && iState.activeEdit.filePath === ctx.sourcePath && iState.activeEdit.regionFrom === ctx.region.from && iState.activeEdit.key === `c${i}`) {
 							restoreEditState(textarea, ctx.view);
 						}
 					}

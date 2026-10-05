@@ -16,6 +16,11 @@ export interface ContainerPathEntry {
 export type ContainerPath = ContainerPathEntry[];
 
 export interface ActiveEditState {
+	/**
+	 * Note the edit belongs to. The editor view outlives a note switch in its
+	 * tab, so offsets and keys alone can match a block in the next note.
+	 */
+	filePath: string;
 	regionFrom: number;
 	/** Source text of the block when editing started (see live-edit). */
 	regionSource?: string;

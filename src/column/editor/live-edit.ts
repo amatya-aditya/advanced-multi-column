@@ -75,8 +75,12 @@ export interface LiveEditHandle {
 const EDIT_KEY_ATTR = "data-amc-edit-key";
 const RESTORE_EVENT = "amc-restore-edit";
 
-function matchesEditState(st: ActiveEditState | null, editState: LiveEditState): st is ActiveEditState {
-	if (!st || st.key !== editState.key) return false;
+function matchesEditState(
+	st: ActiveEditState | null,
+	editState: LiveEditState,
+	filePath: string,
+): st is ActiveEditState {
+	if (!st || st.key !== editState.key || st.filePath !== filePath) return false;
 	refreshRegionPosition(editState.region);
 	if (st.regionFrom === editState.region.from) return true;
 	// A whole-file reload invalidates offsets; then fall back to identical
@@ -202,6 +206,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			// the rebuilt sibling editor re-opens from this state.
 			refreshRegionPosition(editState.region);
 			getInteractionState(editState.view).activeEdit = {
+				filePath: sourcePath,
 				regionFrom: editState.region.from,
 				regionSource: editState.regionSource,
 				key: target.key,
@@ -232,6 +237,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		// the interaction state.
 		refreshRegionPosition(editState.region);
 		getInteractionState(editState.view).activeEdit = {
+			filePath: sourcePath,
 			regionFrom: editState.region.from,
 			regionSource: editState.regionSource,
 			key: editState.key,
@@ -338,7 +344,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 	const restorePending = () => {
 		if (active) return;
 		const st = getInteractionState(editState.view).activeEdit;
-		if (!matchesEditState(st, editState)) return;
+		if (!matchesEditState(st, editState, sourcePath)) return;
 		enterEdit({value: st.value, cursorStart: st.cursorStart, cursorEnd: st.cursorEnd}, true);
 	};
 
@@ -350,7 +356,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 	// state now (synchronously, inside the rebuild) and open it once the new
 	// DOM is attached.
 	const pending = getInteractionState(editState.view).activeEdit;
-	if (matchesEditState(pending, editState)) {
+	if (matchesEditState(pending, editState, sourcePath)) {
 		pending.owner = owner;
 		pending.orphaned = false;
 		queueMicrotask(() => {
