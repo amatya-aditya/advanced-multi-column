@@ -129,6 +129,8 @@
 }
 
 .columns-container {
+	/* Space between columns stacked on top of each other. */
+	--amc-stack-gap: 8px;
 	--columns-block-default-border-width: var(--amc-container-border-width, 1px);
 	--columns-block-default-border-color: var(--amc-container-border-color, var(--background-modifier-border));
 	/* Structural flex layout. Some themes force a div's display with their own
@@ -1020,6 +1022,8 @@
 
 .columns-container.columns-stacked {
 	flex-direction: column;
+	/* Keep bordered or tinted columns from touching. */
+	gap: var(--amc-stack-gap);
 }
 
 .columns-container.columns-stacked > .column-item {
@@ -1077,8 +1081,8 @@
 	flex: 1 1 0%;
 	min-width: 0;
 	align-items: stretch;
-	gap: 4px;
-	padding:0 4px;
+	gap: var(--amc-stack-gap);
+	padding: 0 4px;
 }
 
 .columns-container .columns-stack-group > .column-item {
