@@ -73,7 +73,7 @@ Unsaved column text is never dropped when a block re-renders: if the note change
 |---|---|
 | Click `+` | Add sibling (respects stacked context) |
 | `Ctrl/Cmd + Click` `+` | Add opposite type (stacked → non-stacked, non-stacked → stacked) |
-| Click `x` | Remove the column (shown when the block has more than one column) |
+| Click `×` | Remove the column (shown when the block has more than one column). A column with content asks first: `×` becomes **Delete?**, and a second click removes it. |
 
 ## Column multi-select behavior
 

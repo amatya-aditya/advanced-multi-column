@@ -70,7 +70,7 @@ You always see the full layout, making multi-column editing feel natural instead
 - **Footnotes in columns** — `[^1]` and inline `^[...]` footnotes work inside columns and tables in columns, numbered with the rest of the note and listed at the end of it
 - **PDF export** — **Export to PDF** keeps your column layout, styles and headers instead of flattening them
 - **Style tokens** — portable styling via marker parameters (`b:`, `bc:`, `t:`, `sb:`, `hd:`)
-- **Quick add/remove** — `+` / `x` buttons in each column header
+- **Quick add/remove** — `+` / `×` buttons on each column; removing a column with content asks first
 - **Global settings** — default layout, colors, borders, dividers
 - **MOC (map of content)** — auto-updating columns of links to notes from a folder, tags or properties, grouped into columns you choose
 
@@ -215,8 +215,8 @@ Nested content.
 - **`[[`** — wikilink suggestions
 - **Ctrl/Cmd+B** — bold, **Ctrl/Cmd+I** — italic
 - **Paste image** — auto-saves and inserts `![[...]]`
-- **Drag handle** or **Alt+drag** — reorder columns
-- **`+`** — add column, **`x`** — remove column
+- **Drag handle** (top-left of a column) or **Alt+drag** — reorder columns
+- **`+`** — add column, **`×`** — remove column (asks first if the column has content)
 
 ## Right-Click Style Popover
 

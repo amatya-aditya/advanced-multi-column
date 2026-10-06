@@ -19,7 +19,7 @@ Right
 
 ## B. Container stack layout (`l:stack`)
 
-All top-level columns render vertically.
+All top-level columns render vertically. Stacked columns are spaced 8px apart, so bordered or tinted columns don't touch.
 
 ```md
 %% col-start:l:stack %%
@@ -36,7 +36,7 @@ Row 3
 
 ## C. Per-group stacking (`stk:<id>`)
 
-Only consecutive columns with same stack ID are stacked together.
+Only consecutive columns with same stack ID are stacked together. To stack a column with its neighbour from the menu, right-click it and turn on **Stack with next column** (This column tab).
 
 ```md
 %% col-start %%

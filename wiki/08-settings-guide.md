@@ -35,7 +35,7 @@ Requires Obsidian 1.13 or newer.
 
 ### Show drag handles
 
-1. Turns header grip visibility on/off.
+1. Shows or hides the drag grip at each column's top-left corner.
 2. You can still use `Alt+drag` on column body.
 
 ### Inherit style on add
