@@ -165,7 +165,31 @@ function cloneColumns(columns: ColumnData[]): ColumnData[] {
 	}));
 }
 
-function closeActivePopover(): void {
+const TARGET_CLASS = "amc-menu-target";
+let highlighted: HTMLElement[] = [];
+
+function clearTargetHighlight(): void {
+	for (const el of highlighted) el.removeClass(TARGET_CLASS);
+	highlighted = [];
+}
+
+/** Outline what the active tab changes: the column(s), or the whole box. */
+function highlightTarget(menuData: ColumnStyleContextMenuData, indices: Set<number>): void {
+	clearTargetHighlight();
+	const container = menuData.containerEl;
+	if (!container?.isConnected) return;
+	if (activeTab === "column") {
+		const items = getColumnElements(container);
+		highlighted = [...indices].map((i) => items[i]).filter((el): el is HTMLElement => !!el);
+	} else {
+		highlighted = [container];
+	}
+	for (const el of highlighted) el.addClass(TARGET_CLASS);
+}
+
+/** Close the style menu, saving any pending change (also on plugin unload). */
+export function closeActivePopover(): void {
+	clearTargetHighlight();
 	if (pendingFlush) {
 		pendingFlush();
 		pendingFlush = null;
@@ -798,6 +822,8 @@ function toggleStacked(
 	state: PopoverRenderState,
 	indices: Set<number>,
 	allStacked: boolean,
+	/** Stack group to join instead of starting a new one. */
+	joinId?: number,
 ): void {
 	if (allStacked) {
 		const split = splitStackGroup(state.columns, indices);
@@ -810,15 +836,66 @@ function toggleStacked(
 				.filter((col) => col.stacked && col.stacked > 0)
 				.map((col) => col.stacked!),
 		);
-		let nextId = 1;
-		while (usedIds.has(nextId)) nextId++;
+		let nextId = joinId ?? 1;
+		while (joinId === undefined && usedIds.has(nextId)) nextId++;
 		state.columns = state.columns.map((col, idx) =>
 			indices.has(idx) ? {...col, stacked: nextId} : col,
 		);
 	}
+	// A stack of one column is not a stack: drop its leftover id.
+	const groupSizes = new Map<number, number>();
+	for (const col of state.columns) {
+		if (col.stacked && col.stacked > 0) groupSizes.set(col.stacked, (groupSizes.get(col.stacked) ?? 0) + 1);
+	}
+	state.columns = state.columns.map((col) =>
+		col.stacked && groupSizes.get(col.stacked) === 1 ? {...col, stacked: undefined} : col,
+	);
 	pendingFlush = null;
 	menuData.onChange(state.columns, state.containerStyle);
 	closeActivePopover();
+}
+
+/**
+ * Stack columns on top of each other inside a side-by-side block (the Block
+ * tab's Stacked layout stacks the whole block instead). One column is
+ * stacked together with its neighbour; several selected columns with each
+ * other.
+ */
+function renderStackToggle(
+	body: HTMLElement,
+	menuData: ColumnStyleContextMenuData,
+	state: PopoverRenderState,
+	indices: Set<number>,
+	index: number,
+): void {
+	if (state.layout === "stack") return;
+
+	if (indices.size > 1) {
+		const allStacked = [...indices].every((i) => (state.columns[i]?.stacked ?? 0) > 0);
+		createToggle(createRow(body, "Stack selected columns"), "Stack selected columns", allStacked, () =>
+			toggleStacked(menuData, state, indices, allStacked),
+		);
+		return;
+	}
+
+	const col = state.columns[index];
+	const prev = state.columns[index - 1];
+	const next = state.columns[index + 1];
+	if (!col || (!prev && !next)) return;
+
+	const stackId = col.stacked ?? 0;
+	const withNext = stackId > 0 ? next?.stacked === stackId : !!next;
+	const neighbourIndex = withNext ? index + 1 : index - 1;
+	const label = withNext ? "Stack with next column" : "Stack with previous column";
+	createToggle(createRow(body, label), label, stackId > 0, () => {
+		if (stackId > 0) {
+			toggleStacked(menuData, state, indices, true);
+			return;
+		}
+		// Join the neighbour's stack, or start a new one with it.
+		const neighbourId = state.columns[neighbourIndex]?.stacked ?? 0;
+		toggleStacked(menuData, state, new Set([index, neighbourIndex]), false, neighbourId > 0 ? neighbourId : undefined);
+	});
 }
 
 function renderColumnTab(
@@ -858,10 +935,7 @@ function renderColumnTab(
 		patch({leftBorder: eff.leftBorder ? undefined : true}),
 	);
 
-	const allStacked = [...indices].every((i) => (state.columns[i]?.stacked ?? 0) > 0);
-	createToggle(createRow(body, "Stacked"), "Stacked", allStacked, () =>
-		toggleStacked(menuData, state, indices, allStacked),
-	);
+	renderStackToggle(body, menuData, state, indices, index);
 
 	// A separator is drawn after a column, so the last column has none.
 	const isLast = indices.size === 1 && index === state.columns.length - 1;
@@ -947,13 +1021,13 @@ function renderBlockTab(
 	}
 
 	createDropdown(createRow(body, "Background"), {
-		label: "Block background",
+		label: "Box background",
 		value: eff.background,
 		options: BACKGROUND_OPTION_ITEMS,
 		onChange: (value) => patch({background: value}),
 	});
 	createDropdown(createRow(body, "Text color"), {
-		label: "Block text color",
+		label: "Box text color",
 		value: eff.textColor,
 		options: STYLE_COLOR_OPTION_ITEMS,
 		onChange: (value) => patch({textColor: value}),
@@ -961,18 +1035,34 @@ function renderBlockTab(
 
 	const border = createRow(body, "Border");
 	createDropdown(border, {
-		label: "Block border color",
+		label: "Box border color",
 		value: eff.borderColor,
 		options: STYLE_COLOR_OPTION_ITEMS,
 		disabled: !eff.showBorder,
 		onChange: (value) => patch({borderColor: value}),
 	});
-	createToggle(border, "Block border", eff.showBorder, () => {
+	createToggle(border, "Box border", eff.showBorder, () => {
 		const nextShow = !eff.showBorder;
 		// Matching the global setting again means "follow the global setting".
 		const followsGlobal = nextShow === eff.globalBorder && state.containerStyle?.borderColor === undefined;
 		patch({showBorder: followsGlobal ? undefined : nextShow});
 	});
+}
+
+/** One line saying exactly what the active tab's settings change. */
+function scopeHint(menuData: ColumnStyleContextMenuData, state: PopoverRenderState, sorted: number[]): string {
+	if (activeTab === "column") {
+		// "nested" keeps it apart from the parent column the header names.
+		const which = menuData.parentIndex !== undefined ? "nested column" : "column";
+		return sorted.length > 1
+			? `Only ${which}s ${sorted.map((i) => i + 1).join(", ")}.`
+			: `Only ${which} ${(sorted[0] ?? menuData.columnIndex) + 1}.`;
+	}
+	const count = state.columns.length;
+	if (menuData.parentIndex !== undefined) {
+		return `The box around the ${count} columns nested in column ${menuData.parentIndex}.`;
+	}
+	return count === 1 ? "The box around the column." : `The box around all ${count} columns.`;
 }
 
 function renderPopoverContent(
@@ -1012,8 +1102,8 @@ function renderPopoverContent(
 	createSegmented(popover, {
 		value: activeTab,
 		options: [
-			{value: "column", label: sorted.length > 1 ? "Columns" : "Column"},
-			{value: "block", label: menuData.parentIndex !== undefined ? "Nested block" : "Block"},
+			{value: "column", label: sorted.length > 1 ? "These columns" : "This column"},
+			{value: "block", label: "All columns"},
 		],
 		cls: "amc-menu-tabs",
 		onChange: (value) => {
@@ -1021,6 +1111,9 @@ function renderPopoverContent(
 			renderPopoverContent(popover, menuData, state);
 		},
 	});
+
+	popover.createDiv({cls: "amc-menu-scope", text: scopeHint(menuData, state, sorted)});
+	highlightTarget(menuData, indices);
 
 	const body = popover.createDiv({cls: "amc-menu-body"});
 	if (activeTab === "column") {
@@ -1031,7 +1124,7 @@ function renderPopoverContent(
 
 	const footer = popover.createDiv({cls: "amc-menu-footer"});
 	createTextAction(footer, {
-		label: activeTab === "column" ? "Reset column" : "Reset block",
+		label: activeTab === "column" ? (sorted.length > 1 ? "Reset columns" : "Reset column") : "Reset box",
 		onClick: () => {
 			if (activeTab === "column") patchStylesAndRerender(menuData, state, CLEAR_STYLE_PATCH);
 			else patchContainerStyleAndRerender(menuData, state, CLEAR_STYLE_PATCH);

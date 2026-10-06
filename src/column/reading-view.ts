@@ -8,6 +8,8 @@ import {
 	TFile,
 } from "obsidian";
 import {findColumnRegions} from "./core/parser";
+import {NoteFootnotes} from "./core/footnotes";
+import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "./core/column-style";
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
 import type {ColumnRegion} from "./core/types";
@@ -367,7 +369,10 @@ const LAYER_RENDER_WAIT_MS = 40;
  * blocks then render in parallel instead of one after another, which made
  * opening a note with many columns slow.
  */
-type RenderTasks = Promise<unknown>[];
+type RenderTasks = Promise<unknown>[] & {
+	/** The note's footnotes, when the whole note is rendered (see buildWrapper). */
+	footnotes?: NoteFootnotes | null;
+};
 
 function renderMarkdownInto(
 	plugin: ColumnsPlugin,
@@ -377,7 +382,17 @@ function renderMarkdownInto(
 	sourcePath: string,
 	tasks: RenderTasks,
 ): void {
-	tasks.push(MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component));
+	const footnotes = tasks.footnotes;
+	if (!footnotes) {
+		tasks.push(MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component));
+		return;
+	}
+	// Pieces are located in source order, so do it before rendering starts.
+	const piece = footnotes.locate(markdown);
+	tasks.push(
+		MarkdownRenderer.render(plugin.app, footnotes.prepare(markdown), el, sourcePath, component)
+			.then(() => applyNoteFootnotes(el, footnotes, piece, "reading")),
+	);
 }
 
 function renderMarkdownSegment(
@@ -579,6 +594,7 @@ async function buildWrapper(
 	// (stored by Obsidian as lines) map onto this layer — see reading-scroll.
 	const lineOf = createLineIndex(text);
 	const tasks: RenderTasks = [];
+	tasks.footnotes = NoteFootnotes.parse(text);
 	let cursor = getFrontmatterEnd(text);
 	for (const region of regions) {
 		const before = text.slice(cursor, region.from);
@@ -591,6 +607,14 @@ async function buildWrapper(
 	const after = text.slice(cursor);
 	const tail = renderMarkdownSegment(plugin, component, wrapper, after, sourcePath, tasks);
 	tagSourceLines(tail, lineOf(cursor), lineOf(text.length));
+	// Each piece above was rendered on its own, so the note's footnote list
+	// is built here, as Obsidian does at the end of a note.
+	if (tasks.footnotes) {
+		const footnoteTasks = buildFootnoteSection(wrapper, tasks.footnotes, (el, markdown) =>
+			MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component));
+		tasks.push(...footnoteTasks);
+		wireReadingFootnotes(wrapper, plugin.app, sourcePath);
+	}
 	// Text is rendered synchronously; what the promises wait for is mostly
 	// slow embeds and other plugins' post-processors. Wait briefly so the
 	// layer usually appears complete, but never hold the whole note back for

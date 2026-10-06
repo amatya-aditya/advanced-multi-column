@@ -129,6 +129,8 @@
 }
 
 .columns-container {
+	/* Space between columns stacked on top of each other. */
+	--amc-stack-gap: 8px;
 	--columns-block-default-border-width: var(--amc-container-border-width, 1px);
 	--columns-block-default-border-color: var(--amc-container-border-color, var(--background-modifier-border));
 	/* Structural flex layout. Some themes force a div's display with their own
@@ -338,7 +340,57 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 0px;
+	/* Keep add and remove apart so a slightly-off click on add does not
+	   hit remove (remove also asks before deleting content). */
+	gap: 6px;
+}
+
+/* Drag handle: top-left, inside the column's left padding, so it covers no
+   text. Shown like the toolbar: on hover and while editing. */
+.columns-container .column-item > .column-drag-gutter {
+	position: absolute;
+	top: 6px;
+	left: 0;
+	width: var(--amc-col-pad-inline, 14px);
+	display: flex;
+	justify-content: center;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+	z-index: 5;
+}
+
+.columns-container .column-item:hover > .column-drag-gutter,
+.columns-container .column-item.is-editing > .column-drag-gutter {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.columns-container .column-drag-gutter > .column-drag-handle {
+	padding: 2px 0;
+	width: 100%;
+}
+
+.columns-container .column-drag-gutter > .column-drag-handle .svg-icon {
+	width: min(14px, var(--amc-col-pad-inline, 14px));
+	/* Toward the border, away from the text: the icon's dots sit in its
+	   middle, so centred they came within ~4px of the text. */
+	transform: translateX(-3px);
+}
+
+/* Second step of removing a column with content. */
+.columns-container .column-remove-btn.is-confirming {
+	color: var(--text-on-accent);
+	background: var(--background-modifier-error);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	padding: 2px 6px;
+	white-space: nowrap;
+}
+
+.columns-container .column-remove-btn.is-confirming:hover {
+	color: var(--text-on-accent);
+	background: var(--background-modifier-error-hover, var(--background-modifier-error));
 }
 
 .columns-container .column-item:hover .column-toolbar,
@@ -420,9 +472,11 @@
 
 /* A nested block and the text around it are separate blocks in the source
    (markers need their own lines), so keep a paragraph-sized gap between
-   them. Must outrank the div margin reset below. */
+   them. Must outrank the div margin reset below: the text after a nested
+   block is a div, so `+ *` would lose to it and the text would touch the
+   block in Live Preview; `:not(...)` adds the needed weight. */
 .columns-container .column-item .column-preview.markdown-rendered > .columns-nested:not(:first-child),
-.columns-container .column-item .column-preview.markdown-rendered > .columns-nested + * {
+.columns-container .column-item .column-preview.markdown-rendered > .columns-nested + :not(.columns-nested) {
 	margin-top: 1em;
 }
 
@@ -746,6 +800,25 @@
 	cursor: text;
 }
 
+/* The editor carries Obsidian's `cm-table-widget` class (for Obsidian's own
+   nested-editor styling), so it also gets the box geometry meant for real
+   tables. Obsidian pulls the widget out by --size-4-4 on each side (a
+   negative margin it forces) and pads it by the table drag-handle size,
+   which is larger on mobile, so the text moved when editing started; themes
+   may also widen and centre table widgets with an offset and a transform.
+   Pin the box instead: no offset or transform, full column width, and side
+   padding equal to Obsidian's pull-out, so the editing text starts exactly
+   where the column's text does. The qualifiers outrank
+   `.markdown-source-view.mod-cm6 .cm-table-widget`. */
+.columns-container .column-item .amc-embedded-editor.cm-table-widget {
+	left: auto;
+	right: auto;
+	transform: none;
+	width: 100%;
+	max-width: none;
+	padding: 0 var(--size-4-4);
+}
+
 .columns-container .amc-embedded-editor .markdown-source-view.mod-cm6 {
 	padding: 0;
 	background: transparent;
@@ -1020,6 +1093,8 @@
 
 .columns-container.columns-stacked {
 	flex-direction: column;
+	/* Keep bordered or tinted columns from touching. */
+	gap: var(--amc-stack-gap);
 }
 
 .columns-container.columns-stacked > .column-item {
@@ -1077,8 +1152,8 @@
 	flex: 1 1 0%;
 	min-width: 0;
 	align-items: stretch;
-	gap: 4px;
-	padding:0 4px;
+	gap: var(--amc-stack-gap);
+	padding: 0 4px;
 }
 
 .columns-container .columns-stack-group > .column-item {
@@ -1247,4 +1322,20 @@
 	flex-direction: row;
 	align-items: center;
 	gap: 8px;
+}
+
+/* Live Preview: footnote references in columns show their source, styled
+   like Obsidian's editor does (see render/footnote-render.ts). */
+.amc-columns-host sup.footnote-ref.amc-footref-source a.footnote-link {
+	color: var(--text-muted);
+	text-decoration: none;
+}
+
+.amc-columns-host sup.footnote-ref.amc-footref-source .amc-footref-mark {
+	color: var(--text-faint);
+}
+
+/* Footnote preview shown when a reference in a column is hovered. */
+.popover.hover-popover .amc-footnote-popover {
+	padding: var(--size-4-3) var(--size-4-4);
 }

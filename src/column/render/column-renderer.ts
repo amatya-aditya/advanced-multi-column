@@ -17,6 +17,7 @@ import {isInteractivePreviewTarget} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
 import {refreshRegionPosition} from "../core/region-position";
 import {buildResizeHandle} from "./column-resizer";
+import {applyNoteFootnotes, livePreviewFootnotes, wireLivePreviewFootnotes} from "./footnote-render";
 import {wireDragItem} from "./column-drag";
 import {
 	insertColumnAfter,
@@ -229,7 +230,13 @@ export function renderMarkdown(
 		const component = new Component();
 		component.load();
 		ctx.components.push(component);
-		void MarkdownRenderer.render(plugin.app, content, parent, sourcePath, component).then(() => {
+		// Columns render on their own; bring in the note's footnote
+		// definitions and numbers (see core/footnotes).
+		const footnotes = livePreviewFootnotes(ctx);
+		const piece = footnotes?.locate(content);
+		const markdown = footnotes ? footnotes.prepare(content, true) : content;
+		void MarkdownRenderer.render(plugin.app, markdown, parent, sourcePath, component).then(() => {
+			if (footnotes && piece) applyNoteFootnotes(parent, footnotes, piece, "live");
 			// Unwrap <p> inside <li> (loose lists) so parent items render
 			// identically to child items without block-level spacing artifacts.
 			unwrapLooseListParagraphs(parent);
@@ -511,9 +518,9 @@ function wireColumnSelection(
 	view: EditorView,
 ): void {
 	item.addEventListener("click", (e: MouseEvent) => {
-		// Let toolbar action buttons (add/drag) handle their own Ctrl+Click
+		// Let toolbar buttons and the drag handle handle their own Ctrl+Click
 		const target = e.target as HTMLElement;
-		if (target.closest(".column-toolbar-actions")) return;
+		if (target.closest(".column-toolbar-actions, .column-drag-gutter")) return;
 		// Ctrl/Cmd+Click on a link opens it in a new tab; never turn it into
 		// a column selection (this capture listener would swallow the click).
 		if (target.closest(".amc-embedded-editor")) return;
@@ -592,15 +599,60 @@ export function wireContextMenu(
 
 // ── Toolbar Remove Button ───────────────────────────────────
 
-function buildRemoveButton(toolbarActions: HTMLElement, onRemove: () => void): void {
+/** How long the "Delete?" confirmation waits for the second click. */
+const REMOVE_CONFIRM_MS = 3000;
+
+/**
+ * Remove button. An empty column goes at once; a column with content asks
+ * first — the button turns into "Delete?" and only a second click removes
+ * it — so a click meant for the add button next to it loses nothing.
+ */
+function buildRemoveButton(
+	toolbarActions: HTMLElement,
+	onRemove: () => void,
+	isEmpty: () => boolean,
+): void {
 	const removeBtn = toolbarActions.createEl("button", {cls: "column-remove-btn"});
-	removeBtn.setAttribute("aria-label", "Remove column");
-	setIcon(removeBtn, "x");
+	let confirmTimer: number | null = null;
+
+	const reset = () => {
+		if (confirmTimer !== null) removeBtn.win.clearTimeout(confirmTimer);
+		confirmTimer = null;
+		removeBtn.removeClass("is-confirming");
+		removeBtn.empty();
+		setIcon(removeBtn, "x");
+		removeBtn.setAttribute("aria-label", "Remove column");
+	};
+	reset();
+
 	removeBtn.addEventListener("click", (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		onRemove();
+		if (confirmTimer !== null || isEmpty()) {
+			reset();
+			onRemove();
+			return;
+		}
+		removeBtn.addClass("is-confirming");
+		removeBtn.setText("Delete?");
+		removeBtn.setAttribute("aria-label", "Click again to remove this column");
+		confirmTimer = removeBtn.win.setTimeout(reset, REMOVE_CONFIRM_MS);
 	});
+	removeBtn.addEventListener("mouseleave", () => {
+		if (confirmTimer !== null) reset();
+	});
+}
+
+/**
+ * The drag handle sits on its own at the column's top-left, in the column's
+ * left padding, apart from the add and remove buttons on the right.
+ */
+function buildDragHandle(colEl: HTMLElement): HTMLElement {
+	const gutter = colEl.createDiv({cls: "column-drag-gutter"});
+	const dragHandle = gutter.createSpan({cls: "column-drag-handle"});
+	dragHandle.setAttribute("aria-label", "Drag to reorder");
+	setIcon(dragHandle, "grip-vertical");
+	return dragHandle;
 }
 
 // ── Commit Edit Helper ──────────────────────────────────────
@@ -1107,10 +1159,7 @@ function renderNestedRegion(
 			const colContent = renderColumnHeader(colEl, col.content);
 
 			const toolbar = colEl.createDiv({cls: "column-toolbar"});
-
-			const dragHandle = toolbar.createSpan({cls: "column-drag-handle"});
-			dragHandle.setAttribute("aria-label", "Drag to reorder");
-			setIcon(dragHandle, "grip-vertical");
+			const dragHandle = buildDragHandle(colEl);
 
 			const isStacked = !!(col.stacked && col.stacked > 0);
 			const addBtn = toolbar.createEl("button", {cls: "column-add-btn"});
@@ -1136,8 +1185,7 @@ function renderNestedRegion(
 
 			const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 			toolbarActions.appendChild(addBtn);
-			buildRemoveButton(toolbarActions, deleteNestedColumn);
-			toolbarActions.appendChild(dragHandle);
+			buildRemoveButton(toolbarActions, deleteNestedColumn, () => !region.columns[i]?.content.trim());
 
 			const hasNestedRegions = findColumnRegions(colContent).length > 0;
 			let liveEdit: LiveEditHandle | null = null;
@@ -1260,6 +1308,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 		iStateInit.selectionContainerEl = null;
 	}
 	ensureSelectionClearOnNormalClick(ctx.view);
+	wireLivePreviewFootnotes(container, ctx.view, getPluginInstance().app, ctx.sourcePath);
 
 	// Clear column selection on regular (non-Ctrl/Meta) clicks anywhere in the container
 	container.addEventListener("click", (e: MouseEvent) => {
@@ -1329,10 +1378,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
 				const toolbar = colEl.createDiv({cls: "column-toolbar"});
-
-				const dragHandle = toolbar.createSpan({cls: "column-drag-handle"});
-				dragHandle.setAttribute("aria-label", "Drag to reorder");
-				setIcon(dragHandle, "grip-vertical");
+				const dragHandle = buildDragHandle(colEl);
 
 				const isStacked = !!(col.stacked && col.stacked > 0);
 				const addBtn = toolbar.createEl("button", {cls: "column-add-btn"});
@@ -1355,8 +1401,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 
 				const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 				toolbarActions.appendChild(addBtn);
-				if (columns.length > 1) buildRemoveButton(toolbarActions, deleteColumn);
-				toolbarActions.appendChild(dragHandle);
+				if (columns.length > 1) buildRemoveButton(toolbarActions, deleteColumn, () => !columns[i]?.content.trim());
 
 				const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 				applyCompactPreviewSpacing(previewEl);

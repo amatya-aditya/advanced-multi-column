@@ -15,7 +15,7 @@ Details:
 
 ## Reorder columns by drag
 
-1. Drag the column grip handle (`⋮⋮`) to reorder.
+1. Drag the column grip (`⋮⋮`) at the column's top-left corner to reorder. It shows when you hover the column or edit it.
 2. Or hold `Alt` before mouse-down and drag the column body.
 3. Drop indicator shows before/after insertion position.
 
@@ -29,7 +29,7 @@ Advanced behavior:
 
 ### Add sibling
 
-1. Click `+` in a column header.
+1. Click `+` at the column's top-right.
 2. New column is inserted to the right (or below if stacked).
 3. Tooltip reflects context: "Add column to the right" for non-stacked, "Add stacked item below" for stacked columns.
 
@@ -47,8 +47,8 @@ Advanced behavior:
 
 ## Remove columns
 
-1. Click `×` in a column header.
-2. If more than one sibling exists, selected column is removed.
+1. Click `×` at the column's top-right, below `+`.
+2. If more than one sibling exists, the column is removed. If the column has content, `×` first turns into a red **Delete?** button; click it again to remove the column. Moving away or waiting 3 seconds cancels. An empty column is removed with one click.
 3. Widths are normalized/preserved based on stack context.
 
 Nested edge case:

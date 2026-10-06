@@ -51,7 +51,7 @@ Tip: `Tab` moves to the next column editor, `Shift+Tab` moves to previous.
 
 ## Step 4: Reorder columns
 
-1. Drag from the column grip handle (`⋮⋮`) in the column header.
+1. Hover a column and drag the grip (`⋮⋮`) at its top-left corner.
 2. Drop before/after another column.
 
 Alternative: hold `Alt` first, then mouse-down and drag a column body.
@@ -64,8 +64,8 @@ Alternative: hold `Alt` first, then mouse-down and drag a column body.
 
 ## Step 6: Add/remove columns quickly
 
-1. Click `+` in a column header to add a column to the right.
-2. Click `×` in a column header to remove that column.
+1. Click `+` at a column's top-right to add a column to the right.
+2. Click `×` below it to remove that column. If the column has content, `×` first turns into a red **Delete?** button; click it again to remove the column. Moving away or waiting 3 seconds cancels. An empty column is removed with one click.
 
 ## A clean starter example
 

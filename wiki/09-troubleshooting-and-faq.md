@@ -27,7 +27,7 @@ Check:
 
 Try:
 
-1. Drag from header grip (`⋮⋮`).
+1. Drag from the grip (`⋮⋮`) at the column's top-left corner (hover the column to show it).
 2. Or hold `Alt` while dragging column body.
 3. Ensure note is in Live Preview.
 
