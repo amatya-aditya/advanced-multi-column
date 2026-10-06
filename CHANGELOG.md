@@ -4,6 +4,30 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.4.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.4.0) - 2026-10-05
+
+### Added
+- Footnotes work inside columns, including in tables inside columns. `[^label]` and inline `^[…]` footnotes keep their definitions from anywhere in the note:
+  - **Reading view:** footnotes are numbered across the whole note and listed at its end. Click a number to jump to its footnote, and ↩︎ to jump back.
+  - **Live Preview:** references show as `[^label]` and `^[text]`, as in the editor. Click one to move the cursor to its definition.
+  - Hovering a reference previews the footnote in both views.
+- Removing a column with content asks first: the first click on `×` turns it into **Delete?**, and only a second click removes the column. Moving away or waiting 3 seconds cancels. Empty columns are still removed with one click.
+
+### Changed
+- The drag handle moved to the column's top-left corner, so it no longer covers text; `+` and `×` stay at the top right, with more space between them.
+- Style menu: the tabs are now **This column** and **All columns** (was **Column** and **Block**). A line under the tabs says what the settings change, and the page outlines it while the menu is open. **Reset block** is now **Reset box**.
+- Style menu: **Stacked** in the column tab is now **Stack with next column** (**Stack with previous column** for the last column, **Stack selected columns** for a selection). It is hidden when the whole block is already stacked, and turning it off no longer leaves one-column stacks behind.
+- Columns stacked on top of each other are spaced 8px apart.
+
+### Fixed
+- Live Preview: editing a column no longer shifts its text sideways with themes that restyle tables (such as Willemstad with wide tables), and no longer shifts it slightly on mobile in any theme ([#27](https://github.com/amatya-aditya/advanced-multi-column/issues/27)).
+- Live Preview: text right after a nested column block now has the same space as the text before it.
+- Appearance settings (border, background, dividers) now apply in every window, including popout windows, and reloading the plugin no longer leaves old styles behind.
+- The style menu now closes when the plugin is turned off or reloaded.
+
+### Internal
+- Added `CONTRIBUTING.md`.
+
 ## [2.3.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.3.0) - 2026-10-05
 
 ### Added
