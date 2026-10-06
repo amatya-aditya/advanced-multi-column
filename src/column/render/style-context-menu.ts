@@ -165,7 +165,8 @@ function cloneColumns(columns: ColumnData[]): ColumnData[] {
 	}));
 }
 
-function closeActivePopover(): void {
+/** Close the style menu, saving any pending change (also on plugin unload). */
+export function closeActivePopover(): void {
 	if (pendingFlush) {
 		pendingFlush();
 		pendingFlush = null;

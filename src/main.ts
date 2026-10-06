@@ -6,6 +6,7 @@ import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
 import {buildRuntimeStyles, RuntimeStyleSheets} from "./column/runtime-styles";
+import {closeActivePopover} from "./column/render/style-context-menu";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
 import {LAYOUT_TEMPLATES, LayoutTemplate} from "./layouts";
 import {MocSync} from "./moc/sync";
@@ -156,6 +157,7 @@ export default class ColumnsPlugin extends Plugin {
 		this.cleanupReadingView = null;
 		this.cleanupPropertyFolding?.();
 		this.cleanupPropertyFolding = null;
+		closeActivePopover();
 		setPluginInstance(null);
 		this.runtimeStyles.detachAll();
 	}
