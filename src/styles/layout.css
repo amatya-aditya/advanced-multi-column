@@ -343,6 +343,39 @@
 	gap: 0px;
 }
 
+/* Drag handle: top-left, inside the column's left padding, so it covers no
+   text. Shown like the toolbar: on hover and while editing. */
+.columns-container .column-item > .column-drag-gutter {
+	position: absolute;
+	top: 6px;
+	left: 0;
+	width: var(--amc-col-pad-inline, 14px);
+	display: flex;
+	justify-content: center;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease;
+	z-index: 5;
+}
+
+.columns-container .column-item:hover > .column-drag-gutter,
+.columns-container .column-item.is-editing > .column-drag-gutter {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.columns-container .column-drag-gutter > .column-drag-handle {
+	padding: 2px 0;
+	width: 100%;
+}
+
+.columns-container .column-drag-gutter > .column-drag-handle .svg-icon {
+	width: min(14px, var(--amc-col-pad-inline, 14px));
+	/* Toward the border, away from the text: the icon's dots sit in its
+	   middle, so centred they came within ~4px of the text. */
+	transform: translateX(-3px);
+}
+
 .columns-container .column-item:hover .column-toolbar,
 .columns-container .column-item.is-editing .column-toolbar {
 	opacity: 1;

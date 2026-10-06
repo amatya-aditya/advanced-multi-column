@@ -518,9 +518,9 @@ function wireColumnSelection(
 	view: EditorView,
 ): void {
 	item.addEventListener("click", (e: MouseEvent) => {
-		// Let toolbar action buttons (add/drag) handle their own Ctrl+Click
+		// Let toolbar buttons and the drag handle handle their own Ctrl+Click
 		const target = e.target as HTMLElement;
-		if (target.closest(".column-toolbar-actions")) return;
+		if (target.closest(".column-toolbar-actions, .column-drag-gutter")) return;
 		// Ctrl/Cmd+Click on a link opens it in a new tab; never turn it into
 		// a column selection (this capture listener would swallow the click).
 		if (target.closest(".amc-embedded-editor")) return;
@@ -608,6 +608,18 @@ function buildRemoveButton(toolbarActions: HTMLElement, onRemove: () => void): v
 		e.stopPropagation();
 		onRemove();
 	});
+}
+
+/**
+ * The drag handle sits on its own at the column's top-left, in the column's
+ * left padding, apart from the add and remove buttons on the right.
+ */
+function buildDragHandle(colEl: HTMLElement): HTMLElement {
+	const gutter = colEl.createDiv({cls: "column-drag-gutter"});
+	const dragHandle = gutter.createSpan({cls: "column-drag-handle"});
+	dragHandle.setAttribute("aria-label", "Drag to reorder");
+	setIcon(dragHandle, "grip-vertical");
+	return dragHandle;
 }
 
 // ── Commit Edit Helper ──────────────────────────────────────
@@ -1114,10 +1126,7 @@ function renderNestedRegion(
 			const colContent = renderColumnHeader(colEl, col.content);
 
 			const toolbar = colEl.createDiv({cls: "column-toolbar"});
-
-			const dragHandle = toolbar.createSpan({cls: "column-drag-handle"});
-			dragHandle.setAttribute("aria-label", "Drag to reorder");
-			setIcon(dragHandle, "grip-vertical");
+			const dragHandle = buildDragHandle(colEl);
 
 			const isStacked = !!(col.stacked && col.stacked > 0);
 			const addBtn = toolbar.createEl("button", {cls: "column-add-btn"});
@@ -1144,7 +1153,6 @@ function renderNestedRegion(
 			const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 			toolbarActions.appendChild(addBtn);
 			buildRemoveButton(toolbarActions, deleteNestedColumn);
-			toolbarActions.appendChild(dragHandle);
 
 			const hasNestedRegions = findColumnRegions(colContent).length > 0;
 			let liveEdit: LiveEditHandle | null = null;
@@ -1337,10 +1345,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
 				const toolbar = colEl.createDiv({cls: "column-toolbar"});
-
-				const dragHandle = toolbar.createSpan({cls: "column-drag-handle"});
-				dragHandle.setAttribute("aria-label", "Drag to reorder");
-				setIcon(dragHandle, "grip-vertical");
+				const dragHandle = buildDragHandle(colEl);
 
 				const isStacked = !!(col.stacked && col.stacked > 0);
 				const addBtn = toolbar.createEl("button", {cls: "column-add-btn"});
@@ -1364,7 +1369,6 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 				const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 				toolbarActions.appendChild(addBtn);
 				if (columns.length > 1) buildRemoveButton(toolbarActions, deleteColumn);
-				toolbarActions.appendChild(dragHandle);
 
 				const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 				applyCompactPreviewSpacing(previewEl);
