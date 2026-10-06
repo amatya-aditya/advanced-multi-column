@@ -26,7 +26,7 @@ The popover always shows what is currently rendered, including values that come 
 2. `Text color` — also applies to links (internal, external, tags) within the column.
 3. `Border` toggle + color.
 4. `Accent stripe` (callout-style left border).
-5. `Stacked` toggle.
+5. `Stack with next column` (`Stack with previous column` for the last column) — puts this column and its neighbour on top of each other inside a side-by-side block. With several columns selected it reads `Stack selected columns`. Hidden when the whole block uses the `Stacked` layout (Block tab).
 6. `Separator after` (or `Separator below` inside a stack) — toggle; when on, choose line style (`solid`, `dashed`, `dotted`, `double`, or a custom `Character`), color and width. Turning it off also hides the global vertical divider after this column (`sep:0`). Not shown for the last column.
 
 ![Dashed separator in the accent colour](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-separator.png)

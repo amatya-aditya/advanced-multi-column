@@ -86,7 +86,7 @@ Scenario:
 
 1. You have `1 | (3,4,5,6,7 stacked:1)`.
 2. You select `6,7`.
-3. Toggle `Stacked` off.
+3. Turn `Stack selected columns` off.
 
 Result:
 
