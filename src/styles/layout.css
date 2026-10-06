@@ -340,7 +340,9 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	gap: 0px;
+	/* Keep add and remove apart so a slightly-off click on add does not
+	   hit remove (remove also asks before deleting content). */
+	gap: 6px;
 }
 
 /* Drag handle: top-left, inside the column's left padding, so it covers no
@@ -374,6 +376,21 @@
 	/* Toward the border, away from the text: the icon's dots sit in its
 	   middle, so centred they came within ~4px of the text. */
 	transform: translateX(-3px);
+}
+
+/* Second step of removing a column with content. */
+.columns-container .column-remove-btn.is-confirming {
+	color: var(--text-on-accent);
+	background: var(--background-modifier-error);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	padding: 2px 6px;
+	white-space: nowrap;
+}
+
+.columns-container .column-remove-btn.is-confirming:hover {
+	color: var(--text-on-accent);
+	background: var(--background-modifier-error-hover, var(--background-modifier-error));
 }
 
 .columns-container .column-item:hover .column-toolbar,

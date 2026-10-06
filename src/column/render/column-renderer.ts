@@ -599,14 +599,47 @@ export function wireContextMenu(
 
 // ── Toolbar Remove Button ───────────────────────────────────
 
-function buildRemoveButton(toolbarActions: HTMLElement, onRemove: () => void): void {
+/** How long the "Delete?" confirmation waits for the second click. */
+const REMOVE_CONFIRM_MS = 3000;
+
+/**
+ * Remove button. An empty column goes at once; a column with content asks
+ * first — the button turns into "Delete?" and only a second click removes
+ * it — so a click meant for the add button next to it loses nothing.
+ */
+function buildRemoveButton(
+	toolbarActions: HTMLElement,
+	onRemove: () => void,
+	isEmpty: () => boolean,
+): void {
 	const removeBtn = toolbarActions.createEl("button", {cls: "column-remove-btn"});
-	removeBtn.setAttribute("aria-label", "Remove column");
-	setIcon(removeBtn, "x");
+	let confirmTimer: number | null = null;
+
+	const reset = () => {
+		if (confirmTimer !== null) removeBtn.win.clearTimeout(confirmTimer);
+		confirmTimer = null;
+		removeBtn.removeClass("is-confirming");
+		removeBtn.empty();
+		setIcon(removeBtn, "x");
+		removeBtn.setAttribute("aria-label", "Remove column");
+	};
+	reset();
+
 	removeBtn.addEventListener("click", (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		onRemove();
+		if (confirmTimer !== null || isEmpty()) {
+			reset();
+			onRemove();
+			return;
+		}
+		removeBtn.addClass("is-confirming");
+		removeBtn.setText("Delete?");
+		removeBtn.setAttribute("aria-label", "Click again to remove this column");
+		confirmTimer = removeBtn.win.setTimeout(reset, REMOVE_CONFIRM_MS);
+	});
+	removeBtn.addEventListener("mouseleave", () => {
+		if (confirmTimer !== null) reset();
 	});
 }
 
@@ -1152,7 +1185,7 @@ function renderNestedRegion(
 
 			const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 			toolbarActions.appendChild(addBtn);
-			buildRemoveButton(toolbarActions, deleteNestedColumn);
+			buildRemoveButton(toolbarActions, deleteNestedColumn, () => !region.columns[i]?.content.trim());
 
 			const hasNestedRegions = findColumnRegions(colContent).length > 0;
 			let liveEdit: LiveEditHandle | null = null;
@@ -1368,7 +1401,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 
 				const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
 				toolbarActions.appendChild(addBtn);
-				if (columns.length > 1) buildRemoveButton(toolbarActions, deleteColumn);
+				if (columns.length > 1) buildRemoveButton(toolbarActions, deleteColumn, () => !columns[i]?.content.trim());
 
 				const previewEl = colEl.createDiv({cls: "column-preview markdown-rendered"});
 				applyCompactPreviewSpacing(previewEl);
