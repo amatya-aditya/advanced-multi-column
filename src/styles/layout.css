@@ -800,6 +800,25 @@
 	cursor: text;
 }
 
+/* The editor carries Obsidian's `cm-table-widget` class (for Obsidian's own
+   nested-editor styling), so it also gets the box geometry meant for real
+   tables. Obsidian pulls the widget out by --size-4-4 on each side (a
+   negative margin it forces) and pads it by the table drag-handle size,
+   which is larger on mobile, so the text moved when editing started; themes
+   may also widen and centre table widgets with an offset and a transform.
+   Pin the box instead: no offset or transform, full column width, and side
+   padding equal to Obsidian's pull-out, so the editing text starts exactly
+   where the column's text does. The qualifiers outrank
+   `.markdown-source-view.mod-cm6 .cm-table-widget`. */
+.columns-container .column-item .amc-embedded-editor.cm-table-widget {
+	left: auto;
+	right: auto;
+	transform: none;
+	width: 100%;
+	max-width: none;
+	padding: 0 var(--size-4-4);
+}
+
 .columns-container .amc-embedded-editor .markdown-source-view.mod-cm6 {
 	padding: 0;
 	background: transparent;
