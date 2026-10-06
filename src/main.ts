@@ -5,7 +5,7 @@ import {ColumnsSettingTab, MOC_PAGE_NAME} from "./settings-tab";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
-import {buildRuntimeStyles} from "./column/runtime-styles";
+import {buildRuntimeStyles, RuntimeStyleSheets} from "./column/runtime-styles";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
 import {LAYOUT_TEMPLATES, LayoutTemplate} from "./layouts";
 import {MocSync} from "./moc/sync";
@@ -35,8 +35,7 @@ class MocTemplateModal extends SuggestModal<MocTemplate> {
 
 export default class ColumnsPlugin extends Plugin {
 	settings!: ColumnsPluginSettings;
-	private runtimeStyleSheet: CSSStyleSheet | null = null;
-	private runtimeStyleEl: HTMLStyleElement | null = null;
+	private readonly runtimeStyles = new RuntimeStyleSheets();
 	private cleanupReadingView: (() => void) | null = null;
 	private cleanupPropertyFolding: (() => void) | null = null;
 	private lastLiveRenderFingerprint = "";
@@ -46,7 +45,7 @@ export default class ColumnsPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 		this.lastLiveRenderFingerprint = this.liveRenderFingerprint();
-		this.applyRuntimeStyles();
+		this.attachRuntimeStyles();
 		setPluginInstance(this);
 
 		// CM6 extension for Live Preview
@@ -158,7 +157,7 @@ export default class ColumnsPlugin extends Plugin {
 		this.cleanupPropertyFolding?.();
 		this.cleanupPropertyFolding = null;
 		setPluginInstance(null);
-		this.detachRuntimeStyleSheet();
+		this.runtimeStyles.detachAll();
 	}
 
 	private insertMoc(editor: Editor, template: MocTemplate, file: TFile | null): void {
@@ -292,84 +291,23 @@ export default class ColumnsPlugin extends Plugin {
 	}
 
 	private applyRuntimeStyles(): void {
-		const css = buildRuntimeStyles(this.settings);
-
-		// Preferred path: a constructed stylesheet adopted by the document.
-		const styleSheet = this.ensureRuntimeStyleSheet();
-		if (styleSheet) {
-			try {
-				styleSheet.replaceSync(css);
-				return;
-			} catch {
-				// Constructed stylesheets can fail under some runtimes; fall through.
-				this.detachRuntimeStyleSheet();
-			}
-		}
-
-		// Fallback: a plain <style> element. Works everywhere and never throws.
-		this.ensureRuntimeStyleEl().textContent = css;
+		this.runtimeStyles.update(buildRuntimeStyles(this.settings));
 	}
 
-	/** Document to attach runtime styles to. Tolerates a missing activeDocument
-	 *  so plugin load can never throw on environments where it is unavailable. */
-	private getStyleDocument(): Document {
-		return activeDocument;
-	}
-
-	private ensureRuntimeStyleSheet(): CSSStyleSheet | null {
-		if (this.runtimeStyleSheet) return this.runtimeStyleSheet;
-		try {
-			const doc = this.getStyleDocument();
-			if (!doc || !("adoptedStyleSheets" in doc)) return null;
-
-			// Construct in the target document's own realm to avoid
-			// cross-document adoption errors in newer Chromium.
-			const view = doc.defaultView ?? window;
-			if (typeof view.CSSStyleSheet === "undefined") return null;
-
-			const sheet = new view.CSSStyleSheet();
-			const adoptedTarget = doc as Document & {
-				adoptedStyleSheets: CSSStyleSheet[];
-			};
-			adoptedTarget.adoptedStyleSheets = [...adoptedTarget.adoptedStyleSheets, sheet];
-			this.runtimeStyleSheet = sheet;
-			return sheet;
-		} catch {
-			return null;
-		}
-	}
-
-	private ensureRuntimeStyleEl(): HTMLStyleElement {
-		if (this.runtimeStyleEl?.isConnected) return this.runtimeStyleEl;
-		const doc = this.getStyleDocument();
-		const el = (doc.head ?? doc.documentElement).createEl("style");
-		el.id = "amc-runtime-styles";
-		this.runtimeStyleEl = el;
-		return el;
-	}
-
-	private detachRuntimeStyleSheet(): void {
-		const sheet = this.runtimeStyleSheet;
-		this.runtimeStyleSheet = null;
-		if (sheet) {
-			try {
-				const doc = this.getStyleDocument();
-				if ("adoptedStyleSheets" in doc) {
-					const adoptedTarget = doc as Document & {
-						adoptedStyleSheets: CSSStyleSheet[];
-					};
-					adoptedTarget.adoptedStyleSheets = adoptedTarget.adoptedStyleSheets.filter(
-						(existing) => existing !== sheet,
-					);
-				}
-			} catch {
-				// Ignore detach failures during teardown.
-			}
-		}
-
-		if (this.runtimeStyleEl) {
-			this.runtimeStyleEl.remove();
-			this.runtimeStyleEl = null;
-		}
+	/**
+	 * Give every window that shows notes the runtime styles: the main window
+	 * now, popouts already open, and popouts opened later.
+	 */
+	private attachRuntimeStyles(): void {
+		this.applyRuntimeStyles();
+		const {workspace} = this.app;
+		this.runtimeStyles.attach(workspace.containerEl.ownerDocument);
+		const attachOpenWindows = () => workspace.iterateAllLeaves((leaf) => {
+			this.runtimeStyles.attach(leaf.view.containerEl.ownerDocument);
+		});
+		attachOpenWindows();
+		workspace.onLayoutReady(attachOpenWindows);
+		this.registerEvent(workspace.on("window-open", (win) => this.runtimeStyles.attach(win.doc)));
+		this.registerEvent(workspace.on("window-close", (win) => this.runtimeStyles.detach(win.doc)));
 	}
 }

@@ -133,3 +133,78 @@ export function buildRuntimeStyles(settings: ColumnsPluginSettings): string {
 
 	return rules.join("\n");
 }
+
+interface AttachedStyles {
+	sheet: CSSStyleSheet | null;
+	el: HTMLStyleElement | null;
+}
+
+/**
+ * The runtime styles, attached to every window that shows notes: the main
+ * window and each popout. Each document gets its own stylesheet, removed
+ * from that same document again — never from whichever window happens to be
+ * focused.
+ */
+export class RuntimeStyleSheets {
+	private readonly attached = new Map<Document, AttachedStyles>();
+	private css = "";
+
+	/** Replace the styles in every attached window. */
+	update(css: string): void {
+		this.css = css;
+		for (const doc of this.attached.keys()) this.write(doc);
+	}
+
+	attach(doc: Document): void {
+		if (!this.attached.has(doc)) this.attached.set(doc, {sheet: null, el: null});
+		this.write(doc);
+	}
+
+	detach(doc: Document): void {
+		const styles = this.attached.get(doc);
+		if (!styles) return;
+		this.attached.delete(doc);
+		if (styles.sheet) {
+			try {
+				doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter((sheet) => sheet !== styles.sheet);
+			} catch {
+				// The window may already be closing.
+			}
+		}
+		styles.el?.remove();
+	}
+
+	detachAll(): void {
+		for (const doc of [...this.attached.keys()]) this.detach(doc);
+	}
+
+	private write(doc: Document): void {
+		const styles = this.attached.get(doc);
+		if (!styles) return;
+		// Preferred: a constructed stylesheet, created in the document's own
+		// realm (adopting one from another window throws).
+		if (!styles.el) {
+			try {
+				if (!styles.sheet) {
+					const view = doc.defaultView;
+					if (!view || !("adoptedStyleSheets" in doc)) throw new Error("unsupported");
+					styles.sheet = new view.CSSStyleSheet();
+					doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, styles.sheet];
+				}
+				styles.sheet.replaceSync(this.css);
+				return;
+			} catch {
+				if (styles.sheet) {
+					const failed = styles.sheet;
+					doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter((sheet) => sheet !== failed);
+					styles.sheet = null;
+				}
+			}
+		}
+		// Fallback: a plain <style> element.
+		if (!styles.el?.isConnected) {
+			styles.el = (doc.head ?? doc.documentElement).createEl("style", {attr: {id: "amc-runtime-styles"}});
+		}
+		styles.el.textContent = this.css;
+	}
+}
