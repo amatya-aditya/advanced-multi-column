@@ -91,6 +91,25 @@
 	margin: var(--size-4-2) var(--size-4-3) 0;
 }
 
+/* What the active tab changes, in words. */
+.columns-style-popover .amc-menu-scope {
+	margin: var(--size-4-1) var(--size-4-3) 0;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+/* …and on the page: the column(s) or the box the active tab changes. An
+   outline, so the layout does not move. */
+.columns-container.amc-menu-target,
+.columns-container .column-item.amc-menu-target {
+	outline: 2px solid hsla(var(--interactive-accent-hsl), 0.6);
+	outline-offset: 2px;
+}
+
+.columns-container .column-item.amc-menu-target {
+	outline-offset: -2px;
+}
+
 /* ── Body rows: label left, controls right ── */
 .columns-style-popover .amc-menu-body {
 	display: flex;

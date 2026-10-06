@@ -6,13 +6,13 @@ All styling actions are available from the right-click popover.
 
 1. Right-click a column in Live Preview.
 2. The header names the column and has quick actions: edit, add column, add nested columns, delete.
-3. Switch between the **Column** and **Block** tabs to style the column or the whole column block.
+3. Switch between the **This column** and **All columns** tabs. **This column** styles the column you right-clicked; **All columns** styles the box around every column of the block (for a nested block, the box around the nested columns). A line under the tabs says what the settings change, and the page outlines it while the menu is open.
 
 The popover always shows what is currently rendered, including values that come from the global **Appearance** settings (block border, background, vertical dividers). Changing a value writes it to the markers; picking the default again removes it, so the block follows the global settings again.
 
-![Column menu: Column tab](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-column-menu.png)
+![Column menu: This column tab](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-column-menu.png)
 
-![Column menu: Block tab](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-column-menu-block.png)
+![Column menu: All columns tab](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-column-menu-block.png)
 
 ## Apply style to one or multiple columns
 
@@ -20,18 +20,20 @@ The popover always shows what is currently rendered, including values that come 
 2. Right-click one selected column.
 3. Style changes apply to selected set.
 
-## Column tab
+## This column tab
 
 1. `Background`.
 2. `Text color` — also applies to links (internal, external, tags) within the column.
 3. `Border` toggle + color.
 4. `Accent stripe` (callout-style left border).
-5. `Stack with next column` (`Stack with previous column` for the last column) — puts this column and its neighbour on top of each other inside a side-by-side block. With several columns selected it reads `Stack selected columns`. Hidden when the whole block uses the `Stacked` layout (Block tab).
+5. `Stack with next column` (`Stack with previous column` for the last column) — puts this column and its neighbour on top of each other inside a side-by-side block. With several columns selected it reads `Stack selected columns`. Hidden when the whole block uses the `Stacked` layout (All columns tab).
 6. `Separator after` (or `Separator below` inside a stack) — toggle; when on, choose line style (`solid`, `dashed`, `dotted`, `double`, or a custom `Character`), color and width. Turning it off also hides the global vertical divider after this column (`sep:0`). Not shown for the last column.
 
 ![Dashed separator in the accent colour](https://raw.githubusercontent.com/amatya-aditya/advanced-multi-column/master/assets/demo-separator.png)
 
-## Block tab
+## All columns tab
+
+These settings style the box around all the columns, not each column.
 
 1. `Layout` (`Side by side` or `Stacked`).
 2. `Background`.
@@ -40,7 +42,7 @@ The popover always shows what is currently rendered, including values that come 
 
 ## Reset and clear actions
 
-1. `Reset column` / `Reset block` clears the styles of the current tab.
+1. `Reset column` / `Reset box` clears the styles of the current tab.
 2. `Clear all styles` removes style tokens recursively from the block and nested blocks.
 
 ## Custom palette colors (CSS snippet)
