@@ -422,9 +422,11 @@
 
 /* A nested block and the text around it are separate blocks in the source
    (markers need their own lines), so keep a paragraph-sized gap between
-   them. Must outrank the div margin reset below. */
+   them. Must outrank the div margin reset below: the text after a nested
+   block is a div, so `+ *` would lose to it and the text would touch the
+   block in Live Preview; `:not(...)` adds the needed weight. */
 .columns-container .column-item .column-preview.markdown-rendered > .columns-nested:not(:first-child),
-.columns-container .column-item .column-preview.markdown-rendered > .columns-nested + * {
+.columns-container .column-item .column-preview.markdown-rendered > .columns-nested + :not(.columns-nested) {
 	margin-top: 1em;
 }
 
