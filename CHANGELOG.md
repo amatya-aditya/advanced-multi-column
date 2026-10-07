@@ -4,6 +4,11 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.4.1](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.4.1) - 2026-10-06
+
+### Fixed
+- Embedded notes (`![[note]]`) and canvas file cards show their columns again in Live Preview and Reading view. Before, columns showed only while the embedded note was also open in a tab ([#13](https://github.com/amatya-aditya/advanced-multi-column/issues/13)).
+
 ## [2.4.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.4.0) - 2026-10-05
 
 ### Added
