@@ -119,6 +119,31 @@ If your change affects how people use the plugin, update the matching page in `w
 
 Releases are made by the maintainer: `dev` is merged into `master`, the version is bumped, and a tag starts the release workflow, which builds and attaches `main.js`, `manifest.json` and `styles.css`.
 
+### Beta releases
+
+Larger changes, and fixes that are hard to test without the reporter's setup, go out as a beta first. Beta testers install it with [BRAT](README.md#beta-versions-with-brat).
+
+- **Version:** the next version with a `-beta.N` suffix, counting up from 1: `2.5.0-beta.1`, then `2.5.0-beta.2`. The stable release drops the suffix (`2.5.0`).
+- **Branch:** a beta is tagged on `dev` and is **not** merged into `master`. Obsidian reads `manifest.json` on `master` to offer updates, so a beta version there would reach every user. BRAT installs from the GitHub pre-release instead.
+
+To publish a beta:
+
+1. Add a section for the beta to `CHANGELOG.md`, marked as a pre-release.
+2. Set the version: `npm version 2.5.0-beta.1 --no-git-tag-version`. This updates `package.json`, `manifest.json` and `versions.json`.
+3. Commit as `chore: release 2.5.0-beta.1` on `dev` and push.
+4. Tag that commit with the exact version, without a leading `v`, and push the tag:
+
+   ```bash
+   git tag 2.5.0-beta.1
+   git push origin 2.5.0-beta.1
+   ```
+
+   The release workflow checks that the tag matches `manifest.json`, marks any version containing `-` as a pre-release, and attaches the files.
+5. Replace the generated release notes with the changelog section and the BRAT install steps.
+6. Comment on the issues the beta addresses and ask the reporters to try it. Close the issues after the stable release, not after the beta.
+
+When testers confirm the fixes, release the stable version as usual: merge `dev` into `master`, set the version without the suffix, and fold the beta's changelog section into the stable one.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the project's [license](LICENSE).
