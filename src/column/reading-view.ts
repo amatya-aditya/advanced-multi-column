@@ -151,6 +151,17 @@ function isSupportedPreview(previewEl: HTMLElement, plugin: ColumnsPlugin): bool
 	return !!previewEl.closest(".markdown-reading-view");
 }
 
+/**
+ * True for blocks the column layer renders itself. Blocks of a note embedded
+ * in the layer are not: the embed is a preview of its own.
+ */
+function isOwnLayerContent(el: HTMLElement): boolean {
+	const layer = el.closest(".columns-rv-wrapper, .columns-rv-segment, .column-preview");
+	if (!layer) return false;
+	const embed = el.closest(".internal-embed");
+	return !embed || !layer.contains(embed);
+}
+
 function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
 	const host = previewEl.querySelector(
 		`:scope > .markdown-preview-sizer > .${RV_HOST_CLASS}, :scope > .${RV_HOST_CLASS}`,
@@ -656,6 +667,37 @@ async function buildWrapper(
 }
 
 /**
+ * Replace a whole note rendered into `el` in one piece (no virtualized sizer)
+ * with the column layout. Children `keep` accepts stay in place.
+ */
+function renderNoteInPlace(
+	plugin: ColumnsPlugin,
+	el: HTMLElement,
+	ctx: MarkdownPostProcessorContext,
+	keep: (node: Element) => boolean,
+): Promise<void> | null {
+	const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+	if (!(file instanceof TFile)) return null;
+
+	return (async () => {
+		const text = await plugin.app.vault.cachedRead(file);
+		if (!text.includes("col-start")) return;
+		const regions = findColumnRegions(text);
+		if (regions.length === 0) return;
+
+		const child = new MarkdownRenderChild(el);
+		ctx.addChild(child);
+		const wrapper = await buildWrapper(plugin, ctx.sourcePath, text, regions, child);
+		for (const node of Array.from(el.children)) {
+			if (!keep(node)) node.remove();
+		}
+		el.appendChild(wrapper);
+	})().catch((error) => {
+		rvError("in-place render failed", error);
+	});
+}
+
+/**
  * PDF export: replace the exported note body with the column layout. The
  * exporter awaits `ctx.promises` before printing, so the async render lands
  * in the PDF.
@@ -666,29 +708,22 @@ function renderForExport(
 	ctx: MarkdownPostProcessorContext,
 ): void {
 	const promises = (ctx as MarkdownPostProcessorContext & {promises?: Promise<unknown>[]}).promises;
-	const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
-	if (!(file instanceof TFile)) return;
+	// Keep the optional note-title heading the exporter adds; the note body
+	// itself is wrapped in divs (and bare <hr>s).
+	const task = renderNoteInPlace(plugin, el, ctx, (node) => node.tagName === "H1");
+	if (task) promises?.push(task);
+}
 
-	const task = (async () => {
-		const text = await plugin.app.vault.cachedRead(file);
-		if (!text.includes("col-start")) return;
-		const regions = findColumnRegions(text);
-		if (regions.length === 0) return;
-
-		const child = new MarkdownRenderChild(el);
-		ctx.addChild(child);
-		const wrapper = await buildWrapper(plugin, ctx.sourcePath, text, regions, child);
-		// Keep the optional note-title heading the exporter adds; the note body
-		// itself is wrapped in divs (and bare <hr>s).
-		for (const node of Array.from(el.children)) {
-			if (node.tagName !== "H1") node.remove();
-		}
-		el.appendChild(wrapper);
-	})().catch((error) => {
-		rvError("export render failed", error);
-	});
-
-	promises?.push(task);
+/**
+ * Preview of a whole note embedded in markdown rendered on its own, such as
+ * a column or the column layer itself. Obsidian renders such an embed in one
+ * piece, without the sizer a reading view or a top-level embed has.
+ */
+function isUnsizedEmbedPreview(el: HTMLElement): boolean {
+	if (!el.classList.contains("markdown-preview-view")) return false;
+	if (el.querySelector(":scope > .markdown-preview-sizer")) return false;
+	const embed = el.closest(".internal-embed");
+	return !!embed && !(embed.getAttribute("src") ?? "").includes("#");
 }
 
 export function registerReadingView(plugin: ColumnsPlugin): () => void {
@@ -1231,11 +1266,18 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			// async post-processors (Dataview, Meta Bind, ...) still fire for
 			// the detached column elements.  Scheduling from those would make
 			// every rebuild trigger the next one — an infinite remount loop.
-			if (el.closest(".columns-rv-wrapper, .columns-rv-segment, .column-preview")) return;
+			// A note embedded in the layer is its own preview, though, and
+			// lays out its own columns.
+			if (isOwnLayerContent(el)) return;
 
 			// PDF export renders the whole note into one element outside any view.
 			if (el.closest(".print")) {
 				if (plugin.settings.enableReadingView) renderForExport(plugin, el, ctx);
+				return;
+			}
+
+			if (isUnsizedEmbedPreview(el)) {
+				if (plugin.settings.enableReadingView) void renderNoteInPlace(plugin, el, ctx, () => false);
 				return;
 			}
 
