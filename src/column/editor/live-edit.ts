@@ -1,4 +1,4 @@
-import {App, Component, editorInfoField, Modal, TFile} from "obsidian";
+import {App, Component, Editor, editorInfoField, MarkdownView, Modal, TFile} from "obsidian";
 import {captureBlockUpdate} from "../core/column-serializer";
 import {getPluginInstance} from "../core/plugin-ref";
 import type {EditorView} from "@codemirror/view";
@@ -13,6 +13,7 @@ import {
 } from "./embedded-editor";
 import {createPastedImageLink} from "./column-editor";
 import {getInteractionState} from "./interaction-state";
+import {rebaseDraft} from "./draft-rebase";
 import {
 	isBlockLanguagePreviewTarget,
 	isInteractivePreviewTarget,
@@ -31,6 +32,10 @@ export interface LiveEditRestoreState {
 	value: string;
 	cursorStart: number;
 	cursorEnd: number;
+	/** Column text `value` was edited from; defaults to `value`. */
+	base?: string;
+	/** Take focus at once (the editor being replaced had it). */
+	focus?: boolean;
 }
 
 /** Identifies one editor slot so a rebuilt widget can re-open it. */
@@ -72,7 +77,9 @@ export interface LiveEditHandle {
 	enterEdit(restore?: LiveEditRestoreState): void;
 }
 
-const EDIT_KEY_ATTR = "data-amc-edit-key";
+export const EDIT_KEY_ATTR = "data-amc-edit-key";
+/** Asks an open column editor to commit and close. */
+export const FORCE_COMMIT_EVENT = "amc-force-commit";
 const RESTORE_EVENT = "amc-restore-edit";
 
 function matchesEditState(
@@ -107,24 +114,63 @@ function handleEditorImagePaste(e: ClipboardEvent, editor: InternalMarkdownEdito
 	return false;
 }
 
+/** Offset of `block` in `data` when it occurs exactly once, else -1. */
+function uniqueIndexOf(data: string, block: string): number {
+	const at = data.indexOf(block);
+	return at >= 0 && data.indexOf(block, at + 1) < 0 ? at : -1;
+}
+
 /**
- * Write a column draft straight into the note when its editor was destroyed
- * before it could commit (the tab switched notes or closed). Only replaces the
+ * Editor of a pane that still shows the note, if any: preferably the pane the
+ * column editor belonged to, so that pane's own save includes the draft.
+ */
+function openEditorFor(app: App, sourcePath: string, preferred: EditorView): Editor | null {
+	let found: Editor | null = null;
+	for (const leaf of app.workspace.getLeavesOfType("markdown")) {
+		const view = leaf.view;
+		if (!(view instanceof MarkdownView) || view.file?.path !== sourcePath) continue;
+		const cm = (view.editor as Editor & {cm?: EditorView}).cm;
+		if (cm === preferred) return view.editor;
+		found ??= view.editor;
+	}
+	return found;
+}
+
+/**
+ * Save a column draft whose editor was destroyed before it could commit (the
+ * tab switched notes or closed, or the block was rebuilt). Only replaces the
  * block when its original text is still present exactly once.
+ *
+ * While another pane shows the note, the draft goes into that pane's editor:
+ * Obsidian keeps the panes in sync and saves it. Writing the file underneath
+ * an open editor lost the draft when that editor saved its own text over it,
+ * or duplicated text when Obsidian merged the change back into the editor.
  */
 async function saveDraftToFile(
 	app: App,
 	sourcePath: string,
+	ownView: EditorView,
 	oldBlock: string,
 	newBlock: string,
 	draft: string,
 ): Promise<void> {
+	const editor = openEditorFor(app, sourcePath, ownView);
+	if (editor) {
+		const at = uniqueIndexOf(editor.getValue(), oldBlock);
+		if (at < 0) {
+			new UnsavedDraftModal(app, draft).open();
+			return;
+		}
+		editor.replaceRange(newBlock, editor.offsetToPos(at), editor.offsetToPos(at + oldBlock.length));
+		return;
+	}
+
 	const file = app.vault.getAbstractFileByPath(sourcePath);
 	if (!(file instanceof TFile)) return;
 	let saved = false;
 	await app.vault.process(file, (data) => {
-		const at = data.indexOf(oldBlock);
-		if (at < 0 || data.indexOf(oldBlock, at + 1) >= 0) return data;
+		const at = uniqueIndexOf(data, oldBlock);
+		if (at < 0) return data;
 		saved = true;
 		return data.slice(0, at) + newBlock + data.slice(at + oldBlock.length);
 	});
@@ -214,6 +260,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 				cursorEnd: target.value.length,
 				scrollTop: 0,
 				value: target.value,
+				base: target.value,
 			};
 		}
 		commitAndClose();
@@ -230,6 +277,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		if (active) return;
 
 		const value = restore?.value ?? config.getContent();
+		const base = restore?.base ?? value;
 
 		// Register the edit state before force-committing siblings: a dirty
 		// sibling commit dispatches a document change that synchronously
@@ -245,6 +293,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			cursorEnd: restore?.cursorEnd ?? value.length,
 			scrollTop: 0,
 			value,
+			base,
 			owner,
 		};
 
@@ -252,7 +301,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			// Commit and close other open editors in this container.
 			config.container.querySelectorAll<HTMLElement>(".is-editing").forEach((el) => {
 				if (el !== config.hostEl) {
-					el.dispatchEvent(new CustomEvent("amc-force-commit", {bubbles: false}));
+					el.dispatchEvent(new CustomEvent(FORCE_COMMIT_EVENT, {bubbles: false}));
 				}
 			});
 		}
@@ -309,22 +358,30 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		holder.register(() => {
 			if (active === handle) {
 				active = null;
+				// A blur starts the commit timer, so none pending means the
+				// user was still typing here.
+				const focused = blurTimer === null;
 				clearBlurTimer();
 				config.hostEl.classList.remove("is-editing");
 				const draft = handle.value;
 				const st = getInteractionState(editState.view).activeEdit;
 				if (st?.owner === owner) st.orphaned = true;
+				// A rebuilt widget claims the state before CodeMirror destroys
+				// this one, so check the slot rather than the owner.
+				if (st && st.key === editState.key && st.filePath === sourcePath) st.focused = focused;
 				// Compute the block text now, while the render closures still
 				// describe this block; it is only written if no rebuilt widget
 				// re-opens the draft (e.g. the tab switched to another note).
-				const rescuedBlock = draft !== config.getContent()
+				// An untouched draft is never written: the column may have
+				// changed since (another pane), and it would undo that change.
+				const rescuedBlock = draft !== base && draft !== config.getContent()
 					? captureBlockUpdate(() => config.onCommit(draft))
 					: null;
 				queueMicrotask(() => {
 					const claimed = !!st && st.owner !== owner;
 					clearEditState();
 					if (claimed || rescuedBlock === null) return;
-					void saveDraftToFile(app, sourcePath, editState.regionSource, rescuedBlock, draft);
+					void saveDraftToFile(app, sourcePath, editState.view, editState.regionSource, rescuedBlock, draft);
 				});
 			}
 			handle.destroy();
@@ -336,6 +393,10 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			restore?.cursorStart ?? value.length,
 			restore?.cursorEnd ?? value.length,
 		);
+		// An editor re-opened after a rebuild while the user was typing in it
+		// takes focus at once: until it does, keys typed into the column go to
+		// the note's own editor.
+		if (restore?.focus) handle.focus();
 		window.requestAnimationFrame(() => {
 			if (active === handle) handle.focus();
 		});
@@ -345,11 +406,19 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		if (active) return;
 		const st = getInteractionState(editState.view).activeEdit;
 		if (!matchesEditState(st, editState, sourcePath)) return;
-		enterEdit({value: st.value, cursorStart: st.cursorStart, cursorEnd: st.cursorEnd}, true);
+		const restore = {value: st.value, cursorStart: st.cursorStart, cursorEnd: st.cursorEnd};
+		// The block was rebuilt because the note changed; if this column's text
+		// changed too, a stale draft would overwrite it on commit.
+		if (st.base === undefined) {
+			enterEdit({...restore, focus: st.focused}, true);
+			return;
+		}
+		const current = config.getContent();
+		enterEdit({...rebaseDraft(restore, st.base, current), base: current, focus: st.focused}, true);
 	};
 
 	// Force-commit: triggered by another editor opening in the same container.
-	config.hostEl.addEventListener("amc-force-commit", () => commitAndClose());
+	config.hostEl.addEventListener(FORCE_COMMIT_EVENT, () => commitAndClose());
 	config.hostEl.addEventListener(RESTORE_EVENT, () => restorePending());
 
 	// Re-open an editor that was open when the widget was rebuilt. Claim the

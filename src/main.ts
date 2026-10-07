@@ -5,6 +5,7 @@ import {ColumnsSettingTab, MOC_PAGE_NAME} from "./settings-tab";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
+import {registerColumnEditFlush} from "./column/editor/edit-flush";
 import {buildRuntimeStyles, RuntimeStyleSheets} from "./column/runtime-styles";
 import {closeActivePopover} from "./column/render/style-context-menu";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
@@ -51,6 +52,7 @@ export default class ColumnsPlugin extends Plugin {
 
 		// CM6 extension for Live Preview
 		this.registerEditorExtension(columnDecorations);
+		registerColumnEditFlush(this);
 
 		// Reading view processor (code block fallback)
 		this.cleanupReadingView = registerReadingView(this);
