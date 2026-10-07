@@ -4,6 +4,19 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.5.0-beta.1](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.1) - 2026-10-07 (pre-release)
+
+### Added
+- Fold headings and lists in Reading view, both inside and outside columns, and inside columns in Live Preview. A heading folds everything up to the next heading of the same or a higher level; inside a column it folds only that column. Folding follows **Settings → Editor → Fold heading** and **Fold indent** ([#30](https://github.com/amatya-aditya/advanced-multi-column/issues/30)).
+
+### Fixed
+- A note with columns that is embedded inside another note's columns now shows its columns instead of plain text ([#31](https://github.com/amatya-aditya/advanced-multi-column/issues/31)).
+- Text typed in a column is no longer lost or duplicated ([#25](https://github.com/amatya-aditya/advanced-multi-column/issues/25)):
+  - when Obsidian is closed while a column is being edited;
+  - when the same note is open in two panes, edits in one pane could undo, lose or double text typed in a column in the other;
+  - when another note opens in the pane, or the pane closes, while a column of a note that is also open in another pane is being edited;
+  - text typed while a column was being redrawn could land in the note's hidden column markup instead of the column.
+
 ## [2.4.1](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.4.1) - 2026-10-06
 
 ### Fixed
