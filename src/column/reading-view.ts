@@ -62,11 +62,23 @@ function rvError(...args: unknown[]): void {
 
 function resolveSizerForElement(
 	el: HTMLElement,
+	ctx: MarkdownPostProcessorContext,
 	plugin: ColumnsPlugin,
-	sourcePathHint: string | undefined,
 ): HTMLElement | null {
 	const closest = el.closest(".markdown-preview-sizer");
 	if (closest?.instanceOf(HTMLElement)) return closest;
+
+	// Sections are post-processed before they are attached. The context's
+	// container is the sizer they go into; for an embed or canvas card it is
+	// the only way to find it (the note may not be open anywhere, or open in
+	// another tab whose sizer is the wrong one).
+	const container = (ctx as MarkdownPostProcessorContext & {containerEl?: unknown}).containerEl;
+	if (container instanceof HTMLElement) {
+		const sizer = container.closest(".markdown-preview-sizer");
+		if (sizer?.instanceOf(HTMLElement)) return sizer;
+	}
+
+	const sourcePathHint = ctx.sourcePath;
 
 	if (sourcePathHint) {
 		const leaves = plugin.app.workspace.getLeavesOfType("markdown");
@@ -1227,7 +1239,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				return;
 			}
 
-			const sizer = resolveSizerForElement(el, plugin, ctx.sourcePath);
+			const sizer = resolveSizerForElement(el, ctx, plugin);
 			if (!sizer?.instanceOf(HTMLElement)) return;
 			const previewEl = resolvePreviewElementForSizer(sizer);
 			if (!previewEl?.instanceOf(HTMLElement)) return;
