@@ -19,6 +19,7 @@ import {refreshRegionPosition} from "../core/region-position";
 import {buildResizeHandle} from "./column-resizer";
 import {applyNoteFootnotes, livePreviewFootnotes, wireLivePreviewFootnotes} from "./footnote-render";
 import {wireDragItem} from "./column-drag";
+import {addFoldControls} from "./fold";
 import {
 	insertColumnAfter,
 	insertColumnAfterOpposite,
@@ -245,6 +246,7 @@ export function renderMarkdown(
 			// Tag link-only paragraphs so their spacing rules can target a class
 			// instead of relying on the :has() selector.
 			markLinkLines(parent);
+			addFoldControls(plugin.app, parent);
 			if (onContentChange) {
 				wireTaskCheckboxes(parent, content, onContentChange);
 			}

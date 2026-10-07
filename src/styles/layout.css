@@ -503,6 +503,31 @@
 	padding: 0;
 }
 
+/* Blocks under a folded heading (render/fold.ts). The priority flag is needed:
+   a folded nested block is a .columns-container, whose display is forced. */
+.markdown-rendered .amc-fold-hidden {
+	display: none !important;
+}
+
+/* Fold indicators added by render/fold.ts. Reading view gets Obsidian's own
+   rules (scoped to .markdown-preview-view); live preview columns sit in the
+   editor, so the same rules are repeated for them. */
+.columns-container:not(.columns-reading) .column-item .collapse-indicator {
+	display: inline-flex;
+	position: absolute;
+	cursor: var(--cursor);
+	user-select: none;
+}
+
+.columns-container:not(.columns-reading) .column-item .heading-collapse-indicator {
+	margin-inline-start: -22px;
+	padding: 0 6px;
+}
+
+.columns-container:not(.columns-reading) .column-item li.is-collapsed > :is(ul, ol) {
+	display: none;
+}
+
 /* Live preview spacing normalization */
 .columns-container.columns-ui:not(.columns-reading) :is(.column-preview, .column-inline-edit-preview) {
 	--list-spacing: 0.2rem;

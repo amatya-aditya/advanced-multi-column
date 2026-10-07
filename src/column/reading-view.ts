@@ -12,6 +12,7 @@ import {NoteFootnotes} from "./core/footnotes";
 import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "./core/column-style";
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
+import {addFoldControls} from "./render/fold";
 import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
 import {
@@ -407,14 +408,20 @@ function renderMarkdownInto(
 ): void {
 	const footnotes = tasks.footnotes;
 	if (!footnotes) {
-		tasks.push(MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component));
+		tasks.push(
+			MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component)
+				.then(() => addFoldControls(plugin.app, el)),
+		);
 		return;
 	}
 	// Pieces are located in source order, so do it before rendering starts.
 	const piece = footnotes.locate(markdown);
 	tasks.push(
 		MarkdownRenderer.render(plugin.app, footnotes.prepare(markdown), el, sourcePath, component)
-			.then(() => applyNoteFootnotes(el, footnotes, piece, "reading")),
+			.then(() => {
+				applyNoteFootnotes(el, footnotes, piece, "reading");
+				addFoldControls(plugin.app, el);
+			}),
 	);
 }
 

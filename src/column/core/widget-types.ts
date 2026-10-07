@@ -70,6 +70,8 @@ export const INTERACTIVE_PREVIEW_SELECTOR = [
 	"[role='tab']",
 	"[role='menuitem']",
 	".clickable-icon",
+	// Heading and list fold toggles (see render/fold).
+	".collapse-indicator",
 	// Collapsible callout headers toggle their fold instead of opening the editor.
 	".callout.is-collapsible > .callout-title",
 	".mod-slider",
