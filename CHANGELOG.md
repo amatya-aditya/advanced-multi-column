@@ -4,6 +4,18 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.5.0-beta.2](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.2) - 2026-10-08 (pre-release)
+
+### Fixed
+- Banner plugins work in Reading view with columns ([#32](https://github.com/amatya-aditya/advanced-multi-column/issues/32)):
+  - **Pixel Banner:** the note starts at the banner's content start position again, instead of at the top behind the banner. Banner height and content start changes apply right away.
+  - **Banners:** the banner shows again; it was hidden in notes with columns.
+- Live Preview: footnote definitions written in a column (`[^1]: …`) show where they are written, as in the editor. Before, they only showed while the column was being edited.
+- Switching notes is smoother:
+  - **Reading view:** the previous note's columns no longer show under the new note's title, the new note's columns are no longer briefly built from the previous note's text, and they no longer jump down when the note's title and properties appear.
+  - **Live Preview:** switching notes no longer lays out the hidden Reading view's columns each time, so it is as fast as for notes without columns. Switching to Reading view never shows the note without its columns first.
+- Going back to a note in Reading view returns to where you were reading. Before, notes with columns opened at the top.
+
 ## [2.5.0-beta.1](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.1) - 2026-10-07 (pre-release)
 
 ### Added
