@@ -4,7 +4,7 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
-## Unreleased
+## [2.5.0-beta.3](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.3) - 2026-10-08 (pre-release)
 
 ### Changed
 - Reading view: when a note changes (for example on every save while it is edited in another pane), only the parts that changed are drawn again. A save of a long note no longer freezes Obsidian, and folded headings and lists stay folded.
@@ -15,6 +15,8 @@ Versions follow [Semantic Versioning](https://semver.org/). Each version links t
 - Same note open in two panes: column text could be lost when you edited a column in one pane and then a column in the other.
   - Text typed in the first pane was never saved if its column was redrawn just as you clicked into the other pane; the editor stayed open there.
   - When both columns were saved at almost the same moment (for example on opening another note), one pane's text replaced the other's.
+- Reading view: stacked columns no longer stick out of the block's border on the right, and their hover highlight no longer touches the top border.
+- Columns stacked on a narrow screen keep the dividers and separators between them, drawn as horizontal lines. Before, they disappeared.
 
 ## [2.5.0-beta.2](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.2) - 2026-10-08 (pre-release)
 
