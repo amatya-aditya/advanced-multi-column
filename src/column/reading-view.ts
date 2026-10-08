@@ -12,10 +12,12 @@ import {NoteFootnotes} from "./core/footnotes";
 import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "./core/column-style";
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
-import {addFoldControls} from "./render/fold";
+import {addFoldControls, refreshHeadingFolds} from "./render/fold";
 import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
 import {addMarkdownViewHooks, isLoadingFile} from "./view-hooks";
+import {blockContext, blockKey, BlockReuse, unloadNewBlocks, unloadUntakenBlocks} from "./reading-blocks";
+import type {LayerBlock} from "./reading-blocks";
 import {
 	applyPendingScroll,
 	createLineIndex,
@@ -37,7 +39,9 @@ interface RenderState {
 	wrapper: HTMLElement;
 	host: HTMLElement;
 	previewEl: HTMLElement;
+	/** Owns the layer's own parts (footnote list); blocks own theirs. */
 	component: Component;
+	blocks: LayerBlock[];
 	renderId: number;
 	createdAt: number;
 	previewObserver?: MutationObserver;
@@ -370,6 +374,7 @@ function teardownSizer(
 	if (state) {
 		disconnectObservers(state);
 		state.component.unload();
+		unloadUntakenBlocks(state.blocks, null);
 		state.wrapper.remove();
 		state.host.classList.remove(RV_PENDING_CLASS);
 		restoreFooter(state.previewEl, sizer);
@@ -653,13 +658,28 @@ function getFrontmatterEnd(text: string): number {
 	return end === -1 ? close + 4 : end + 1;
 }
 
+interface BuiltLayer {
+	wrapper: HTMLElement;
+	/** Top-level blocks in order; empty when built without reuse. */
+	blocks: LayerBlock[];
+	/** Move the blocks taken over from the previous layer into place (at mount). */
+	adopt(): void;
+}
+
+/**
+ * Build the note's column layer. With `reuse` (reading view), every top-level
+ * block gets its own component, and blocks unchanged since the previous build
+ * are taken over: they are moved in by adopt(), when the layers are swapped,
+ * so the layer on screen never loses them while this one builds.
+ */
 async function buildWrapper(
 	plugin: ColumnsPlugin,
 	sourcePath: string,
 	text: string,
 	regions: ColumnRegion[],
 	component: Component,
-): Promise<HTMLElement> {
+	reuse?: BlockReuse,
+): Promise<BuiltLayer> {
 	const wrapper = createDiv({cls: "columns-rv-wrapper"});
 	wrapper.dataset.columnsSourcePath = sourcePath;
 
@@ -668,18 +688,55 @@ async function buildWrapper(
 	const lineOf = createLineIndex(text);
 	const tasks: RenderTasks = [];
 	tasks.footnotes = NoteFootnotes.parse(text);
+	const context = blockContext(plugin, tasks.footnotes);
+	const blocks: LayerBlock[] = [];
+	const adoptions: {placeholder: HTMLElement; block: LayerBlock; from: number; to: number}[] = [];
+
+	const addBlock = (
+		kind: "text" | "columns",
+		source: string,
+		from: number,
+		to: number,
+		render: (owner: Component) => HTMLElement | null,
+	): void => {
+		if (!reuse) {
+			tagSourceLines(render(component), from, to);
+			return;
+		}
+		const key = blockKey(kind, source, context);
+		const reused = reuse.take(key);
+		if (reused) {
+			adoptions.push({placeholder: wrapper.createDiv(), block: reused, from, to});
+			blocks.push(reused);
+			return;
+		}
+		const owner = new Component();
+		owner.load();
+		const el = render(owner);
+		if (!el) {
+			owner.unload();
+			return;
+		}
+		tagSourceLines(el, from, to);
+		blocks.push({key, el, component: owner});
+	};
+	const addText = (markdown: string, from: number, to: number): void => {
+		if (markdown.trim().length === 0) return;
+		addBlock("text", markdown, from, to, (owner) =>
+			renderMarkdownSegment(plugin, owner, wrapper, markdown, sourcePath, tasks));
+	};
+
 	let cursor = getFrontmatterEnd(text);
 	for (const region of regions) {
-		const before = text.slice(cursor, region.from);
-		const segment = renderMarkdownSegment(plugin, component, wrapper, before, sourcePath, tasks);
-		tagSourceLines(segment, lineOf(cursor), lineOf(Math.max(cursor, region.from - 1)));
-		buildColumnsRegion(plugin, component, wrapper, region, sourcePath, 0, tasks);
-		tagSourceLines(wrapper.lastElementChild, region.lineStart, region.lineEnd);
+		addText(text.slice(cursor, region.from), lineOf(cursor), lineOf(Math.max(cursor, region.from - 1)));
+		addBlock("columns", text.slice(region.from, region.to), region.lineStart, region.lineEnd, (owner) => {
+			buildColumnsRegion(plugin, owner, wrapper, region, sourcePath, 0, tasks);
+			const container = wrapper.lastElementChild;
+			return container instanceof HTMLElement ? container : null;
+		});
 		cursor = region.to;
 	}
-	const after = text.slice(cursor);
-	const tail = renderMarkdownSegment(plugin, component, wrapper, after, sourcePath, tasks);
-	tagSourceLines(tail, lineOf(cursor), lineOf(text.length));
+	addText(text.slice(cursor), lineOf(cursor), lineOf(text.length));
 	// Each piece above was rendered on its own, so the note's footnote list
 	// is built here, as Obsidian does at the end of a note.
 	if (tasks.footnotes) {
@@ -713,7 +770,18 @@ async function buildWrapper(
 		);
 	});
 
-	return wrapper;
+	return {
+		wrapper,
+		blocks,
+		adopt: () => {
+			for (const {placeholder, block, from, to} of adoptions) {
+				placeholder.replaceWith(block.el);
+				tagSourceLines(block.el, from, to);
+			}
+			// A folded heading hides the blocks after it; the set of blocks changed.
+			if (adoptions.length > 0) refreshHeadingFolds(wrapper);
+		},
+	};
 }
 
 /**
@@ -737,7 +805,7 @@ function renderNoteInPlace(
 
 		const child = new MarkdownRenderChild(el);
 		ctx.addChild(child);
-		const wrapper = await buildWrapper(plugin, ctx.sourcePath, text, regions, child);
+		const {wrapper} = await buildWrapper(plugin, ctx.sourcePath, text, regions, child);
 		for (const node of Array.from(el.children)) {
 			if (!keep(node)) node.remove();
 		}
@@ -894,6 +962,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		if (states.get(sizer) !== state) return;
 
 		state.component.unload();
+		unloadUntakenBlocks(state.blocks, null);
 		states.delete(sizer);
 		// Detach the old render tree so it can be garbage collected instead
 		// of lingering as a detached DOM subtree.
@@ -1254,14 +1323,19 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		const renderId = ++renderIdSeq;
 		let scrollSnapshot: ScrollSnapshot[] = [];
 		inFlightBuilds.set(sizer, {token, fingerprint});
+		// Another build of the same note: take over its unchanged blocks.
+		const reuse = new BlockReuse(previous?.sourcePath === sourcePath ? previous.blocks : []);
+		let built: BuiltLayer | null = null;
 
 		try {
-			const wrapper = await buildWrapper(plugin, sourcePath, text, regions, component);
+			built = await buildWrapper(plugin, sourcePath, text, regions, component, reuse);
+			const {wrapper} = built;
 
 			// Drop only if a different build superseded this one (or the view
 			// went away) — same-fingerprint renders coalesced instead.
 			if (!sizer.isConnected || inFlightBuilds.get(sizer)?.token !== token) {
 				component.unload();
+				unloadNewBlocks(built.blocks, reuse);
 				rvWarn("render result dropped: stale after async build", {
 					renderId,
 					token,
@@ -1273,6 +1347,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 			if (previous && states.get(sizer) === previous) {
 				previous.component.unload();
+				unloadUntakenBlocks(previous.blocks, reuse);
 				states.delete(sizer);
 			}
 			while (host.firstChild) {
@@ -1288,6 +1363,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			previewEl.classList.add(RV_ACTIVE_CLASS);
 			host.appendChild(wrapper);
+			built.adopt();
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
 			// A footer moved out by an older version goes back to Obsidian.
@@ -1300,6 +1376,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				host,
 				previewEl,
 				component,
+				blocks: built.blocks,
 				renderId,
 				createdAt: Date.now(),
 			};
@@ -1324,6 +1401,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				inFlightBuilds.delete(sizer);
 			}
 			component.unload();
+			if (built) unloadNewBlocks(built.blocks, reuse);
 			teardownSizer(sizer, states, "render failed");
 			previewEl.classList.remove(RV_ACTIVE_CLASS);
 			restoreSizerContent(sizer);

@@ -47,6 +47,11 @@ function scopeBlocks(scope: Element): Element[] {
 	return blocks;
 }
 
+/** Re-apply the heading folds of a scope after its blocks changed. */
+export function refreshHeadingFolds(scope: Element): void {
+	applyHeadingFolds(scope);
+}
+
 /** Hide everything under a collapsed heading, up to the next heading of the same or a higher level. */
 function applyHeadingFolds(scope: Element): void {
 	let hideBelow = 0;
