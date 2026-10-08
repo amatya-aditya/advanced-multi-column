@@ -15,9 +15,12 @@ import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/c
 import {addFoldControls} from "./render/fold";
 import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
+import {addMarkdownViewHooks, isLoadingFile} from "./view-hooks";
 import {
+	applyPendingScroll,
 	createLineIndex,
 	installReadingScrollMapping,
+	releasePendingScroll,
 	tagSourceLines,
 	uninstallReadingScrollMapping,
 } from "./reading-scroll";
@@ -109,6 +112,12 @@ function resolveViewForSizer(
 		}
 	}
 	return null;
+}
+
+/** The sizer of the view's own reading view (not of a note embedded in it). */
+function ownSizerOf(view: MarkdownView): HTMLElement | null {
+	const sizer = view.previewMode.containerEl.querySelector(":scope > .markdown-preview-view > .markdown-preview-sizer");
+	return sizer?.instanceOf(HTMLElement) ? sizer : null;
 }
 
 function resolvePreviewElementForSizer(sizer: HTMLElement): HTMLElement | null {
@@ -366,6 +375,7 @@ function teardownSizer(
 		restoreFooter(state.previewEl, sizer);
 		restoreSizerContent(sizer);
 		state.previewEl.classList.remove(RV_ACTIVE_CLASS);
+		releasePendingScroll(state.previewEl);
 		if (!state.host.hasChildNodes()) {
 			state.host.remove();
 		}
@@ -392,6 +402,7 @@ function teardownSizer(
 	restoreFooter(previewEl, sizer);
 	restoreSizerContent(sizer);
 	previewEl.classList.remove(RV_ACTIVE_CLASS);
+	releasePendingScroll(previewEl);
 	rvWarn("teardown stale preview", {reason});
 }
 
@@ -411,6 +422,10 @@ function textFingerprint(sourcePath: string, text: string, regions: ColumnRegion
 		+ `\u0000${(hashA >>> 0).toString(16)}${(hashB >>> 0).toString(16)}`
 	);
 }
+
+/** A render waits up to HEADER_WAIT_TRIES × HEADER_WAIT_MS for the note's header. */
+const HEADER_WAIT_TRIES = 20;
+const HEADER_WAIT_MS = 25;
 
 /** Longest a new layer waits for its markdown renders before it is shown. */
 const LAYER_RENDER_WAIT_MS = 40;
@@ -771,6 +786,8 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const activeSizers = new Set<HTMLElement>();
 	const buildTimes = new WeakMap<HTMLElement, {fingerprint: string; time: number}[]>();
 	const suppressedSizers = new WeakSet<HTMLElement>();
+	/** Times a render waited for the note's header (see renderSizer). */
+	const headerWaits = new WeakMap<HTMLElement, number>();
 	// One entry per sizer while a wrapper build is in flight.  Renders whose
 	// fingerprint matches the in-flight build coalesce into it instead of
 	// invalidating it — otherwise frequent async re-renders (e.g. Dataview
@@ -1105,6 +1122,34 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 		const sourcePath = sourceHints.get(sizer) || view?.file?.path || "";
 
+		if (view && ownSizerOf(view) === sizer) {
+			// Another note is loading: view.file names it, but the view's data
+			// is still the previous note's. Building now would lay out the old
+			// text (and the next build would redo it) while slowing the load
+			// down; the build starts once the note has loaded (afterFileLoad).
+			if (isLoadingFile(view)) return;
+			// The pane shows the editor, not reading view: build when it
+			// switches to reading view (layout-change), not on every note
+			// opened or changed while editing.
+			if (view.getMode() !== "preview") {
+				prepareHiddenLayer(view);
+				return;
+			}
+			// Opening a note re-renders the note's header (inline title,
+			// properties). Columns laid out before it is back jumped down when
+			// it appeared, and the build held it up. Reading view always has
+			// the header element (empty when both are off); wait a little.
+			if (!sizer.querySelector(":scope > .mod-header")) {
+				const waits = headerWaits.get(sizer) ?? 0;
+				if (waits < HEADER_WAIT_TRIES) {
+					headerWaits.set(sizer, waits + 1);
+					scheduleRender(sizer, sourcePath, "await-header", HEADER_WAIT_MS);
+					return;
+				}
+			}
+			headerWaits.delete(sizer);
+		}
+
 		if (!view && !sourcePath) {
 			// No view and no source hint — retry after a short delay
 			// (workspace may not be fully initialized on first load)
@@ -1171,6 +1216,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			existing.previewEl.classList.add(RV_ACTIVE_CLASS);
 			existing.host.classList.remove(RV_PENDING_CLASS);
+			applyPendingScroll(existing.previewEl);
 			hideSizerContent(sizer);
 			rvWarn("render reused existing wrapper", sizerSnapshot(sizer, existing));
 			return;
@@ -1259,7 +1305,9 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			};
 			states.set(sizer, state);
 			mountedState = state;
-			if (scrollSnapshot.length > 0) {
+			// A position Obsidian applied while this layer was being built (e.g.
+			// going back to the note) wins over keeping the current scroll.
+			if (!applyPendingScroll(previewEl) && scrollSnapshot.length > 0) {
 				restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			}
 			retryCounts.delete(sizer);
@@ -1370,6 +1418,77 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	plugin.registerEvent(plugin.app.vault.on("modify", (file) => rescheduleForPath(file.path, "file-modified")));
 	// Switching a pane from editing to reading shows the editor's latest text.
 	plugin.registerEvent(plugin.app.workspace.on("layout-change", () => rescheduleForPath(null, "layout-change")));
+
+	/**
+	 * The view's note has columns but reading view has no layer for it yet:
+	 * it was just opened, or the pane shows the editor (the layer is built when
+	 * reading view is shown). Hide Obsidian's own rendering of reading view
+	 * now, so it shows an empty note until the columns are built, never the
+	 * note without columns, and scroll positions applied meanwhile are kept
+	 * for the columns (see reading-scroll).
+	 */
+	const prepareHiddenLayer = (view: MarkdownView): void => {
+		const sizer = ownSizerOf(view);
+		const previewEl = sizer?.parentElement;
+		const path = view.file?.path;
+		if (!sizer || !previewEl || !path || !plugin.settings.enableReadingView) return;
+		const state = states.get(sizer);
+		if (state?.sourcePath === path) return;
+		if (!view.getViewData().includes("col-start")) {
+			if (state) state.host.classList.add(RV_PENDING_CLASS);
+			return;
+		}
+		const host = state?.host ?? ensureWrapperHost(previewEl, sizer);
+		host.classList.add(RV_PENDING_CLASS);
+		previewEl.classList.add(RV_ACTIVE_CLASS);
+		hideSizerContent(sizer);
+		activeSizers.add(sizer);
+		sourceHints.set(sizer, path);
+	};
+
+	/** Reading view is shown and its columns are not ready: build them now. */
+	const renderShownReadingViews = (): void => {
+		for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
+			const view = leaf.view;
+			if (!(view instanceof MarkdownView) || !view.file || view.getMode() !== "preview") continue;
+			const sizer = ownSizerOf(view);
+			if (!sizer || !activeSizers.has(sizer)) continue;
+			const state = states.get(sizer);
+			if (state?.sourcePath === view.file.path && !state.host.classList.contains(RV_PENDING_CLASS)) continue;
+			scheduleRender(sizer, view.file.path, "reading-view-shown", 0);
+		}
+	};
+	plugin.registerEvent(plugin.app.workspace.on("layout-change", renderShownReadingViews));
+
+	addMarkdownViewHooks(plugin, {
+		// Another note opens in the pane: hide the previous note's columns at
+		// once. They stayed on screen under the new note's title until the new
+		// note's sections rendered.
+		beforeFileChange: (view, next) => {
+			const sizer = ownSizerOf(view);
+			const state = sizer ? states.get(sizer) : undefined;
+			if (state && state.sourcePath !== next?.path) state.host.classList.add(RV_PENDING_CLASS);
+		},
+		// Build the new note's columns as soon as its text is in the view, or
+		// get reading view ready for them while the pane shows the editor.
+		afterFileLoad: (view) => {
+			const sizer = ownSizerOf(view);
+			if (!sizer || !view.file) return;
+			if (view.getMode() !== "preview") {
+				prepareHiddenLayer(view);
+			} else if (!view.getViewData().includes("col-start")) {
+				// No columns: take the previous note's layer down before Obsidian
+				// restores the note's scroll position, so it applies to the note.
+				invalidateRenderToken(sizer);
+				teardownSizer(sizer, states, "loaded a note without columns");
+			} else {
+				// Until the columns are built: no raw note, and the scroll
+				// position Obsidian restores is kept for them.
+				prepareHiddenLayer(view);
+				scheduleRender(sizer, view.file.path, "file-loaded", 0);
+			}
+		},
+	});
 
 	// Opening another note in a pane: hide the previous note's columns before
 	// the first frame of the new note, so they never show over it.

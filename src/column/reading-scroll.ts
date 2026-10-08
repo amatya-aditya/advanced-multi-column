@@ -15,6 +15,8 @@
  */
 
 export const ACTIVE_CLASS = "amc-reading-columns-active";
+/** Set on the layer's host while another note's layer is still up (see reading-view). */
+const PENDING_CLASS = "amc-rv-pending";
 const LINE_FROM = "amcLineFrom";
 const LINE_TO = "amcLineTo";
 
@@ -109,6 +111,56 @@ function scrollForLine(previewEl: HTMLElement, blocks: Block[], line: number, ce
 	return Math.max(0, y);
 }
 
+/** The column layer of another note is still up while this note's is built. */
+function isLayerPending(previewEl: HTMLElement): boolean {
+	if (!previewEl.classList.contains(ACTIVE_CLASS)) return false;
+	const host = previewEl.querySelector(":scope > .amc-reading-columns-host");
+	return !host || host.classList.contains(PENDING_CLASS);
+}
+
+interface PendingScroll {
+	renderer: PreviewRenderer;
+	line: number;
+	options?: ScrollOptions;
+}
+
+/**
+ * Scroll positions Obsidian applied while the note's layer was not built yet,
+ * e.g. going back to a note restores where it was read. Applying them to the
+ * previous note's layer, or to nothing, lost them.
+ */
+const pendingScrolls = new WeakMap<HTMLElement, PendingScroll>();
+
+/** Apply a deferred scroll position once the note's layer is mounted. */
+export function applyPendingScroll(previewEl: HTMLElement): boolean {
+	const pending = pendingScrolls.get(previewEl);
+	if (!pending) return false;
+	const blocks = activeBlocks(previewEl);
+	if (!blocks) return false;
+	pendingScrolls.delete(previewEl);
+	previewEl.scrollTop = scrollForLine(previewEl, blocks, pending.line, !!pending.options?.center);
+	return true;
+}
+
+/**
+ * The note has no columns after all: let Obsidian apply the deferred position.
+ * Its sections were hidden until now and are measured over the next frames,
+ * so a position that cannot be applied yet is retried for a few frames.
+ */
+export function releasePendingScroll(previewEl: HTMLElement): void {
+	const pending = pendingScrolls.get(previewEl);
+	if (!pending) return;
+	pendingScrolls.delete(previewEl);
+	let tries = 0;
+	const attempt = () => {
+		if (pending.renderer.applyScroll(pending.line, pending.options) || ++tries >= RELEASE_SCROLL_TRIES) return;
+		previewEl.win.requestAnimationFrame(attempt);
+	};
+	attempt();
+}
+
+const RELEASE_SCROLL_TRIES = 10;
+
 let patchedProto: (PreviewRenderer & Record<string, unknown>) | null = null;
 let originalGetScroll: PreviewRenderer["getScroll"] | null = null;
 let originalApplyScroll: PreviewRenderer["applyScroll"] | null = null;
@@ -137,11 +189,19 @@ export function installReadingScrollMapping(renderer: unknown): void {
 	patchedProto = proto;
 
 	proto.getScroll = function (this: PreviewRenderer): number | null {
+		// The layer on screen belongs to another note (or none is built yet):
+		// report the deferred position, never a line of the other note.
+		// Obsidian reads the position and applies it again while it renders.
+		if (isLayerPending(this.previewEl)) return pendingScrolls.get(this.previewEl)?.line ?? null;
 		const blocks = activeBlocks(this.previewEl);
 		return blocks ? lineAtScroll(this.previewEl, blocks) : getScroll.call(this);
 	};
 	proto.applyScroll = function (this: PreviewRenderer, line: number, options?: ScrollOptions): boolean {
 		if (typeof line !== "number" || Number.isNaN(line)) return applyScroll.call(this, line, options);
+		if (isLayerPending(this.previewEl)) {
+			pendingScrolls.set(this.previewEl, {renderer: this, line, options});
+			return true;
+		}
 		const blocks = activeBlocks(this.previewEl);
 		if (!blocks) return applyScroll.call(this, line, options);
 		this.previewEl.scrollTop = scrollForLine(this.previewEl, blocks, line, !!options?.center);
