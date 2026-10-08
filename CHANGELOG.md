@@ -14,6 +14,9 @@ Versions follow [Semantic Versioning](https://semver.org/). Each version links t
 
 ### Fixed
 - Reading view no longer jumps to the top of a note with columns whenever the note is saved.
+- Same note open in two panes: column text could be lost when you edited a column in one pane and then a column in the other.
+  - Text typed in the first pane was never saved if its column was redrawn just as you clicked into the other pane; the editor stayed open there.
+  - When both columns were saved at almost the same moment (for example on opening another note), one pane's text replaced the other's.
 
 ## [2.5.0-beta.2](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.2) - 2026-10-08 (pre-release)
 

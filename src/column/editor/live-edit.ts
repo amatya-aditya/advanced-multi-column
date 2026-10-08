@@ -235,6 +235,19 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		}
 	};
 
+	/** Commit shortly after the editor loses focus, unless the focus comes back. */
+	const scheduleBlurCommit = () => {
+		const blurredHandle = active;
+		if (!blurredHandle) return;
+		clearBlurTimer();
+		blurTimer = config.hostEl.win.setTimeout(() => {
+			blurTimer = null;
+			if (active !== blurredHandle) return;
+			if (config.hostEl.contains(config.hostEl.doc.activeElement)) return;
+			commitAndClose();
+		}, blurDelay);
+	};
+
 	const trackChange = (update: ViewUpdate) => {
 		const st = getInteractionState(editState.view).activeEdit;
 		if (st?.owner !== owner) return;
@@ -317,17 +330,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			placeholder: "Type here",
 			sourcePath,
 			onEscape: () => commitAndClose(),
-			onBlur: () => {
-				const blurredHandle = active;
-				if (!blurredHandle) return;
-				clearBlurTimer();
-				blurTimer = config.hostEl.win.setTimeout(() => {
-					blurTimer = null;
-					if (active !== blurredHandle) return;
-					if (config.hostEl.contains(config.hostEl.doc.activeElement)) return;
-					commitAndClose();
-				}, blurDelay);
-			},
+			onBlur: () => scheduleBlurCommit(),
 			onChange: trackChange,
 			onPaste: handleEditorImagePaste,
 			onTab: config.onNavigate
@@ -397,6 +400,13 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		// takes focus at once: until it does, keys typed into the column go to
 		// the note's own editor.
 		if (restore?.focus) handle.focus();
+		// The user had already left this editor (its blur commit was pending
+		// when the widget was rebuilt): finish that commit, and don't take the
+		// focus back from where they went.
+		if (restoring && restore?.focus === false) {
+			scheduleBlurCommit();
+			return;
+		}
 		window.requestAnimationFrame(() => {
 			if (active === handle) handle.focus();
 		});
