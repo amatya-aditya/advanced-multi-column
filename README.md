@@ -134,6 +134,9 @@ Right column content
 
 > Content between `%% col-start %%` and the first `%% col-break %%` is ignored.
 
+> [!WARNING]
+> Type the markers directly in your note. Don't wrap them in a code block: the ` ```md ` fences in this README only display the examples. A fenced layout breaks reading view and can turn the rest of the note into a code block.
+
 ## Syntax Reference
 
 Markers must be on their own lines.
