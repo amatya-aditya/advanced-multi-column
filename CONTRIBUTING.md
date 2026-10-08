@@ -104,7 +104,19 @@ CI runs the same build and lint on Node.js 20 and 22 for every push and pull req
 
 ## Testing your change
 
-There is no automated UI test suite yet, so test by hand in your test vault:
+### End-to-end tests
+
+`npm run test:e2e` builds the plugin, starts a separate Obsidian on a temporary test vault and checks editing, Reading view and Live Preview. It needs Obsidian installed on your computer and takes about two minutes. Your own Obsidian can stay open; the tests use their own copy of Obsidian's settings.
+
+- `npm run test:e2e -- --grep "two panes"` runs only the tests whose name matches.
+- `--no-build` skips the build; `--leave-open` keeps the test Obsidian open (on port 9339) to look around after a failure. Close it before the next run.
+- Set `OBSIDIAN_PATH` if Obsidian isn't installed in the usual place, and `AMC_E2E_PORT` to use another debugging port.
+
+The tests click and type into the test window, so leave it alone while they run. Tests live in `tests/e2e/suites/`; add one for any bug you fix that they can catch.
+
+### By hand
+
+The tests don't cover themes, mobile or every layout, so also check by hand in your test vault:
 
 - **Both views:** **Live Preview** and **Reading view**, with the default theme and at least one popular community theme.
 - **Nesting and layouts:** nested columns and stacked layouts, if your change touches layout.

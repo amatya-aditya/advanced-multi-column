@@ -10,7 +10,8 @@
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"lint": "eslint .",
 		"setup:hooks": "node scripts/setup-git-hooks.mjs",
-		"commit": "node scripts/commit.mjs"
+		"commit": "node scripts/commit.mjs",
+		"test:e2e": "node tests/e2e/run.mjs"
 	},
 	"keywords": [],
 	"license": "0-BSD",
