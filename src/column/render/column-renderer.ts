@@ -17,7 +17,8 @@ import {isInteractivePreviewTarget} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
 import {refreshRegionPosition} from "../core/region-position";
 import {buildResizeHandle} from "./column-resizer";
-import {applyNoteFootnotes, livePreviewFootnotes, wireLivePreviewFootnotes} from "./footnote-render";
+import {applyNoteFootnotes, livePreviewFootnotes, renderLiveFootnoteDefinitions, wireLivePreviewFootnotes} from "./footnote-render";
+import {extractFootnoteDefinitions} from "../core/footnotes";
 import {wireDragItem} from "./column-drag";
 import {addFoldControls} from "./fold";
 import {
@@ -235,9 +236,17 @@ export function renderMarkdown(
 		// definitions and numbers (see core/footnotes).
 		const footnotes = livePreviewFootnotes(ctx);
 		const piece = footnotes?.locate(content);
-		const markdown = footnotes ? footnotes.prepare(content, true) : content;
+		// Definitions show where they are written, as in the editor.
+		const {body, definitions} = extractFootnoteDefinitions(content);
+		const markdown = footnotes ? footnotes.prepare(body, true) : body;
+		const renderFootnotes = (target: HTMLElement, text: string) =>
+			MarkdownRenderer.render(plugin.app, footnotes ? footnotes.prepare(text, true) : text, target, sourcePath, component)
+				.then(() => {
+					if (footnotes) applyNoteFootnotes(target, footnotes, {inlineNumbers: []}, "live");
+				});
 		void MarkdownRenderer.render(plugin.app, markdown, parent, sourcePath, component).then(() => {
 			if (footnotes && piece) applyNoteFootnotes(parent, footnotes, piece, "live");
+			void Promise.all(renderLiveFootnoteDefinitions(parent, definitions, renderFootnotes));
 			// Unwrap <p> inside <li> (loose lists) so parent items render
 			// identically to child items without block-level spacing artifacts.
 			unwrapLooseListParagraphs(parent);

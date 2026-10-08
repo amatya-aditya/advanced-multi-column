@@ -1371,6 +1371,35 @@
 	color: var(--text-faint);
 }
 
+/* Live Preview: a footnote definition written in a column, shown in place as
+   the editor shows it: the label, then the footnote text. */
+.amc-columns-host .amc-footnote-def {
+	display: flex;
+	align-items: baseline;
+	gap: 0.3em;
+}
+
+/* Raised like a superscript: vertical-align has no effect on a flex item. */
+.amc-columns-host .amc-footnote-def-label {
+	flex-shrink: 0;
+	position: relative;
+	top: -0.4em;
+	font-size: 0.75em;
+	color: var(--text-muted);
+}
+
+.amc-columns-host .amc-footnote-def-body {
+	min-width: 0;
+}
+
+.amc-columns-host .amc-footnote-def-body > :first-child {
+	margin-top: 0;
+}
+
+.amc-columns-host .amc-footnote-def-body > :last-child {
+	margin-bottom: 0;
+}
+
 /* Footnote preview shown when a reference in a column is hovered. */
 .popover.hover-popover .amc-footnote-popover {
 	padding: var(--size-4-3) var(--size-4-4);

@@ -106,14 +106,22 @@ function closeInline(text: string, open: number): number {
 	return -1;
 }
 
+/** A `[^label]:` definition block as written in the source. */
+export interface DefinitionBlock {
+	from: number;
+	to: number;
+	label: string;
+	markdown: string;
+}
+
 /**
- * Footnote definitions of `text`. `ranges`, when given, receives the
- * source range of every definition block, duplicates included.
+ * Footnote definitions of `text`. `blocks`, when given, receives every
+ * definition block in source order, duplicates included.
  */
 function parseDefinitions(
 	text: string,
 	masked: string,
-	ranges?: [number, number][],
+	blocks?: DefinitionBlock[],
 ): Map<string, FootnoteDefinition> {
 	const definitions = new Map<string, FootnoteDefinition>();
 	const lines = masked.split("\n");
@@ -162,15 +170,39 @@ function parseDefinitions(
 		// Trailing blank lines are not part of the definition.
 		let last = j - 1;
 		while (last > i && rawLines[last]!.trim() === "") last--;
-		ranges?.push([lineStarts[i]!, lineStarts[last]! + rawLines[last]!.length]);
+		const markdown = body.join("\n").trim();
+		blocks?.push({from: lineStarts[i]!, to: lineStarts[last]! + rawLines[last]!.length, label: m[1]!, markdown});
 		const label = normalizeFootnoteLabel(m[1]!);
 		// The first definition of a label wins, as in Obsidian.
 		if (!definitions.has(label)) {
-			definitions.set(label, {label: m[1]!, markdown: body.join("\n").trim(), from: lineStarts[i]!});
+			definitions.set(label, {label: m[1]!, markdown, from: lineStarts[i]!});
 		}
 		i = j - 1;
 	}
 	return definitions;
+}
+
+/** Text of the placeholder paragraph standing in for definition `index`. */
+export function definitionPlaceholder(index: number): string {
+	return `amcfootnotedefinition${index}placeholder`;
+}
+
+/**
+ * Live Preview shows footnote definitions where they are written, as the
+ * editor does. Replace each definition block of `piece` with a placeholder
+ * paragraph (see definitionPlaceholder) to swap for the rendered definition,
+ * so the renderer neither drops it nor moves it to a list at the end.
+ */
+export function extractFootnoteDefinitions(piece: string): {body: string; definitions: DefinitionBlock[]} {
+	if (!mayHaveFootnotes(piece)) return {body: piece, definitions: []};
+	const definitions: DefinitionBlock[] = [];
+	parseDefinitions(piece, maskIgnored(piece), definitions);
+	let body = piece;
+	for (let i = definitions.length - 1; i >= 0; i--) {
+		const {from, to} = definitions[i]!;
+		body = `${body.slice(0, from)}\n\n${definitionPlaceholder(i)}\n\n${body.slice(to)}`;
+	}
+	return {body, definitions};
 }
 
 /** References and inline footnotes in source order. */
@@ -260,11 +292,11 @@ export class NoteFootnotes {
 	prepare(piece: string, keepUndefined = false): string {
 		if (!mayHaveFootnotes(piece)) return piece;
 		const masked = maskIgnored(piece);
-		const ranges: [number, number][] = [];
-		parseDefinitions(piece, masked, ranges);
+		const blocks: DefinitionBlock[] = [];
+		parseDefinitions(piece, masked, blocks);
 		let body = piece;
 		// Blank lines in place of each block keep a following `---` a rule.
-		for (const [from, to] of ranges.reverse()) {
+		for (const {from, to} of blocks.reverse()) {
 			body = `${body.slice(0, from)}\n${body.slice(to)}`;
 		}
 		const needed: FootnoteDefinition[] = [];
