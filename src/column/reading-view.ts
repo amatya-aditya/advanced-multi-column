@@ -21,8 +21,11 @@ import type {LayerBlock} from "./reading-blocks";
 import {
 	applyPendingScroll,
 	createLineIndex,
+	FILL_MARGIN_LINES,
 	installReadingScrollMapping,
+	pendingScrollLine,
 	releasePendingScroll,
+	setLayerFiller,
 	tagSourceLines,
 	uninstallReadingScrollMapping,
 } from "./reading-scroll";
@@ -42,6 +45,8 @@ interface RenderState {
 	/** Owns the layer's own parts (footnote list); blocks own theirs. */
 	component: Component;
 	blocks: LayerBlock[];
+	/** Stops rendering the layer's deferred blocks (see buildWrapper). */
+	stopFilling?: () => void;
 	renderId: number;
 	createdAt: number;
 	previewObserver?: MutationObserver;
@@ -373,6 +378,8 @@ function teardownSizer(
 	const state = states.get(sizer);
 	if (state) {
 		disconnectObservers(state);
+		state.stopFilling?.();
+		setLayerFiller(state.previewEl, null);
 		state.component.unload();
 		unloadUntakenBlocks(state.blocks, null);
 		state.wrapper.remove();
@@ -664,6 +671,27 @@ interface BuiltLayer {
 	blocks: LayerBlock[];
 	/** Move the blocks taken over from the previous layer into place (at mount). */
 	adopt(): void;
+	/** Render the deferred blocks up to a source line now (in source order). */
+	fill: (line: number) => void;
+	/** Render the remaining deferred blocks in the background; returns a stop function. */
+	fillInBackground: (win: Window) => () => void;
+}
+
+/** Time a background slice of deferred blocks may take before it yields. */
+const FILL_SLICE_MS = 12;
+
+/** Estimated height of a deferred block per source line, until it is rendered. */
+const DEFERRED_EM_PER_LINE = 1.5;
+
+/**
+ * A block rendered after the layer is shown (see buildWrapper's
+ * `renderThroughLine`). Its placeholder holds its place and estimated height.
+ */
+interface DeferredBlock {
+	block: LayerBlock;
+	from: number;
+	to: number;
+	render: (owner: Component, parent: HTMLElement) => HTMLElement | null;
 }
 
 /**
@@ -671,6 +699,12 @@ interface BuiltLayer {
  * block gets its own component, and blocks unchanged since the previous build
  * are taken over: they are moved in by adopt(), when the layers are swapped,
  * so the layer on screen never loses them while this one builds.
+ *
+ * With `renderThroughLine`, only the blocks starting up to that source line
+ * are rendered now; the rest get placeholders and are rendered by fill() and
+ * fillInBackground(). Rendering a long note in one go froze Obsidian for half
+ * a second before anything showed. The deferred blocks come after the
+ * rendered ones, so they render in source order, as footnotes require.
  */
 async function buildWrapper(
 	plugin: ColumnsPlugin,
@@ -679,6 +713,7 @@ async function buildWrapper(
 	regions: ColumnRegion[],
 	component: Component,
 	reuse?: BlockReuse,
+	renderThroughLine?: number,
 ): Promise<BuiltLayer> {
 	const wrapper = createDiv({cls: "columns-rv-wrapper"});
 	wrapper.dataset.columnsSourcePath = sourcePath;
@@ -691,16 +726,17 @@ async function buildWrapper(
 	const context = blockContext(plugin, tasks.footnotes);
 	const blocks: LayerBlock[] = [];
 	const adoptions: {placeholder: HTMLElement; block: LayerBlock; from: number; to: number}[] = [];
+	const deferred: DeferredBlock[] = [];
 
 	const addBlock = (
 		kind: "text" | "columns",
 		source: string,
 		from: number,
 		to: number,
-		render: (owner: Component) => HTMLElement | null,
+		render: (owner: Component, parent: HTMLElement) => HTMLElement | null,
 	): void => {
 		if (!reuse) {
-			tagSourceLines(render(component), from, to);
+			tagSourceLines(render(component, wrapper), from, to);
 			return;
 		}
 		const key = blockKey(kind, source, context);
@@ -712,7 +748,17 @@ async function buildWrapper(
 		}
 		const owner = new Component();
 		owner.load();
-		const el = render(owner);
+		// Once one block is deferred, all later ones are: they render in order.
+		if (renderThroughLine !== undefined && (from > renderThroughLine || deferred.length > 0)) {
+			const placeholder = wrapper.createDiv({cls: "amc-rv-deferred"});
+			placeholder.style.height = `${(to - from + 1) * DEFERRED_EM_PER_LINE}em`;
+			tagSourceLines(placeholder, from, to);
+			const block: LayerBlock = {key, el: placeholder, component: owner, pending: true};
+			blocks.push(block);
+			deferred.push({block, from, to, render});
+			return;
+		}
+		const el = render(owner, wrapper);
 		if (!el) {
 			owner.unload();
 			return;
@@ -722,16 +768,16 @@ async function buildWrapper(
 	};
 	const addText = (markdown: string, from: number, to: number): void => {
 		if (markdown.trim().length === 0) return;
-		addBlock("text", markdown, from, to, (owner) =>
-			renderMarkdownSegment(plugin, owner, wrapper, markdown, sourcePath, tasks));
+		addBlock("text", markdown, from, to, (owner, parent) =>
+			renderMarkdownSegment(plugin, owner, parent, markdown, sourcePath, tasks));
 	};
 
 	let cursor = getFrontmatterEnd(text);
 	for (const region of regions) {
 		addText(text.slice(cursor, region.from), lineOf(cursor), lineOf(Math.max(cursor, region.from - 1)));
-		addBlock("columns", text.slice(region.from, region.to), region.lineStart, region.lineEnd, (owner) => {
-			buildColumnsRegion(plugin, owner, wrapper, region, sourcePath, 0, tasks);
-			const container = wrapper.lastElementChild;
+		addBlock("columns", text.slice(region.from, region.to), region.lineStart, region.lineEnd, (owner, parent) => {
+			buildColumnsRegion(plugin, owner, parent, region, sourcePath, 0, tasks);
+			const container = parent.lastElementChild;
 			return container instanceof HTMLElement ? container : null;
 		});
 		cursor = region.to;
@@ -770,6 +816,17 @@ async function buildWrapper(
 		);
 	});
 
+	let next = 0;
+	const renderNext = (): void => {
+		const {block, from, to, render} = deferred[next++]!;
+		const el = render(block.component, createDiv());
+		block.pending = false;
+		if (!el) return;
+		block.el.replaceWith(el);
+		block.el = el;
+		tagSourceLines(el, from, to);
+	};
+
 	return {
 		wrapper,
 		blocks,
@@ -780,6 +837,27 @@ async function buildWrapper(
 			}
 			// A folded heading hides the blocks after it; the set of blocks changed.
 			if (adoptions.length > 0) refreshHeadingFolds(wrapper);
+		},
+		fill: (line) => {
+			const start = next;
+			while (next < deferred.length && deferred[next]!.from <= line) renderNext();
+			if (next > start) refreshHeadingFolds(wrapper);
+		},
+		fillInBackground: (win) => {
+			let timer: number | null = null;
+			const slice = (): void => {
+				timer = null;
+				const end = performance.now() + FILL_SLICE_MS;
+				const start = next;
+				while (next < deferred.length && performance.now() < end) renderNext();
+				if (next > start) refreshHeadingFolds(wrapper);
+				if (next < deferred.length) timer = win.setTimeout(slice, 0);
+			};
+			if (next < deferred.length) timer = win.setTimeout(slice, 0);
+			return () => {
+				if (timer !== null) win.clearTimeout(timer);
+				timer = null;
+			};
 		},
 	};
 }
@@ -1325,10 +1403,17 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		inFlightBuilds.set(sizer, {token, fingerprint});
 		// Another build of the same note: take over its unchanged blocks.
 		const reuse = new BlockReuse(previous?.sourcePath === sourcePath ? previous.blocks : []);
+		// A note opened in the pane shows its first screen (or where it is
+		// restored to) right away, and the rest of it is rendered afterwards.
+		// A rebuild of the note on screen renders all of it: it reuses most
+		// blocks, and its scroll position is kept in pixels.
+		const renderThroughLine = view && ownSizerOf(view) === sizer && previous?.sourcePath !== sourcePath
+			? (pendingScrollLine(previewEl) ?? 0) + FILL_MARGIN_LINES
+			: undefined;
 		let built: BuiltLayer | null = null;
 
 		try {
-			built = await buildWrapper(plugin, sourcePath, text, regions, component, reuse);
+			built = await buildWrapper(plugin, sourcePath, text, regions, component, reuse, renderThroughLine);
 			const {wrapper} = built;
 
 			// Drop only if a different build superseded this one (or the view
@@ -1355,6 +1440,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				scrollSnapshot = captureScrollSnapshot(previewEl);
 			}
 			if (previous && states.get(sizer) === previous) {
+				previous.stopFilling?.();
 				previous.component.unload();
 				unloadUntakenBlocks(previous.blocks, reuse);
 				states.delete(sizer);
@@ -1385,11 +1471,13 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			};
 			states.set(sizer, state);
 			mountedState = state;
+			setLayerFiller(previewEl, built.fill);
 			// A position Obsidian applied while this layer was being built (e.g.
 			// going back to the note) wins over keeping the current scroll.
 			if (!applyPendingScroll(previewEl) && scrollSnapshot.length > 0) {
 				restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			}
+			state.stopFilling = built.fillInBackground(previewEl.win);
 			retryCounts.delete(sizer);
 			installLifecycleObservers(sizer, state);
 			rvWarn("rendered wrapper", {

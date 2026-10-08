@@ -117,6 +117,49 @@ export default [
 		},
 	},
 	{
+		name: "a long note shows its first screen before the rest is rendered, then renders the rest",
+		async run(o) {
+			await o.call("layout", "Plain.md", undefined, "preview");
+			const r = await o.ev(`(async () => {
+				__amcTest.open("L", "Long2.md", "preview");
+				let firstShown = null;
+				const t0 = performance.now();
+				while (performance.now() - t0 < 8000) {
+					await new Promise((r) => setTimeout(r, 20));
+					const w = ${leafSelector}.querySelector(".markdown-preview-view .columns-rv-wrapper");
+					if (w?.dataset.columnsSourcePath !== "Long2.md") continue;
+					const deferred = w.querySelectorAll(":scope > .amc-rv-deferred").length;
+					if (firstShown === null) firstShown = deferred;
+					if (deferred === 0) return {firstShown, done: true};
+				}
+				return {firstShown, done: false};
+			})()`);
+			assert.ok(r.firstShown > 0, "the whole note was rendered before it showed");
+			assert.ok(r.done, "the rest of the note was never rendered");
+		},
+	},
+	{
+		name: "jumping far into a long note that is still being rendered lands on rendered text",
+		async run(o) {
+			await o.call("layout", "Plain.md", undefined, "preview");
+			const r = await o.ev(`(async () => {
+				const view = app.workspace.getLeavesOfType("markdown")[0].view;
+				__amcTest.open("L", "Long.md", "preview");
+				for (let i = 0; i < 200; i++) {
+					await new Promise((r) => setTimeout(r, 20));
+					const w = view.containerEl.querySelector(".markdown-preview-view .columns-rv-wrapper");
+					if (w?.dataset.columnsSourcePath === "Long.md" && w.querySelector(":scope > .amc-rv-deferred")) break;
+				}
+				const line = view.data.split("\\n").findIndex((l) => l === "## Section 270");
+				view.previewMode.renderer.applyScroll(line);
+				const top = __amcTest.reading("L").top;
+				return {line, top};
+			})()`);
+			assert.ok(r.line > 0, "Long.md has no section 270");
+			assert.equal(r.top, "Section 270");
+		},
+	},
+	{
 		name: "switching from live preview to reading view never shows the note without columns",
 		async run(o) {
 			await o.call("layout", "Plain.md");

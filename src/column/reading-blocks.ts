@@ -20,6 +20,8 @@ export interface LayerBlock {
 	el: HTMLElement;
 	/** Owns what was rendered into `el`, so a moved block keeps working. */
 	component: Component;
+	/** Not rendered yet: `el` is a placeholder (see buildWrapper's deferred blocks). */
+	pending?: boolean;
 }
 
 /** The previous build's blocks, taken by key at most once each. */
@@ -30,6 +32,7 @@ export class BlockReuse {
 
 	constructor(blocks: readonly LayerBlock[]) {
 		for (const block of blocks) {
+			if (block.pending) continue;
 			const list = this.byKey.get(block.key);
 			if (list) list.push(block);
 			else this.byKey.set(block.key, [block]);

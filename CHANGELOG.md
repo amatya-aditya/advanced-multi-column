@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/). Each version links t
 
 ### Changed
 - Reading view: when a note changes (for example on every save while it is edited in another pane), only the parts that changed are drawn again. A save of a long note no longer freezes Obsidian, and folded headings and lists stay folded.
+- Reading view: a long note with columns shows its first screen (or where you return to) right away, and the rest of the note is drawn in the background. Before, Obsidian froze for up to a second before the note appeared.
 
 ### Fixed
 - Reading view no longer jumps to the top of a note with columns whenever the note is saved.

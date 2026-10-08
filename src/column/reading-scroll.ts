@@ -131,10 +131,35 @@ interface PendingScroll {
  */
 const pendingScrolls = new WeakMap<HTMLElement, PendingScroll>();
 
+/** The line a scroll position waiting for the note's layer will show, if any. */
+export function pendingScrollLine(previewEl: HTMLElement): number | null {
+	return pendingScrolls.get(previewEl)?.line ?? null;
+}
+
+/**
+ * Lines past a scroll target that are rendered with it, so the view is full
+ * (also when the target is centred).
+ */
+export const FILL_MARGIN_LINES = 150;
+
+/** Renders a layer's not yet rendered blocks up to a line (see buildWrapper). */
+const layerFillers = new WeakMap<HTMLElement, (line: number) => void>();
+
+export function setLayerFiller(previewEl: HTMLElement, fill: ((line: number) => void) | null): void {
+	if (fill) layerFillers.set(previewEl, fill);
+	else layerFillers.delete(previewEl);
+}
+
+/** Blocks of the layer the view scrolls to: rendered first, so it lands on them and not on placeholders. */
+function fillTo(previewEl: HTMLElement, line: number): void {
+	layerFillers.get(previewEl)?.(line + FILL_MARGIN_LINES);
+}
+
 /** Apply a deferred scroll position once the note's layer is mounted. */
 export function applyPendingScroll(previewEl: HTMLElement): boolean {
 	const pending = pendingScrolls.get(previewEl);
 	if (!pending) return false;
+	fillTo(previewEl, pending.line);
 	const blocks = activeBlocks(previewEl);
 	if (!blocks) return false;
 	pendingScrolls.delete(previewEl);
@@ -202,6 +227,7 @@ export function installReadingScrollMapping(renderer: unknown): void {
 			pendingScrolls.set(this.previewEl, {renderer: this, line, options});
 			return true;
 		}
+		fillTo(this.previewEl, line);
 		const blocks = activeBlocks(this.previewEl);
 		if (!blocks) return applyScroll.call(this, line, options);
 		this.previewEl.scrollTop = scrollForLine(this.previewEl, blocks, line, !!options?.center);
