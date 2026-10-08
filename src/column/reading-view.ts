@@ -1345,6 +1345,15 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			inFlightBuilds.delete(sizer);
 
+			// Recovery renders must not force a scroll position captured after the
+			// DOM was damaged. That position may already be stale and was the source
+			// of the repeated scrollbar jumps in the old remount loop.
+			// Capture it before the old layer goes: without it the page is
+			// briefly empty, the browser resets the scroll to the top, and that
+			// was restored (reading view jumped to the top on every save).
+			if (!reason.startsWith("recover:")) {
+				scrollSnapshot = captureScrollSnapshot(previewEl);
+			}
 			if (previous && states.get(sizer) === previous) {
 				previous.component.unload();
 				unloadUntakenBlocks(previous.blocks, reuse);
@@ -1355,12 +1364,6 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			host.classList.remove(RV_PENDING_CLASS);
 			wrapper.dataset.columnsRenderId = String(renderId);
-			// Recovery renders must not force a scroll position captured after the
-			// DOM was damaged. That position may already be stale and was the source
-			// of the repeated scrollbar jumps in the old remount loop.
-			if (!reason.startsWith("recover:")) {
-				scrollSnapshot = captureScrollSnapshot(previewEl);
-			}
 			previewEl.classList.add(RV_ACTIVE_CLASS);
 			host.appendChild(wrapper);
 			built.adopt();
