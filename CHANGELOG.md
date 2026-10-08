@@ -4,6 +4,17 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## Unreleased
+
+### Added
+- **Hide comments in live preview** setting (off by default): hides `%% comments %%` in Live Preview, as Reading View does. A comment shows while the cursor is on it, so it can still be edited.
+
+### Changed
+- Reading view: when a note changes (for example on every save while it is edited in another pane), only the parts that changed are drawn again. A save of a long note no longer freezes Obsidian, and folded headings and lists stay folded.
+
+### Fixed
+- Reading view no longer jumps to the top of a note with columns whenever the note is saved.
+
 ## [2.5.0-beta.2](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.2) - 2026-10-08 (pre-release)
 
 ### Fixed
