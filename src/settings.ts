@@ -54,6 +54,8 @@ export interface ColumnsPluginSettings {
 	showDragHandles: boolean;
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
+	/** Hide `%% … %%` comments in live preview, as reading view does. */
+	hideCommentsInLivePreview: boolean;
 	foldNotePropertiesByDefault: boolean;
 	enableSlashSuggest: boolean;
 	inheritStyleOnAdd: boolean;
@@ -85,6 +87,7 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	showDragHandles: true,
 	enableLivePreview: true,
 	enableReadingView: true,
+	hideCommentsInLivePreview: false,
 	foldNotePropertiesByDefault: false,
 	enableSlashSuggest: true,
 	inheritStyleOnAdd: true,

@@ -36,6 +36,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 				items: [
 					{name: "Enable in live preview", desc: "Render columns in live preview (editing) mode.", control: {type: "toggle", key: "enableLivePreview"}},
 					{name: "Enable in reading view", desc: "Render columns in reading (preview) mode.", control: {type: "toggle", key: "enableReadingView"}},
+					{name: "Hide comments in live preview", desc: "Hide %% comments %% in live preview, as in reading view. A comment shows while the cursor is on it, so you can still edit it.", aliases: ["comment", "%%"], visible: () => settings.enableLivePreview, control: {type: "toggle", key: "hideCommentsInLivePreview"}},
 					{name: "Fold note properties by default", desc: "Collapse the properties section when a note is opened, including new notes.", control: {type: "toggle", key: "foldNotePropertiesByDefault"}},
 					{name: "Enable slash suggest", desc: "Show plugin slash command suggestions in column editors.", control: {type: "toggle", key: "enableSlashSuggest"}},
 					{name: "Inherit style on add", desc: "New columns inherit the style of the column they are added after.", control: {type: "toggle", key: "inheritStyleOnAdd"}},
