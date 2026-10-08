@@ -52,7 +52,7 @@ async function savedCounts(o, path, tokens) {
 async function typeInColumn(o, side, index) {
 	let hit = "";
 	for (let attempt = 0; attempt < 3; attempt++) {
-		const p = await o.call("columnPoint", side, index);
+		const p = await waitFor(o, () => o.call("columnPoint", side, index), 2000);
 		assert.ok(p, `no column ${index} in pane ${side}`);
 		hit = await o.call("hitAt", p.x, p.y);
 		await o.click(p);

@@ -23,6 +23,8 @@
 		const c = clipEl.getBoundingClientRect();
 		const top = Math.max(r.top, c.top), bottom = Math.min(r.bottom, c.bottom);
 		const left = Math.max(r.left, c.left);
+		// Not laid out yet, or not in view: no point to click.
+		if (bottom - top < 4 || Math.min(r.right, c.right) - left < 4) return null;
 		return {x: Math.round(left + Math.min(30, (Math.min(r.right, c.right) - left) / 2)), y: Math.round((top + bottom) / 2)};
 	};
 
