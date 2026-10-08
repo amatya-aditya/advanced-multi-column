@@ -1133,9 +1133,16 @@
 	gap: var(--amc-stack-gap);
 }
 
+/* Full width through stretching, not width: 100%: reading view columns have
+   side margins, which made them overflow the container's right border. */
 .columns-container.columns-stacked > .column-item {
 	flex: none;
-	width: 100%;
+}
+
+/* Reading view containers have no padding; keep stacked columns (and their
+   hover background) off the container's top and bottom border. */
+.columns-container.columns-reading.columns-stacked {
+	padding: 4px 0;
 }
 
 /* Hide horizontal resize handles in stacked mode */
@@ -1194,7 +1201,6 @@
 
 .columns-container .columns-stack-group > .column-item {
 	flex: none;
-	width: 100%;
 }
 
 /* Hide vertical resize handles inside stack groups */

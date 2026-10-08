@@ -27,6 +27,8 @@ const NOTES = {
 	"C2.md": `# Note C2\n\nIntro text of C2.\n\n${cols("C2 left", "C2 right")}\n\nC2 tail.\n`,
 	"Plain.md": "# Plain\n\nA note without columns.\n",
 	"Plain2.md": "# Plain2\n\nAnother note without columns.\n",
+	"Stacked.md": "# Stacked\n\n%% col-start:l:stack %%\n\n%% col-break %%\n\nColumn 1\n\n%% col-break %%\n\nColumn 2\n\n%% col-end %%\n",
+	"Sep.md": "# Sep\n\n%% col-start %%\n\n%% col-break %%\n\nColumn 1\n\n%% col-break:0,sep:true,sc:red,sw:2 %%\n\nColumn 2\n\n%% col-break %%\n\nColumn 3\n\n%% col-end %%\n",
 	"I31A.md": "![[I31B]]\n",
 	"I31B.md": `# B\n\n${cols("Left column of B.", "Right column of B.")}\n\n![[I31C]]\n`,
 	"I31C.md": `# C\n\n${cols("Left column of C.", "Right column of C.")}\n`,

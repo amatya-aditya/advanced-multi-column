@@ -159,6 +159,29 @@ export default [
 			assert.equal(r.top, "Section 270");
 		},
 	},
+	...["preview", "source"].map((mode) => ({
+		name: `stacked columns stay inside the container's border (${mode === "preview" ? "reading view" : "live preview"})`,
+		async run(o) {
+			await o.call("layout", "Stacked.md", undefined, mode);
+			await o.sleep(1000);
+			assert.deepEqual(await o.call("columnsOutside", "L"), []);
+		},
+	})),
+	...["preview", "source"].map((mode) => ({
+		name: `columns stacked on a narrow screen keep their dividers, as lines between them (${mode === "preview" ? "reading view" : "live preview"})`,
+		async run(o) {
+			try {
+				// Wider than the pane: the columns stack.
+				await o.call("setting", "narrowBreakpointPx", 1200);
+				await o.call("layout", "Sep.md", undefined, mode);
+				await o.sleep(1000);
+				assert.deepEqual(await o.call("columnsOutside", "L"), []);
+				assert.deepEqual(await o.call("dividers", "L"), ["horizontal", "horizontal red"]);
+			} finally {
+				await o.call("setting", "narrowBreakpointPx", 480);
+			}
+		},
+	})),
 	{
 		name: "switching from live preview to reading view never shows the note without columns",
 		async run(o) {

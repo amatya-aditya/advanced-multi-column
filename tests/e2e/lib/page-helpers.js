@@ -8,6 +8,9 @@
 	const leafOf = (side) => (side === "A" || !panes[side] ? app.workspace.activeLeaf : panes[side]);
 	const viewOf = (side) => leafOf(side).view;
 	const readingEl = (side) => viewOf(side).containerEl.querySelector(".markdown-reading-view .markdown-preview-view");
+	/** The first column block the pane shows (reading view's or live preview's). */
+	const shownContainer = (side) => [...viewOf(side).containerEl.querySelectorAll(".columns-container")]
+		.find((c) => c.getClientRects().length > 0 && !c.closest(".amc-rv-hidden, .internal-embed"));
 	/** A point on `el`, inside the part of it its scroll container shows (not under a header or toggle). */
 	/**
 	 * Give the main window back the focus after a modal that showed in a window
@@ -101,6 +104,30 @@
 		trace: () => trace.join("\n"),
 		/** The text of every open column editor, per pane (to explain a lost draft). */
 		openColumnEditors: () => JSON.stringify(app.workspace.getLeavesOfType("markdown").map((l) => [...l.view.containerEl.querySelectorAll(".column-item.is-editing .cm-content")].map((c) => c.innerText))),
+		/** Columns of the pane's first shown column block that stick out of its border box. */
+		columnsOutside(side) {
+			const c = shownContainer(side);
+			const box = c.getBoundingClientRect();
+			return [...c.querySelectorAll(":scope > .column-item")].filter((e) => {
+				const r = e.getBoundingClientRect();
+				return r.left < box.left + 1 || r.right > box.right - 1 || r.top < box.top + 1 || r.bottom > box.bottom - 1;
+			}).map((e) => e.innerText.trim());
+		},
+		/** The lines drawn between the columns of the pane's first shown column block, in order. */
+		dividers(side) {
+			const c = shownContainer(side);
+			const lines = [];
+			for (const el of c.children) {
+				const s = el.classList.contains("column-separator-visual") ? getComputedStyle(el) : getComputedStyle(el, "::before");
+				if (!el.classList.contains("column-separator-visual") && (s.content === "none" || s.display === "none")) continue;
+				const top = parseFloat(s.borderTopWidth) > 0 && s.borderTopStyle !== "none";
+				const left = parseFloat(s.borderLeftWidth) > 0 && s.borderLeftStyle !== "none";
+				if (!top && !left) continue;
+				const color = top ? s.borderTopColor : s.borderLeftColor;
+				lines.push(`${top ? "horizontal" : "vertical"}${color === "rgb(239, 68, 68)" ? " red" : ""}`);
+			}
+			return lines;
+		},
 		markdownLeafCount: () => app.workspace.getLeavesOfType("markdown").length,
 		/** Focus and modal state, to explain a key press that did nothing. */
 		focusState() {

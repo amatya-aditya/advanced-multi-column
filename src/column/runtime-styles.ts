@@ -66,17 +66,68 @@ function buildNarrowStackRules(settings: ColumnsPluginSettings): string {
 		flex-direction: column !important;
 	}
 
+	/* Stretched, not width: 100%: reading view columns have side margins. */
 	.columns-container:not(.columns-stacked) > :is(.column-item, .columns-stack-group) {
 		flex: none !important;
-		width: 100% !important;
+		width: auto !important;
 	}
 
+	.columns-container.columns-reading:not(.columns-stacked) {
+		padding: 4px 0;
+		row-gap: var(--amc-stack-gap);
+	}
+
+	/* Live preview: the resize handles between columns draw the dividers and
+	   separators; they become horizontal lines (nothing to resize here). */
 	.columns-container:not(.columns-stacked) > .column-resize-handle {
-		display: none !important;
+		flex: 0 0 auto;
+		width: auto;
+		height: var(--amc-stack-gap);
+		margin: 0 8px;
+		cursor: default;
+		pointer-events: none;
+	}
+
+	.columns-container:not(.columns-stacked) > .column-resize-handle.no-separator {
+		height: 0;
+	}
+
+	/* As specific as the dividers' own rules, which this overrides. */
+	.columns-container:not(.columns-stacked) > .column-resize-handle:not(.has-separator):not(.no-separator)::before,
+	.columns-container:not(.columns-stacked) > .column-resize-handle.has-separator::before {
+		left: 0;
+		right: 0;
+		top: 50%;
+		bottom: auto;
+		width: auto;
+		transform: translateY(-50%);
+		border-left: none;
+	}
+
+	.columns-container:not(.columns-stacked) > .column-resize-handle:not(.has-separator):not(.no-separator)::before {
+		border-top: var(--amc-divider-width, 0px) var(--amc-divider-style, solid) var(--amc-divider-color, var(--background-modifier-border));
+	}
+
+	.columns-container:not(.columns-stacked) > .column-resize-handle.has-separator:not(.has-separator-custom)::before {
+		border-top: var(--sep-width, 1px) var(--sep-style, solid) var(--sep-color, var(--background-modifier-border));
+	}
+
+	.columns-container:not(.columns-stacked) > .column-resize-handle.has-separator-custom {
+		height: auto;
+		min-height: 1.2rem;
+	}
+
+	.columns-container:not(.columns-stacked) > .column-resize-handle.has-separator-custom::before {
+		writing-mode: horizontal-tb;
+		text-align: center;
+	}
+
+	.columns-container:not(.columns-stacked) > .column-resize-handle::after {
+		display: none;
 	}
 
 	.columns-container:not(.columns-stacked) > .column-separator-visual {
-		width: 100%;
+		width: auto;
 		flex: 0 0 auto;
 		border-left: none;
 		border-top: var(--sep-width, 1px) var(--sep-style, solid) var(--sep-color, var(--background-modifier-border));
@@ -85,11 +136,17 @@ function buildNarrowStackRules(settings: ColumnsPluginSettings): string {
 
 	.columns-container:not(.columns-stacked) > .column-separator-custom {
 		writing-mode: horizontal-tb;
-		width: 100%;
+		width: auto;
 	}
 
-	.columns-container.columns-reading:not(.columns-stacked) > :is(.column-item, .columns-stack-group)::before {
-		display: none;
+	/* Reading view: the divider between columns becomes a horizontal line. */
+	.columns-container.columns-reading:not(.columns-stacked) > :is(.column-item, .columns-stack-group) + :is(.column-item, .columns-stack-group):not(.amc-no-divider-before)::before {
+		left: 8px;
+		right: 8px;
+		top: calc(var(--amc-stack-gap) / -2);
+		bottom: auto;
+		border-left: none;
+		border-top: var(--amc-divider-width, 0px) var(--amc-divider-style, solid) var(--amc-divider-color, var(--background-modifier-border));
 	}
 }
 `;
