@@ -26,8 +26,9 @@
 /* Hide Obsidian's rendered sections by class pattern as well, so a section
    added while scrolling never takes space — not even until the observer tags
    it. A momentary section above the column layer shifted it and made the
-   view jump. */
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > :is([class^="el-"], [class*=" el-"], .markdown-preview-pusher) {
+   view jump. The frontmatter section stays (see isReplacedSection). */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > :is([class^="el-"], [class*=" el-"]):not(.mod-frontmatter),
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .markdown-preview-pusher {
 	display: none;
 }
 
@@ -44,6 +45,16 @@
 
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
 	display: contents;
+}
+
+/* The dissolved sizer's top padding (set by banner plugins and themes) is
+   carried over to this spacer by reading-view.ts, so the note still starts
+   where it would without columns, e.g. below a banner. */
+.markdown-preview-view.amc-reading-columns-active::before {
+	content: "";
+	display: block;
+	flex-shrink: 0;
+	height: var(--amc-sizer-padding-top, 0px);
 }
 
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > *,

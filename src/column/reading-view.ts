@@ -295,18 +295,43 @@ function restoreFooter(previewEl: HTMLElement, sizer: HTMLElement): void {
 
 const RV_HIDDEN_CLASS = "amc-rv-hidden";
 
+const SIZER_PADDING_VAR = "--amc-sizer-padding-top";
+
+/**
+ * While columns are active the sizer is `display: contents` (see layout.css),
+ * so its own top padding no longer applies. Banner plugins set it to start
+ * the note below the banner (Pixel Banner's content start position), and
+ * themes may set it too. Carry it over to a spacer at the top of the preview.
+ * An inline value is copied as written, so a `var()` in it keeps updating.
+ */
+function carrySizerPadding(sizer: HTMLElement): void {
+	const previewEl = sizer.parentElement;
+	if (!previewEl) return;
+	const value = sizer.style.paddingTop || sizer.win.getComputedStyle(sizer).paddingTop;
+	if (previewEl.style.getPropertyValue(SIZER_PADDING_VAR) !== value) {
+		previewEl.setCssProps({[SIZER_PADDING_VAR]: value});
+	}
+}
+
+/**
+ * Sections of Obsidian's own render that the column layer replaces: the
+ * note's content (el-* divs) and the pusher. The frontmatter section stays:
+ * the layer never renders frontmatter, and banner plugins attach to that
+ * section (Banners turns it into the banner's wrapper).
+ */
+function isReplacedSection(el: HTMLElement): boolean {
+	if (el.classList.contains("markdown-preview-pusher")) return true;
+	const cls = el.className;
+	return (cls.startsWith("el-") || cls.includes(" el-")) && !el.classList.contains("mod-frontmatter");
+}
+
 /** Hide el-* content divs and the pusher inside the sizer, preserving
  *  metadata containers, banner plugin elements, inline titles, etc. */
 function hideSizerContent(sizer: HTMLElement): void {
 	for (const child of Array.from(sizer.children)) {
-		if (!child.instanceOf(HTMLElement)) continue;
-		const cls = child.className;
-		const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
-		const isPusher = child.classList.contains("markdown-preview-pusher");
-		if (isElDiv || isPusher) {
-			child.classList.add(RV_HIDDEN_CLASS);
-		}
+		if (child.instanceOf(HTMLElement) && isReplacedSection(child)) child.classList.add(RV_HIDDEN_CLASS);
 	}
+	carrySizerPadding(sizer);
 }
 
 /** Restore hidden elements when tearing down. */
@@ -314,6 +339,9 @@ function restoreSizerContent(sizer: HTMLElement): void {
 	const hidden = sizer.querySelectorAll<HTMLElement>(`:scope > .${RV_HIDDEN_CLASS}`);
 	for (let i = 0; i < hidden.length; i++) {
 		hidden[i]!.classList.remove(RV_HIDDEN_CLASS);
+	}
+	if (sizer.classList.contains("markdown-preview-sizer")) {
+		sizer.parentElement?.setCssProps({[SIZER_PADDING_VAR]: ""});
 	}
 }
 
@@ -881,15 +909,12 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		// The AMC host deliberately remains a sibling of the sizer so those virtual
 		// DOM mutations cannot remove it and trigger a recovery-render loop.
 		const sizerObserver = new MutationObserver((mutations) => {
+			// Banner plugins set the sizer's top padding after it rendered.
+			if (mutations.some((m) => m.type === "attributes")) carrySizerPadding(sizer);
+			if (mutations.every((m) => m.type === "attributes")) return;
 			for (const mutation of mutations) {
 				for (const node of Array.from(mutation.addedNodes)) {
-					if (!node.instanceOf(HTMLElement)) continue;
-					const cls = node.className;
-					const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
-					const isPusher = node.classList.contains("markdown-preview-pusher");
-					if (isElDiv || isPusher) {
-						node.classList.add(RV_HIDDEN_CLASS);
-					}
+					if (node.instanceOf(HTMLElement) && isReplacedSection(node)) node.classList.add(RV_HIDDEN_CLASS);
 				}
 			}
 			if (!state.host.isConnected || state.host.parentElement !== state.previewEl) {
@@ -898,7 +923,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			placeWrapperHost(state.previewEl, sizer, state.host);
 		});
-		sizerObserver.observe(sizer, {childList: true});
+		sizerObserver.observe(sizer, {childList: true, attributes: true, attributeFilter: ["style"]});
 
 		const previewObserver = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
