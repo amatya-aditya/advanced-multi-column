@@ -16,10 +16,6 @@ Requires Obsidian 1.13 or newer.
 1. Turn on to render markers in Reading View.
 2. Turn off to disable reading-view renderer.
 
-### Hide comments in live preview
-
-Off by default. Turn on to hide `%% comments %%` in Live Preview, as Reading View does. A comment shows again while the cursor or a selection is on it, so you can still edit it. Comments on lines of their own are hidden together with their lines. `%%` inside code is not a comment and stays visible. Shown only when **Enable in live preview** is on.
-
 ### Default column count
 
 1. Controls `Insert layout (custom count)` output.

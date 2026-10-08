@@ -5,7 +5,6 @@ import {ColumnsSettingTab, MOC_PAGE_NAME} from "./settings-tab";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
-import {hideComments} from "./column/cm/hide-comments";
 import {registerColumnEditFlush} from "./column/editor/edit-flush";
 import {installMarkdownViewHooks} from "./column/view-hooks";
 import {buildRuntimeStyles, RuntimeStyleSheets} from "./column/runtime-styles";
@@ -54,7 +53,6 @@ export default class ColumnsPlugin extends Plugin {
 
 		// CM6 extension for Live Preview
 		this.registerEditorExtension(columnDecorations);
-		this.registerEditorExtension(hideComments);
 		installMarkdownViewHooks(this);
 		registerColumnEditFlush(this);
 
@@ -247,9 +245,6 @@ export default class ColumnsPlugin extends Plugin {
 		if (typeof s.showDragHandles !== "boolean") s.showDragHandles = DEFAULT_SETTINGS.showDragHandles;
 		if (typeof s.enableLivePreview !== "boolean") s.enableLivePreview = DEFAULT_SETTINGS.enableLivePreview;
 		if (typeof s.enableReadingView !== "boolean") s.enableReadingView = DEFAULT_SETTINGS.enableReadingView;
-		if (typeof s.hideCommentsInLivePreview !== "boolean") {
-			s.hideCommentsInLivePreview = DEFAULT_SETTINGS.hideCommentsInLivePreview;
-		}
 		if (typeof s.foldNotePropertiesByDefault !== "boolean") {
 			s.foldNotePropertiesByDefault = DEFAULT_SETTINGS.foldNotePropertiesByDefault;
 		}
@@ -287,7 +282,7 @@ export default class ColumnsPlugin extends Plugin {
 	/** Settings that are baked into rendered live preview widgets (not CSS). */
 	private liveRenderFingerprint(): string {
 		const s = this.settings;
-		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes, s.enableSlashSuggest, s.hideCommentsInLivePreview]);
+		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes, s.enableSlashSuggest]);
 	}
 
 	/** Re-render live preview columns so rendering settings take effect. */

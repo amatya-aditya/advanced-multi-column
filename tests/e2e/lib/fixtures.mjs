@@ -32,7 +32,6 @@ const NOTES = {
 	"I31C.md": `# C\n\n${cols("Left column of C.", "Right column of C.")}\n`,
 	"I30.md": `# Outside heading\n\nText under outside heading.\n\n- outer item\n\t- child item\n\t- child item 2\n\n${cols("## Inside heading\n\nText under inside heading.\n\n- in item\n\t- in child", "Right side.")}\n\n## Second outside heading\n\nTail text.\n`,
 	"FnCols.md": `# Footnotes in columns\n\n${cols("This is the reference notes cited in [^1]\n\n[^1]: I also added information here", "This is reference in 2nd column [^2]\n\n[^2]: This is something I added, **bold**, see also [^1]\n\n[^orphan]: A definition nobody references")}\n`,
-	"Comments.md": `# Comments\n\nText with %%an inline comment%% in it.\n\n%%\nA block comment\nover two lines\n%%\n\nInline code \`%%not a comment%%\` stays.\n\n\`\`\`\n%% inside a code block %%\n\`\`\`\n\n${cols("Left %%hidden in column%% text.", "Right.")}\n\nEnd.\n`,
 	"ReuseFn.md": `# Reuse test\n\nIntro with a footnote[^a].\n\n${cols("## Left heading\n\nLeft text with[^b].", "Right text.")}\n\nMiddle text.\n\n${cols("Second block left[^c].", "Second block right.")}\n\n![[I31C]]\n\nTail.\n\n[^a]: Footnote A.\n[^b]: Footnote B.\n[^c]: Footnote C.\n`,
 };
 

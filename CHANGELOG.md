@@ -6,9 +6,6 @@ Versions follow [Semantic Versioning](https://semver.org/). Each version links t
 
 ## Unreleased
 
-### Added
-- **Hide comments in live preview** setting (off by default): hides `%% comments %%` in Live Preview, as Reading View does. A comment shows while the cursor is on it, so it can still be edited.
-
 ### Changed
 - Reading view: when a note changes (for example on every save while it is edited in another pane), only the parts that changed are drawn again. A save of a long note no longer freezes Obsidian, and folded headings and lists stay folded.
 - Reading view: a long note with columns shows its first screen (or where you return to) right away, and the rest of the note is drawn in the background. Before, Obsidian froze for up to a second before the note appeared.

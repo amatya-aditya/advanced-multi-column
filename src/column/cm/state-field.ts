@@ -220,11 +220,6 @@ const atomicColumns = EditorView.atomicRanges.of(
 	(view) => view.state.field(columnDecorationField, false) ?? Decoration.none,
 );
 
-/** The column blocks rendered in the editor, as decorations over their source. */
-export function columnBlocks(state: EditorState): DecorationSet {
-	return state.field(columnDecorationField, false) ?? Decoration.none;
-}
-
 /** Rebuild all column widgets in the given editors (e.g. after a settings change). */
 export function refreshColumnWidgets(views: Iterable<EditorView>): void {
 	renderGeneration++;
