@@ -37,6 +37,18 @@
 	height: 12px;
 }
 
+/* The form never grows wider than its container: a long, unbreakable group
+   name (a nested tag, a property value) would otherwise set the min-content
+   width of the preview columns and stretch every row off screen. */
+.amc-moc-form {
+	min-width: 0;
+}
+
+.amc-moc-form .setting-item-name,
+.amc-moc-preview-body {
+	overflow-wrap: break-word;
+}
+
 /* Live preview of the generated block */
 .amc-moc-preview {
 	padding: var(--size-4-2) 0;

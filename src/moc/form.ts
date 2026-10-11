@@ -177,6 +177,7 @@ export class MocForm extends Component {
 
 	constructor(private readonly host: HTMLElement, private readonly opts: MocFormOptions) {
 		super();
+		host.addClass("amc-moc-form");
 	}
 
 	onload(): void {
