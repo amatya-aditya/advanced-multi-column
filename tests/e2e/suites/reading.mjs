@@ -117,6 +117,44 @@ export default [
 		},
 	},
 	{
+		// Meta Bind inputs write a property on every keystroke; a rebuild took
+		// focus away from the input being typed in.
+		name: "a property save keeps the columns, and a field typed in inside them keeps focus",
+		async run(o) {
+			await o.call("write", "Props.md", "---\nname: Aria\n---\n# Props\n\n%% col-start %%\n\n%% col-break %%\n\nLeft\n\n%% col-break %%\n\nRight\n\n%% col-end %%\n");
+			await o.call("layout", "Props.md", undefined, "preview");
+			await o.sleep(1500);
+			const focusField = () => o.ev(`(() => {
+				const col = ${leafSelector}.querySelector(".columns-rv-wrapper .column-item");
+				const input = col.querySelector("input.e2e-field") ?? col.createEl("input", {cls: "e2e-field", value: "typing"});
+				input.focus();
+				input.setSelectionRange(3, 3);
+				return document.activeElement === input;
+			})()`);
+			const state = () => o.ev(`(() => {
+				const w = ${leafSelector}.querySelector(".columns-rv-wrapper");
+				const a = document.activeElement;
+				return {sameLayer: w?.dataset.e2eLayer === "1", focused: a?.classList.contains("e2e-field") ?? false, caret: a?.selectionStart ?? null};
+			})()`);
+			const setName = (value) => o.ev(`app.fileManager.processFrontMatter(app.vault.getAbstractFileByPath("Props.md"), (fm) => { fm.name = ${JSON.stringify(value)}; })`);
+
+			await o.ev(`${leafSelector}.querySelector(".columns-rv-wrapper").dataset.e2eLayer = "1"`);
+			assert.ok(await focusField(), "could not focus the test field");
+			await setName("Arianna");
+			await o.sleep(1500);
+			assert.deepEqual(await state(), {sameLayer: true, focused: true, caret: 3}, "a property changed in place rebuilt the columns");
+
+			// A save that adds frontmatter lines rebuilds the layer (blocks are
+			// tagged with source lines); the field must keep focus and caret.
+			await setName("Arianna\nWindrunner");
+			await o.sleep(1500);
+			const after = await state();
+			assert.equal(after.sameLayer, false, "adding frontmatter lines did not rebuild the layer");
+			assert.equal(after.focused, true, "the field lost focus when the layer was rebuilt");
+			assert.equal(after.caret, 3, "the field lost its caret position");
+		},
+	},
+	{
 		name: "a long note shows its first screen before the rest is rendered, then renders the rest",
 		async run(o) {
 			await o.call("layout", "Plain.md", undefined, "preview");

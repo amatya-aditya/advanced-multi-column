@@ -418,21 +418,66 @@ function teardownSizer(
 	rvWarn("teardown stale preview", {reason});
 }
 
+/**
+ * What the layer was built from. The frontmatter counts only by its number of
+ * lines: the layer does not render it (Obsidian draws the properties), but
+ * blocks are tagged with source lines. A property changed in place — as Meta
+ * Bind inputs do on every keystroke — rebuilt the layer, and the input being
+ * typed in lost focus.
+ */
 function textFingerprint(sourcePath: string, text: string, regions: ColumnRegion[]): string {
+	const bodyStart = getFrontmatterEnd(text);
+	let frontmatterLines = 0;
+	for (let i = 0; i < bodyStart; i++) if (text.charCodeAt(i) === 10) frontmatterLines++;
 	// Two independent 32-bit hashes keep the fingerprint compact while still
 	// detecting same-length edits such as GUI width/style changes. The previous
 	// length/first/last fingerprint treated many real edits as unchanged.
 	let hashA = 0x811c9dc5;
 	let hashB = 0x9e3779b9;
-	for (let i = 0; i < text.length; i++) {
+	for (let i = bodyStart; i < text.length; i++) {
 		const code = text.charCodeAt(i);
 		hashA = Math.imul(hashA ^ code, 0x01000193);
 		hashB = Math.imul(hashB ^ code, 0x85ebca6b);
 	}
 	return (
-		`${sourcePath}\u0000${text.length}\u0000${regions.length}`
+		`${sourcePath}\u0000${frontmatterLines}\u0000${text.length - bodyStart}\u0000${regions.length}`
 		+ `\u0000${(hashA >>> 0).toString(16)}${(hashB >>> 0).toString(16)}`
 	);
+}
+
+/** A text field focused inside the layer, and where its caret was. */
+interface FocusedField {
+	el: HTMLInputElement | HTMLTextAreaElement;
+	start: number | null;
+	end: number | null;
+}
+
+function focusedFieldIn(host: HTMLElement): FocusedField | null {
+	const el = host.ownerDocument.activeElement;
+	if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) || !host.contains(el)) return null;
+	try {
+		return {el, start: el.selectionStart, end: el.selectionEnd};
+	} catch {
+		// Inputs such as number have no selection.
+		return {el, start: null, end: null};
+	}
+}
+
+/**
+ * Give focus back to a field whose block was moved into the new layer: moving
+ * an element in the DOM takes focus away, so a field another plugin renders
+ * (a Meta Bind input) stopped taking keystrokes after a save that rebuilt the
+ * layer.
+ */
+function restoreFocusedField(field: FocusedField | null): void {
+	if (!field || !field.el.isConnected || field.el.ownerDocument.activeElement === field.el) return;
+	field.el.focus({preventScroll: true});
+	if (field.start === null || field.end === null) return;
+	try {
+		field.el.setSelectionRange(field.start, field.end);
+	} catch {
+		// The field no longer supports a selection.
+	}
 }
 
 /** A render waits up to HEADER_WAIT_TRIES × HEADER_WAIT_MS for the note's header. */
@@ -1445,6 +1490,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				unloadUntakenBlocks(previous.blocks, reuse);
 				states.delete(sizer);
 			}
+			const focused = focusedFieldIn(host);
 			while (host.firstChild) {
 				host.removeChild(host.firstChild);
 			}
@@ -1453,6 +1499,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			previewEl.classList.add(RV_ACTIVE_CLASS);
 			host.appendChild(wrapper);
 			built.adopt();
+			restoreFocusedField(focused);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
 			// A footer moved out by an older version goes back to Obsidian.
