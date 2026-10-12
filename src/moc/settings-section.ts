@@ -1,15 +1,12 @@
-import {App, Setting, SettingDefinitionPage} from "obsidian";
+import {App, Setting, SettingDefinitionPage, SettingGroup, SettingPage} from "obsidian";
 import type ColumnsPlugin from "../main";
 import {describeMocTemplate, MocForm} from "./form";
 import {createMocTemplate, MocTemplate, newMocTemplateId} from "./types";
 
-/** Template whose form is open; kept across re-renders of the page. */
-let expandedTemplateId: string | null = null;
-
 /**
- * "MOC" settings page: the feature toggle and reusable MOC templates. MOCs
- * built with "New MOC…" for a single note are edited from that note
- * (right-click → Edit MOC) instead.
+ * "MOC" settings page: the feature toggle and reusable MOC templates, each
+ * edited on its own page. MOCs built with "New MOC…" for a single note are
+ * edited from that note (right-click → Edit MOC) instead.
  */
 export function mocSettingsPage(app: App, plugin: ColumnsPlugin, name: string, refresh: () => void): SettingDefinitionPage {
 	const enabled = () => plugin.settings.enableMoc;
@@ -18,12 +15,22 @@ export function mocSettingsPage(app: App, plugin: ColumnsPlugin, name: string, r
 		await plugin.saveSettings();
 		plugin.mocSync.refreshSoon();
 	};
+	const remove = (template: MocTemplate) => {
+		const all = plugin.settings.mocTemplates;
+		const index = all.indexOf(template);
+		if (index < 0) return;
+		all.splice(index, 1);
+		void save().then(refresh);
+	};
 
 	return {
 		type: "page",
 		name,
-		desc: "Maps of content: note links in columns that update themselves.",
-		displayValue: () => (enabled() ? "On" : "Off"),
+		desc: "MOCs: lists of note links in columns that update themselves.",
+		displayValue: () => {
+			if (!enabled()) return "Off";
+			return `${templates.length} template${templates.length === 1 ? "" : "s"}`;
+		},
 		items: [
 			{
 				type: "group",
@@ -47,77 +54,89 @@ export function mocSettingsPage(app: App, plugin: ColumnsPlugin, name: string, r
 					name: "Add MOC template",
 					action: () => {
 						const all = plugin.settings.mocTemplates;
-						const id = newMocTemplateId(all);
-						all.push(createMocTemplate(id, `MOC ${templates.length + 1}`));
-						expandedTemplateId = id;
-						void save().then(refresh);
+						const template = createMocTemplate(newMocTemplateId(all), `MOC ${templates.length + 1}`);
+						all.push(template);
+						void save().then(() => {
+							refresh();
+							openSettingsPage(app, plugin, [name, pageName(template, [...templates, template])]);
+						});
 					},
 				},
 				onDelete: (index) => {
 					const template = templates[index];
-					if (!template) return;
-					const all = plugin.settings.mocTemplates;
-					all.splice(all.indexOf(template), 1);
-					if (expandedTemplateId === template.id) expandedTemplateId = null;
-					void save().then(refresh);
+					if (template) remove(template);
 				},
-				items: templates.map((template) => ({
-					name: uniqueLabel(template, templates),
+				items: templates.map((template): SettingDefinitionPage => ({
+					type: "page",
+					name: pageName(template, templates),
 					desc: describeMocTemplate(template),
-					aliases: ["MOC template"],
-					render: (setting: Setting) => renderTemplate(app, plugin, setting, template, save, refresh),
+					page: () => new MocTemplatePage(app, plugin, template, save, () => {
+						remove(template);
+						openSettingsPage(app, plugin, [name]);
+					}, refresh),
 				})),
 			},
 		],
 	};
 }
 
-function renderTemplate(
-	app: App,
-	plugin: ColumnsPlugin,
-	setting: Setting,
-	template: MocTemplate,
-	save: () => Promise<void>,
-	refresh: () => void,
-): (() => void) | void {
-	const expanded = expandedTemplateId === template.id;
-	setting.settingEl.addClass("amc-settings-card");
-	setting
-		.setName(template.name || template.id)
-		.setDesc(describeMocTemplate(template))
-		.addExtraButton((btn) => btn
-			.setIcon(expanded ? "chevron-up" : "pencil")
-			.setTooltip(expanded ? "Close" : "Edit")
-			.onClick(() => {
-				expandedTemplateId = expanded ? null : template.id;
-				refresh();
-			}));
-	if (!expanded) return;
+/** Editor for one template: the MOC form and a delete button. */
+class MocTemplatePage extends SettingPage {
+	private form: MocForm | null = null;
 
-	const body = setting.settingEl.createDiv({cls: "amc-settings-card-body amc-moc-card-body"});
-	const form = new MocForm(body, {
-		app,
-		plugin,
-		template,
-		// Note-relative folders preview against the note that is open.
-		sourcePath: app.workspace.getActiveFile()?.path,
-		showName: true,
-		onChange: async () => {
-			await save();
-			setting.setName(template.name || template.id).setDesc(describeMocTemplate(template));
-		},
-	});
-	form.load();
-	// Obsidian reuses the row when the page re-renders and only clears its own
-	// controls, so the editor added below the row is removed here.
-	return () => {
-		form.unload();
-		body.remove();
-	};
+	constructor(
+		private readonly app: App,
+		private readonly plugin: ColumnsPlugin,
+		private readonly template: MocTemplate,
+		private readonly save: () => Promise<void>,
+		private readonly remove: () => void,
+		private readonly refresh: () => void,
+	) {
+		super();
+		this.title = template.name || template.id;
+	}
+
+	display(): void {
+		const {containerEl, template} = this;
+		containerEl.empty();
+		this.form?.unload();
+		this.form = new MocForm(containerEl.createDiv(), {
+			app: this.app,
+			plugin: this.plugin,
+			template,
+			// Note-relative folders preview against the note that is open.
+			sourcePath: this.app.workspace.getActiveFile()?.path,
+			showName: true,
+			onChange: () => this.save(),
+		});
+		this.form.load();
+
+		new Setting(new SettingGroup(containerEl).listEl)
+			.setName("Delete template")
+			.setDesc("MOCs already inserted from it stay in your notes as ordinary columns and are no longer updated.")
+			.addButton((btn) => btn
+				.setButtonText("Delete")
+				.setDestructive()
+				.onClick(() => this.remove()));
+	}
+
+	hide(): void {
+		this.form?.unload();
+		this.form = null;
+		super.hide();
+		// The list shows the template's name and summary, which may have changed.
+		this.refresh();
+	}
 }
 
-/** Row label; Obsidian keys rows by name, so repeated names get the id. */
-function uniqueLabel(template: MocTemplate, templates: MocTemplate[]): string {
+/** Open a page of this plugin's settings (not in the public API). */
+function openSettingsPage(app: App, plugin: ColumnsPlugin, path: string[]): void {
+	const setting = (app as App & {setting?: {openPagePath?(id: string, path: string[]): unknown}}).setting;
+	setting?.openPagePath?.(plugin.manifest.id, path);
+}
+
+/** Page label; Obsidian keys rows by name, so repeated names get the id. */
+function pageName(template: MocTemplate, templates: MocTemplate[]): string {
 	const label = template.name || template.id;
 	const repeated = templates.some((t) => t !== template && (t.name || t.id) === label);
 	return repeated ? `${label} (${template.id})` : label;

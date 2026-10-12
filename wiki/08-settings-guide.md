@@ -48,9 +48,9 @@ Requires Obsidian 1.13 or newer.
 
 **Enable MOC** (on by default) turns the MOC features on or off: the **Insert MOC** menu, the MOC commands, **Edit MOC** and automatic updates. When off, inserted MOCs stay in your notes as ordinary columns and are not updated; turning it back on updates them.
 
-Under **Templates**, use **+** to add a template, the pencil to open its editor, and **×** to delete it. Create and edit reusable MOC templates — saved queries that list notes by folder (fixed, or relative to the note the MOC is in), tags and/or properties, grouped into columns. One-off MOCs built with **Insert MOC → New MOC…** are edited from the note instead (right-click → **Edit MOC**). Each template shows a live preview from your vault, and inserted MOCs update automatically when the template changes.
+Under **Templates**, use **+** to add a template; each template opens as its own page (select it in the list), with **Delete template** at the bottom. Create and edit reusable MOC templates — saved queries that list notes by folder (fixed, or relative to the note the MOC is in), tags and/or properties, grouped into columns. One-off MOCs built with **Insert MOC → New MOC…** are edited from the note instead (right-click → **Edit MOC**). Each template shows a live preview from your vault, and inserted MOCs update automatically when the template changes.
 
-Settings per template: name; **Sources** (folder: this note's folder, its parent, a specific folder or any; include subfolders; tags; properties; combine sources); **Layout** (group by, group property, columns, sort notes by, reverse sort order, show group headings, show bullets, notes per group); **Column for each group**; **Preview**.
+Settings per template: name, then three tabs — **Sources** (folder: this note's folder, its parent, a specific folder or any; include subfolders; tags; properties; notes must match), **Groups** (group by, group property, columns, show group headings, column for each group) and **List** (sort notes by, reverse sort order, show bullets, notes per group) — and the **Preview**.
 
 See [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for what each setting does.
 

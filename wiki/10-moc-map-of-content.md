@@ -24,9 +24,9 @@ Because the folder can be relative to the note (**This note's folder** / **Paren
 
 ## MOC options
 
-The New MOC dialog, **Edit MOC** and the template settings show the same options. In settings, changes are saved immediately and every inserted MOC that uses the template is updated; in the dialog, they apply when you select **Insert** or **Save**.
+The New MOC dialog, **Edit MOC** and a template's settings page show the same options, split into three tabs: **Sources**, **Groups** and **List**. Each tab shows a one-line summary of its options (for example *This folder + 1 tag* or *By tag, 3 columns*), so you can check the whole MOC without opening every tab. The **Preview** below the tabs is always visible. In settings, changes are saved immediately and every inserted MOC that uses the template is updated; in the dialog, they apply when you select **Insert** or **Save**.
 
-### Sources — which notes are listed
+### Sources tab — which notes are listed
 
 | Setting | What it does |
 |---|---|
@@ -34,26 +34,31 @@ The New MOC dialog, **Edit MOC** and the template settings show the same options
 | **Include subfolders** | Also lists notes in all subfolders of the folder. |
 | **Tags** | Type a tag (suggestions come from your vault) and press Enter or pick it; picked tags appear as chips you can remove. A parent tag also matches its subtags: `area` matches `#area/work`. Tags in properties and in the note body both count. |
 | **Properties** | Pick a property and, optionally, a value (both suggested from your vault), then press Enter or **+**. `status` + `active` lists notes whose `status` is `active` (case-insensitive; for list properties any item may match, and `[[Link]]` values match `Link`). A property without a value lists notes that have it with any value. |
-| **Combine sources** | **Match all sources**: a note must match the folder *and* every tag *and* every property line. **Match any source**: matching one of them is enough. |
+| **Notes must match** | Shown once there is more than one source to combine. **Every source**: a note must match the folder *and* every tag *and* every property line. **Any source**: matching one of them is enough. |
 
 The note that contains the MOC is never listed in its own MOC. A template with no sources lists nothing.
 
-### Layout — how notes are arranged
+### Groups tab — how notes are split into columns
 
 | Setting | What it does |
 |---|---|
 | **Group by** | **Subfolder**: one group per top-level subfolder of the chosen folder (notes directly in the folder form a group named after it). **Tag**: one group per tag — the tags listed under Sources, or every tag of the notes if none are listed; notes without tags go to *Untagged*. **Property value**: one group per value of the **Group property** (a note with a list value appears under each value; notes without it go to *No value*). **No grouping**: one list. |
 | **Group property** | Shown when grouping by property value — the property key to group by. |
 | **Columns** | 1–6. Groups are placed into columns; if there are fewer groups than columns, fewer columns are used. With **No grouping**, the list is split evenly across the columns. |
+| **Show group headings** | Writes each group's name as a `###` heading above its links. |
+
+#### Column for each group
+
+Lists the groups found in your vault right now (on the **Groups** tab, when grouping is on). Choose a column for a group to pin it there, or leave it on **Automatic** — automatic groups are placed, in name order, into whichever column is currently shortest. Groups that appear later (for example a new subfolder) are placed automatically.
+
+### List tab — how each list looks
+
+| Setting | What it does |
+|---|---|
 | **Sort notes by** | **Name** (A–Z, numbers in natural order), **Last modified** or **Created** (newest first). Groups are always sorted by name. |
 | **Reverse sort order** | Lists notes in the opposite order: **Name** Z–A, **Last modified** and **Created** oldest first. **Notes per group** then keeps the oldest notes instead of the newest. |
-| **Show group headings** | Writes each group's name as a `###` heading above its links. |
 | **Show bullets** | On: links are a bulleted list (`- [[Note]]`). Off: one plain link per line. Plain lines rely on Obsidian's default line breaks; with **Settings → Editor → Strict line breaks** turned on they run together on one line, so keep bullets on in that case. |
-| **Notes per group** | Lists at most this many notes per group (`0` = all). Useful with **Last modified** to show only recent notes. |
-
-### Column for each group
-
-Lists the groups found in your vault right now. Choose a column for a group to pin it there, or leave it on **Automatic** — automatic groups are placed, in name order, into whichever column is currently shortest. Groups that appear later (for example a new subfolder) are placed automatically.
+| **Notes per group** | Lists at most this many notes per group (`0` = all); called **Maximum notes** with **No grouping**. Useful with **Last modified** to show only recent notes. |
 
 ### Preview
 
