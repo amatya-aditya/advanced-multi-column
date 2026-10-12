@@ -123,6 +123,20 @@ Notes:
 3. Built-in rows do not show the delete button while their original ID is unchanged.
 4. Select the pencil on a header type to edit it; the banner previews the result.
 
+## Remove all column markers
+
+At the very bottom of the page. Use it before uninstalling the plugin: it removes this plugin's markers (`%% col-start %%`, `%% col-break %%`, `%% col-end %%`) from every note and keeps the notes' text.
+
+1. Select **Remove…**. The plugin scans your notes and shows how many markers it found, and in which notes.
+2. Type `delete all amc markers` to enable **Remove markers**, then select it.
+
+What changes and what doesn't:
+
+- Only the marker lines are removed. The text of every column stays, in the same order, as ordinary paragraphs.
+- Column widths and styles are stored in the markers, so they are lost. MOCs stay as plain lists of links and are no longer updated.
+- Other comments, callout columns (`[!col]`) and markers inside code blocks are not changed. Column header lines (`!note: Title`) stay as plain text.
+- It cannot be undone. Back up your vault first.
+
 ## About
 
 Contains:

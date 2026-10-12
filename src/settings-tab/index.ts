@@ -10,6 +10,7 @@ import {
 } from "../settings";
 import {renderAbout} from "./about";
 import {headerTypesList} from "./header-types";
+import {renderRemoveMarkers} from "./remove-markers";
 
 /** Name of the MOC sub-page, used to open settings directly on it. */
 export const MOC_PAGE_NAME = "Maps of content";
@@ -167,6 +168,16 @@ export class ColumnsSettingTab extends PluginSettingTab {
 				heading: "About",
 				items: [
 					{name: "About", searchable: false, render: (setting) => renderAbout(setting, this.plugin)},
+				],
+			},
+			{
+				type: "group",
+				items: [
+					{
+						name: "Remove all column markers",
+						aliases: ["uninstall", "delete markers"],
+						render: (setting) => renderRemoveMarkers(setting, this.app),
+					},
 				],
 			},
 		];
