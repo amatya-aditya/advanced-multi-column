@@ -289,24 +289,40 @@ function unwrapLooseListParagraphs(parent: HTMLElement): void {
 }
 
 /**
+ * Checkboxes that are not the column's own task lines: results drawn by code
+ * blocks (Dataview, Tasks queries) and tasks of embedded notes. Those plugins
+ * and embeds handle their own checkboxes.
+ */
+const FOREIGN_TASKS = "[class*='block-language-'], .internal-embed, .markdown-embed";
+
+/** A task line, also in a callout or quote: `- [ ] `, `> * [x] `… */
+const TASK_LINE_RE = /^(\s*(?:>\s*)*[-*+] \[)(.)(\] )/;
+
+/**
  * Wire click handlers on task checkboxes in rendered markdown.
  * Clicking a checkbox toggles the character inside `[x]`/`[ ]`/`[/]` etc.
+ * Checkboxes are matched to the column's task lines in order, so only the
+ * column's own ones count: a query result's checkbox shifted the matching
+ * and toggled another line.
  */
 function wireTaskCheckboxes(
 	parent: HTMLElement,
 	content: string,
 	onContentChange: (nextContent: string) => void,
 ): void {
-	const checkboxes = parent.querySelectorAll<HTMLInputElement>(
+	const checkboxes = Array.from(parent.querySelectorAll<HTMLInputElement>(
 		"li.task-list-item > input[type='checkbox'], li.task-list-item > .task-list-item-checkbox",
-	);
+	)).filter((checkbox) => {
+		const foreign = checkbox.closest(FOREIGN_TASKS);
+		return !foreign || !parent.contains(foreign);
+	});
 	if (checkboxes.length === 0) return;
 
 	// Find all task lines in the content: lines matching `- [.] ` or `* [.] ` etc.
 	const lines = content.split("\n");
 	const taskLineIndices: number[] = [];
 	for (let i = 0; i < lines.length; i++) {
-		if (/^\s*[-*+] \[.\] /.test(lines[i]!)) {
+		if (TASK_LINE_RE.test(lines[i]!)) {
 			taskLineIndices.push(i);
 		}
 	}
@@ -319,13 +335,13 @@ function wireTaskCheckboxes(
 			e.preventDefault();
 			e.stopPropagation();
 			const line = lines[lineIdx]!;
-			const match = line.match(/^(\s*[-*+] \[)(.)(\] )/);
+			const match = line.match(TASK_LINE_RE);
 			if (!match) return;
 
 			const currentStatus = match[2]!;
 			// Toggle: unchecked → checked, anything else → unchecked
 			const newStatus = currentStatus === " " ? "x" : " ";
-			lines[lineIdx] = line.replace(/^(\s*[-*+] \[).\]/, `$1${newStatus}]`);
+			lines[lineIdx] = line.replace(TASK_LINE_RE, `$1${newStatus}$3`);
 			onContentChange(lines.join("\n"));
 		});
 	});
