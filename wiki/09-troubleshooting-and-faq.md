@@ -71,6 +71,14 @@ Common causes:
 2. Missing `%% col-end %%`.
 3. Marker text is not on its own line.
 
+## Better Bullets symbols in columns
+
+[Better Bullets](https://github.com/lualum/better-bullets) draws its bullet symbols in the editor only. Columns in Live Preview use its symbols too, also when a column is not being edited: each level gets the symbol and style set in Better Bullets (by hierarchy or by indentation). Numbered lists keep their numbers and tasks their checkboxes.
+
+- Better Bullets' text rules (styling or numbering by pattern) apply only while a column is being edited.
+- Reading View keeps the theme's bullets, as it does outside columns, because Better Bullets does not change Reading View.
+- After changing Better Bullets' settings, columns update the next time they are drawn (for example when you reopen the note).
+
 ## MOC does not update
 
 1. Check that the block's first marker still contains `moc:<id>` (for example `%% col-start:moc:moc-1 %%`). Without it the block is a normal column block.

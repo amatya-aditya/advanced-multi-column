@@ -8,6 +8,7 @@ import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
 import {registerColumnEditFlush} from "./column/editor/edit-flush";
 import {installMarkdownViewHooks} from "./column/view-hooks";
 import {buildRuntimeStyles, RuntimeStyleSheets} from "./column/runtime-styles";
+import {setBulletStyleSink} from "./column/render/better-bullets";
 import {closeActivePopover} from "./column/render/style-context-menu";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
 import {LAYOUT_TEMPLATES, LayoutTemplate} from "./layouts";
@@ -39,6 +40,8 @@ class MocTemplateModal extends SuggestModal<MocTemplate> {
 export default class ColumnsPlugin extends Plugin {
 	settings!: ColumnsPluginSettings;
 	private readonly runtimeStyles = new RuntimeStyleSheets();
+	/** Better Bullets symbols for rendered columns (see column/render/better-bullets). */
+	private readonly bulletStyles = new RuntimeStyleSheets();
 	private cleanupReadingView: (() => void) | null = null;
 	private cleanupPropertyFolding: (() => void) | null = null;
 	private lastLiveRenderFingerprint = "";
@@ -164,6 +167,8 @@ export default class ColumnsPlugin extends Plugin {
 		closeActivePopover();
 		setPluginInstance(null);
 		this.runtimeStyles.detachAll();
+		setBulletStyleSink(null);
+		this.bulletStyles.detachAll();
 	}
 
 	private insertMoc(editor: Editor, template: MocTemplate, file: TFile | null): void {
@@ -306,14 +311,15 @@ export default class ColumnsPlugin extends Plugin {
 	 */
 	private attachRuntimeStyles(): void {
 		this.applyRuntimeStyles();
+		setBulletStyleSink((css) => this.bulletStyles.update(css));
 		const {workspace} = this.app;
-		this.runtimeStyles.attach(workspace.containerEl.ownerDocument);
-		const attachOpenWindows = () => workspace.iterateAllLeaves((leaf) => {
-			this.runtimeStyles.attach(leaf.view.containerEl.ownerDocument);
-		});
+		const sheets = [this.runtimeStyles, this.bulletStyles];
+		const attach = (doc: Document) => sheets.forEach((s) => s.attach(doc));
+		attach(workspace.containerEl.ownerDocument);
+		const attachOpenWindows = () => workspace.iterateAllLeaves((leaf) => attach(leaf.view.containerEl.ownerDocument));
 		attachOpenWindows();
 		workspace.onLayoutReady(attachOpenWindows);
-		this.registerEvent(workspace.on("window-open", (win) => this.runtimeStyles.attach(win.doc)));
-		this.registerEvent(workspace.on("window-close", (win) => this.runtimeStyles.detach(win.doc)));
+		this.registerEvent(workspace.on("window-open", (win) => attach(win.doc)));
+		this.registerEvent(workspace.on("window-close", (win) => sheets.forEach((s) => s.detach(win.doc))));
 	}
 }

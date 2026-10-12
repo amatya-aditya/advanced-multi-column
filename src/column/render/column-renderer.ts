@@ -20,6 +20,7 @@ import {buildResizeHandle} from "./column-resizer";
 import {applyNoteFootnotes, livePreviewFootnotes, renderLiveFootnoteDefinitions, wireLivePreviewFootnotes} from "./footnote-render";
 import {extractFootnoteDefinitions} from "../core/footnotes";
 import {wireDragItem} from "./column-drag";
+import {applyBetterBullets} from "./better-bullets";
 import {addFoldControls} from "./fold";
 import {
 	insertColumnAfter,
@@ -255,6 +256,8 @@ export function renderMarkdown(
 			// Tag link-only paragraphs so their spacing rules can target a class
 			// instead of relying on the :has() selector.
 			markLinkLines(parent);
+			// Better Bullets only draws its symbols in the editor.
+			applyBetterBullets(plugin.app, parent);
 			addFoldControls(plugin.app, parent);
 			if (onContentChange) {
 				wireTaskCheckboxes(parent, content, onContentChange);
