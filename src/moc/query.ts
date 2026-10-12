@@ -180,6 +180,13 @@ function sortFiles(files: TFile[], template: MocTemplate): TFile[] {
 	}
 }
 
+/** Groups the MOC shows: all of them, minus the ones the template hides. */
+export function visibleMocGroups(template: MocTemplate, groups: MocGroup[]): MocGroup[] {
+	if (template.groupBy === "none" || template.hiddenGroups.length === 0) return groups;
+	const hidden = new Set(template.hiddenGroups);
+	return groups.filter((group) => !hidden.has(group.name));
+}
+
 /**
  * Matching notes, grouped and sorted. `limitOverride` caps notes per group
  * (used by the settings preview) on top of the template's own limit.

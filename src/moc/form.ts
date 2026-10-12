@@ -1,9 +1,9 @@
-import {App, Component, debounce, Setting, SettingGroup} from "obsidian";
+import {App, Component, debounce, DropdownComponent, ExtraButtonComponent, Setting, SettingGroup} from "obsidian";
 import type ColumnsPlugin from "../main";
 import {findColumnRegions} from "../column/core/parser";
 import {renderColumnsRegion} from "../column/reading-view";
 import {FolderSuggest, ListSuggest, renderChips, VaultVocabulary} from "./form-pickers";
-import {collectMocGroups, resolveMocFolder} from "./query";
+import {collectMocGroups, resolveMocFolder, visibleMocGroups} from "./query";
 import {generateMocBlock, mocColumnCount} from "./generate";
 import {
 	MAX_MOC_COLUMNS,
@@ -75,7 +75,8 @@ function summarizeSources(template: MocTemplate): string {
 
 function summarizeGroups(template: MocTemplate): string {
 	const by = template.groupBy === "none" ? "No groups" : `By ${GROUP_BY_OPTIONS[template.groupBy].toLowerCase()}`;
-	return `${by}, ${template.columns} column${template.columns === 1 ? "" : "s"}`;
+	const hidden = template.groupBy === "none" ? 0 : template.hiddenGroups.length;
+	return `${by}, ${template.columns} column${template.columns === 1 ? "" : "s"}${hidden > 0 ? `, ${hidden} hidden` : ""}`;
 }
 
 function summarizeList(template: MocTemplate): string {
@@ -409,7 +410,7 @@ export class MocForm extends Component {
 			f.appendText("Column for each group");
 			f.createDiv({
 				cls: "setting-item-description",
-				text: "Groups found right now. Automatic places a group in the shortest column.",
+				text: "Groups found right now. Automatic places a group in the shortest column. Use the eye to leave a group out of the MOC.",
 			});
 		});
 		const assignments = new SettingGroup(panel).setHeading(heading);
@@ -433,10 +434,33 @@ export class MocForm extends Component {
 		for (let i = 0; i < count; i++) options[`col-${i}`] = `Column ${i + 1}`;
 		for (const group of groups) {
 			const assigned = template.assignments[group.name];
-			new Setting(el)
+			const setting = new Setting(el)
 				.setName(group.name)
-				.setDesc(`${group.files.length} note${group.files.length === 1 ? "" : "s"}`)
-				.addDropdown((dd) => dd
+				.setDesc(`${group.files.length} note${group.files.length === 1 ? "" : "s"}`);
+			let dropdown: DropdownComponent | null = null;
+			let eye: ExtraButtonComponent | null = null;
+			// Hiding keeps the column choice, so showing the group again puts it back.
+			const showState = () => {
+				const hidden = template.hiddenGroups.includes(group.name);
+				setting.settingEl.toggleClass("is-hidden-group", hidden);
+				dropdown?.setDisabled(hidden);
+				eye?.setIcon(hidden ? "eye-off" : "eye").setTooltip(hidden ? "Show in MOC" : "Hide from MOC");
+			};
+			setting.addExtraButton((btn) => {
+				eye = btn.onClick(async () => {
+					const hidden = template.hiddenGroups.includes(group.name);
+					template.hiddenGroups = hidden
+						? template.hiddenGroups.filter((name) => name !== group.name)
+						: [...template.hiddenGroups, group.name];
+					showState();
+					await this.opts.onChange();
+					if (this.tabsEl) this.renderTabs(this.tabsEl);
+					this.refreshDerived();
+				});
+				btn.extraSettingsEl.addClass("amc-moc-group-visibility");
+			});
+			setting.addDropdown((dd) => {
+				dropdown = dd
 					.addOptions(options)
 					.setValue(assigned !== undefined && assigned < count ? `col-${assigned}` : "auto")
 					.onChange(async (value) => {
@@ -444,7 +468,9 @@ export class MocForm extends Component {
 						else template.assignments[group.name] = parseInt(value.slice("col-".length), 10);
 						await this.opts.onChange();
 						this.refreshDerived();
-					}));
+					});
+			});
+			showState();
 		}
 	}
 
@@ -509,7 +535,7 @@ export class MocForm extends Component {
 			el.createDiv({cls: "amc-moc-preview-empty", text: "Open a note to preview a MOC relative to its folder."});
 			return;
 		}
-		const groups = collectMocGroups(app, template, sourcePath, PREVIEW_LIMIT);
+		const groups = visibleMocGroups(template, collectMocGroups(app, template, sourcePath, PREVIEW_LIMIT));
 		const where = relative ? ` Folder: ${folder === "" ? "/" : folder} (from ${sourcePath}).` : "";
 		if (groups.length === 0) {
 			el.createDiv({cls: "amc-moc-preview-empty", text: `No notes match these sources.${where}`});

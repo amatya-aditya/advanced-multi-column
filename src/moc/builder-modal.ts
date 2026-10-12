@@ -10,6 +10,7 @@ function cloneTemplate(template: MocTemplate): MocTemplate {
 		tags: [...template.tags],
 		properties: template.properties.map((p) => ({...p})),
 		assignments: {...template.assignments},
+		hiddenGroups: [...template.hiddenGroups],
 	};
 }
 

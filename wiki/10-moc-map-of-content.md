@@ -51,6 +51,8 @@ The note that contains the MOC is never listed in its own MOC. A template with n
 
 Lists the groups found in your vault right now (on the **Groups** tab, when grouping is on). Choose a column for a group to pin it there, or leave it on **Automatic** — automatic groups are placed, in name order, into whichever column is currently shortest. Groups that appear later (for example a new subfolder) are placed automatically.
 
+Select the eye button next to a group to leave it out of the MOC, for example a tag or a subfolder you don't want listed. A hidden group stays in this list, crossed out; select the eye again to show it in its previous column. With **Group by: Tag** or **Property value**, a note in a hidden group still appears under its other groups. The **Groups** tab summary shows how many groups are hidden.
+
 ### List tab — how each list looks
 
 | Setting | What it does |

@@ -118,6 +118,12 @@
 	color: var(--text-muted);
 }
 
+/* A group left out of the MOC stays listed, dimmed, so it can be shown again. */
+.amc-moc-form .setting-item.is-hidden-group :is(.setting-item-name, .setting-item-description) {
+	color: var(--text-faint);
+	text-decoration: line-through;
+}
+
 /* Live preview of the generated block */
 .amc-moc-preview {
 	padding-bottom: var(--size-4-2);
