@@ -1,6 +1,7 @@
 import {setIcon} from "obsidian";
 import type {ColumnBackgroundOption, StyleColorOption} from "../../settings";
 import type {ColumnData, ColumnLayout, ColumnStyleData, SeparatorLineStyle} from "../core/types";
+import type {ColumnContextActions, MenuEdits} from "../core/widget-types";
 import {applyColumnStyle, applyContainerStyle} from "../core/column-style";
 import {getPluginInstance} from "../core/plugin-ref";
 import {getColumnElements, groupColumns} from "./column-renderer";
@@ -28,13 +29,11 @@ const CLEAR_STYLE_PATCH: StylePatch = {
 	separatorCustomChar: undefined,
 };
 
-export interface ColumnContextActions {
-	editColumn?: () => void;
-	editMoc?: () => void;
-	addColumn?: () => void;
-	addChild?: () => void;
-	deleteColumn?: () => void;
-}
+export type LayoutChangeHandler = (
+	nextLayout: ColumnLayout | undefined,
+	columns: ColumnData[],
+	containerStyle: ColumnStyleData | undefined,
+) => void;
 
 export interface ColumnStyleContextMenuData {
 	columnIndex: number;
@@ -45,7 +44,8 @@ export interface ColumnStyleContextMenuData {
 	) => void;
 	containerStyle?: ColumnStyleData;
 	layout?: ColumnLayout;
-	onLayoutChange?: (nextLayout: ColumnLayout | undefined) => void;
+	/** Gets the menu's latest columns and box style, so one edit saves them all. */
+	onLayoutChange?: LayoutChangeHandler;
 	parentIndex?: number;
 	actions?: ColumnContextActions;
 	containerEl?: HTMLElement;
@@ -310,7 +310,7 @@ function createTextInput(
 
 function createIconAction(
 	parent: HTMLElement,
-	config: {label: string; icon: string; danger?: boolean; onClick: () => void},
+	config: {label: string; icon: string; danger?: boolean; onClick: () => void; savesEdits?: boolean},
 ): void {
 	const button = parent.createEl("button", {cls: "clickable-icon amc-menu-icon-btn"});
 	button.type = "button";
@@ -320,8 +320,9 @@ function createIconAction(
 	button.addEventListener("click", (evt) => {
 		evt.preventDefault();
 		evt.stopPropagation();
-		// Flush pending style changes before structural actions.
-		flushPending();
+		// Save pending style changes first, unless the action saves them itself:
+		// a separate save would leave the action with the block's old range.
+		if (!config.savesEdits) flushPending();
 		config.onClick();
 		closeActivePopover();
 	});
@@ -1013,8 +1014,10 @@ function renderBlockTab(
 			onChange: (value) => {
 				const nextLayout = value === "row" ? undefined : value;
 				state.layout = nextLayout;
-				flushPending();
-				menuData.onLayoutChange?.(nextLayout);
+				// One edit for the pending styles and the layout: a separate save
+				// first would leave the layout change with the block's old range.
+				pendingFlush = null;
+				menuData.onLayoutChange?.(nextLayout, state.columns, state.containerStyle);
 				closeActivePopover();
 			},
 		});
@@ -1093,10 +1096,18 @@ function renderPopoverContent(
 	const a = menuData.actions;
 	if (a?.editMoc) createIconAction(actions, {label: "Edit MOC", icon: "list-tree", onClick: a.editMoc});
 	if (a?.editColumn) createIconAction(actions, {label: "Edit column", icon: "pencil", onClick: a.editColumn});
-	if (a?.addColumn) createIconAction(actions, {label: "Add column", icon: "plus", onClick: a.addColumn});
-	if (a?.addChild) createIconAction(actions, {label: "Add nested columns", icon: "git-branch-plus", onClick: a.addChild});
+	const withEdits = (action: (latest: MenuEdits) => void) => () => {
+		pendingFlush = null;
+		action({columns: state.columns, containerStyle: state.containerStyle});
+	};
+	if (a?.addColumn) {
+		createIconAction(actions, {label: "Add column", icon: "plus", onClick: withEdits(a.addColumn), savesEdits: true});
+	}
+	if (a?.addChild) {
+		createIconAction(actions, {label: "Add nested columns", icon: "git-branch-plus", onClick: withEdits(a.addChild), savesEdits: true});
+	}
 	if (a?.deleteColumn) {
-		createIconAction(actions, {label: "Delete column", icon: "trash-2", danger: true, onClick: a.deleteColumn});
+		createIconAction(actions, {label: "Delete column", icon: "trash-2", danger: true, onClick: withEdits(a.deleteColumn), savesEdits: true});
 	}
 
 	createSegmented(popover, {
