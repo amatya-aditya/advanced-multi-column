@@ -2,6 +2,12 @@ const START_RE = /^%%\s*col-start(?:\s*:(.*?))?\s*%%$/;
 const BREAK_RE = /^%%\s*col-break(?:\s*:(.*?))?\s*%%$/;
 const END_RE = /^%%\s*col-end\s*%%$/;
 
+/** Whether a line is one of this plugin's column markers (start, break or end). */
+export function isColumnMarkerLine(line: string): boolean {
+	const trimmed = line.trim();
+	return START_RE.test(trimmed) || BREAK_RE.test(trimmed) || END_RE.test(trimmed);
+}
+
 const BACKGROUND_OPTION_VALUES = [
 	"transparent",
 	"primary",

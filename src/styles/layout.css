@@ -26,8 +26,9 @@
 /* Hide Obsidian's rendered sections by class pattern as well, so a section
    added while scrolling never takes space — not even until the observer tags
    it. A momentary section above the column layer shifted it and made the
-   view jump. */
-.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > :is([class^="el-"], [class*=" el-"], .markdown-preview-pusher) {
+   view jump. The frontmatter section stays (see isReplacedSection). */
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > :is([class^="el-"], [class*=" el-"]):not(.mod-frontmatter),
+.markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .markdown-preview-pusher {
 	display: none;
 }
 
@@ -44,6 +45,16 @@
 
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer {
 	display: contents;
+}
+
+/* The dissolved sizer's top padding (set by banner plugins and themes) is
+   carried over to this spacer by reading-view.ts, so the note still starts
+   where it would without columns, e.g. below a banner. */
+.markdown-preview-view.amc-reading-columns-active::before {
+	content: "";
+	display: block;
+	flex-shrink: 0;
+	height: var(--amc-sizer-padding-top, 0px);
 }
 
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > *,
@@ -501,6 +512,31 @@
 .columns-container .column-item .column-preview.markdown-rendered li {
 	margin: 0;
 	padding: 0;
+}
+
+/* Blocks under a folded heading (render/fold.ts). The priority flag is needed:
+   a folded nested block is a .columns-container, whose display is forced. */
+.markdown-rendered .amc-fold-hidden {
+	display: none !important;
+}
+
+/* Fold indicators added by render/fold.ts. Reading view gets Obsidian's own
+   rules (scoped to .markdown-preview-view); live preview columns sit in the
+   editor, so the same rules are repeated for them. */
+.columns-container:not(.columns-reading) .column-item .collapse-indicator {
+	display: inline-flex;
+	position: absolute;
+	cursor: var(--cursor);
+	user-select: none;
+}
+
+.columns-container:not(.columns-reading) .column-item .heading-collapse-indicator {
+	margin-inline-start: -22px;
+	padding: 0 6px;
+}
+
+.columns-container:not(.columns-reading) .column-item li.is-collapsed > :is(ul, ol) {
+	display: none;
 }
 
 /* Live preview spacing normalization */
@@ -1097,9 +1133,16 @@
 	gap: var(--amc-stack-gap);
 }
 
+/* Full width through stretching, not width: 100%: reading view columns have
+   side margins, which made them overflow the container's right border. */
 .columns-container.columns-stacked > .column-item {
 	flex: none;
-	width: 100%;
+}
+
+/* Reading view containers have no padding; keep stacked columns (and their
+   hover background) off the container's top and bottom border. */
+.columns-container.columns-reading.columns-stacked {
+	padding: 4px 0;
 }
 
 /* Hide horizontal resize handles in stacked mode */
@@ -1158,7 +1201,6 @@
 
 .columns-container .columns-stack-group > .column-item {
 	flex: none;
-	width: 100%;
 }
 
 /* Hide vertical resize handles inside stack groups */
@@ -1333,6 +1375,35 @@
 
 .amc-columns-host sup.footnote-ref.amc-footref-source .amc-footref-mark {
 	color: var(--text-faint);
+}
+
+/* Live Preview: a footnote definition written in a column, shown in place as
+   the editor shows it: the label, then the footnote text. */
+.amc-columns-host .amc-footnote-def {
+	display: flex;
+	align-items: baseline;
+	gap: 0.3em;
+}
+
+/* Raised like a superscript: vertical-align has no effect on a flex item. */
+.amc-columns-host .amc-footnote-def-label {
+	flex-shrink: 0;
+	position: relative;
+	top: -0.4em;
+	font-size: 0.75em;
+	color: var(--text-muted);
+}
+
+.amc-columns-host .amc-footnote-def-body {
+	min-width: 0;
+}
+
+.amc-columns-host .amc-footnote-def-body > :first-child {
+	margin-top: 0;
+}
+
+.amc-columns-host .amc-footnote-def-body > :last-child {
+	margin-bottom: 0;
 }
 
 /* Footnote preview shown when a reference in a column is hovered. */

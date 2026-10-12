@@ -1,8 +1,9 @@
-import {AbstractInputSuggest, App, Component, debounce, getAllTags, setIcon, Setting, TFolder} from "obsidian";
+import {App, Component, debounce, DropdownComponent, ExtraButtonComponent, Setting, SettingGroup} from "obsidian";
 import type ColumnsPlugin from "../main";
 import {findColumnRegions} from "../column/core/parser";
 import {renderColumnsRegion} from "../column/reading-view";
-import {collectMocGroups, resolveMocFolder} from "./query";
+import {FolderSuggest, ListSuggest, renderChips, VaultVocabulary} from "./form-pickers";
+import {collectMocGroups, resolveMocFolder, visibleMocGroups} from "./query";
 import {generateMocBlock, mocColumnCount} from "./generate";
 import {
 	MAX_MOC_COLUMNS,
@@ -43,113 +44,49 @@ const REVERSE_SORT_DESC: Record<MocSort, string> = {
 };
 
 const MATCH_OPTIONS: Record<MocMatch, string> = {
-	all: "Match all sources",
-	any: "Match any source",
+	all: "Every source",
+	any: "Any source",
 };
 
-// ── Vault vocabulary (for pickers) ──────────────────────────
+/** Sections of the form, shown one at a time. */
+type MocFormTab = "sources" | "groups" | "list";
 
-/** Tags, property keys and values in use, read from the metadata cache. */
-class VaultVocabulary {
-	readonly tags: string[];
-	readonly propertyKeys: string[];
-	private readonly values = new Map<string, Set<string>>();
+const TABS: Array<{id: MocFormTab; label: string; summary: (t: MocTemplate) => string}> = [
+	{id: "sources", label: "Sources", summary: summarizeSources},
+	{id: "groups", label: "Groups", summary: summarizeGroups},
+	{id: "list", label: "List", summary: summarizeList},
+];
 
-	constructor(app: App) {
-		const tags = new Set<string>();
-		for (const file of app.vault.getMarkdownFiles()) {
-			const cache = app.metadataCache.getFileCache(file);
-			if (!cache) continue;
-			const fileTags: string[] = getAllTags(cache) ?? [];
-			for (const tag of fileTags) tags.add(tag.replace(/^#/, ""));
-			const frontmatter: Record<string, unknown> = cache.frontmatter ?? {};
-			for (const key of Object.keys(frontmatter)) {
-				if (key === "position") continue;
-				const raw = frontmatter[key];
-				const set = this.values.get(key) ?? new Set<string>();
-				const values: unknown[] = Array.isArray(raw) ? (raw as unknown[]) : [raw];
-				for (const value of values) {
-					if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-						set.add(String(value).replace(/^\[\[|\]\]$/g, ""));
-					}
-				}
-				this.values.set(key, set);
-			}
-		}
-		this.tags = [...tags].sort((a, b) => a.localeCompare(b));
-		this.propertyKeys = [...this.values.keys()].sort((a, b) => a.localeCompare(b));
-	}
-
-	propertyValues(key: string): string[] {
-		return [...(this.values.get(key) ?? [])].sort((a, b) => a.localeCompare(b));
-	}
+/** Number of separate conditions a note is checked against. */
+function sourceCount(template: MocTemplate): number {
+	return (template.folderMode === "none" ? 0 : 1) + template.tags.length
+		+ template.properties.filter((p) => p.key.trim()).length;
 }
 
-class ListSuggest extends AbstractInputSuggest<string> {
-	constructor(
-		app: App,
-		private readonly input: HTMLInputElement,
-		private readonly source: () => string[],
-		private readonly onPick: (value: string) => void,
-	) {
-		super(app, input);
-	}
-
-	getSuggestions(query: string): string[] {
-		const q = query.toLowerCase().replace(/^#/, "");
-		return this.source().filter((v) => v.toLowerCase().includes(q)).slice(0, 50);
-	}
-
-	renderSuggestion(value: string, el: HTMLElement): void {
-		el.setText(value);
-	}
-
-	selectSuggestion(value: string): void {
-		this.input.value = value;
-		this.onPick(value);
-		this.close();
-	}
+function summarizeSources(template: MocTemplate): string {
+	const parts: string[] = [];
+	if (template.folderMode === "fixed") parts.push(template.folder.trim() || "No folder yet");
+	else if (template.folderMode !== "none") parts.push(template.folderMode === "note" ? "This folder" : "Parent folder");
+	if (template.tags.length > 0) parts.push(`${template.tags.length} tag${template.tags.length === 1 ? "" : "s"}`);
+	const props = template.properties.length;
+	if (props > 0) parts.push(`${props} propert${props === 1 ? "y" : "ies"}`);
+	return parts.length > 0 ? parts.join(" + ") : "Nothing selected";
 }
 
-class FolderSuggest extends AbstractInputSuggest<TFolder> {
-	constructor(app: App, private readonly input: HTMLInputElement, private readonly onPick: (folder: TFolder) => void) {
-		super(app, input);
-	}
-
-	getSuggestions(query: string): TFolder[] {
-		const q = query.toLowerCase();
-		return this.app.vault.getAllLoadedFiles()
-			.filter((f): f is TFolder => f instanceof TFolder)
-			.filter((f) => f.path.toLowerCase().includes(q))
-			.slice(0, 50);
-	}
-
-	renderSuggestion(folder: TFolder, el: HTMLElement): void {
-		el.setText(folder.path === "/" ? "/ (vault root)" : folder.path);
-	}
-
-	selectSuggestion(folder: TFolder): void {
-		this.input.value = folder.path;
-		this.onPick(folder);
-		this.close();
-	}
+function summarizeGroups(template: MocTemplate): string {
+	const by = template.groupBy === "none" ? "No groups" : `By ${GROUP_BY_OPTIONS[template.groupBy].toLowerCase()}`;
+	const hidden = template.groupBy === "none" ? 0 : template.hiddenGroups.length;
+	return `${by}, ${template.columns} column${template.columns === 1 ? "" : "s"}${hidden > 0 ? `, ${hidden} hidden` : ""}`;
 }
 
-function renderChips(
-	parent: HTMLElement,
-	items: ReadonlyArray<string>,
-	onRemove: (index: number) => void,
-): void {
-	const list = parent.createDiv({cls: "amc-moc-chips"});
-	items.forEach((label, index) => {
-		const chip = list.createSpan({cls: "amc-moc-chip", text: label});
-		const remove = chip.createSpan({cls: "amc-moc-chip-remove", attr: {"aria-label": `Remove ${label}`}});
-		setIcon(remove, "x");
-		remove.addEventListener("click", () => onRemove(index));
-	});
+function summarizeList(template: MocTemplate): string {
+	const order: Record<MocSort, [string, string]> = {
+		name: ["A to Z", "Z to A"],
+		modified: ["Recently modified", "Least recently modified"],
+		created: ["Newest", "Oldest"],
+	};
+	return order[template.sort][template.sortReverse ? 1 : 0];
 }
-
-// ── Form ────────────────────────────────────────────────────
 
 export interface MocFormOptions {
 	app: App;
@@ -167,16 +104,20 @@ export interface MocFormOptions {
 }
 
 /**
- * The MOC options form, shared by the settings tab (templates) and the MOC
- * builder dialog. Mutates `template` in place.
+ * The MOC options form, shared by the template settings page and the MOC
+ * builder dialog. The options are split into tabs (sources, groups, list)
+ * above a live preview. Mutates `template` in place.
  */
 export class MocForm extends Component {
 	private vocabulary: VaultVocabulary | null = null;
 	private previewComponent: Component | null = null;
 	private refreshDerived: () => void = () => {};
+	private tab: MocFormTab = "sources";
+	private tabsEl: HTMLElement | null = null;
 
 	constructor(private readonly host: HTMLElement, private readonly opts: MocFormOptions) {
 		super();
+		host.addClass("amc-moc-form");
 	}
 
 	onload(): void {
@@ -194,18 +135,21 @@ export class MocForm extends Component {
 	}
 
 	private render(): void {
-		const {app, template} = this.opts;
+		const {template} = this.opts;
+		const scrollEl = this.host.closest(".vertical-tab-content, .amc-moc-builder-form");
+		const scrollTop = scrollEl?.scrollTop ?? 0;
 		this.host.empty();
 		const body = this.host;
-		const previewEl = createDiv();
+		const previewEl = createDiv({cls: "amc-moc-preview"});
 		const assignmentsEl = createDiv();
 		const refresh = debounce(() => {
-			this.renderAssignments(assignmentsEl);
+			if (this.tab === "groups") this.renderAssignments(assignmentsEl);
 			this.renderPreview(previewEl);
 		}, 250, true);
 		this.refreshDerived = refresh;
 		const change = async () => {
 			await this.opts.onChange();
+			if (this.tabsEl) this.renderTabs(this.tabsEl);
 			refresh();
 		};
 		const changeAndRerender = async () => {
@@ -214,7 +158,7 @@ export class MocForm extends Component {
 		};
 
 		if (this.opts.showName) {
-			new Setting(body).setName("Name").addText((text) => text
+			new Setting(section(body)).setName("Name").addText((text) => text
 				.setValue(template.name)
 				.onChange(async (value) => {
 					template.name = value;
@@ -222,8 +166,53 @@ export class MocForm extends Component {
 				}));
 		}
 
-		// ── Sources ──
-		new Setting(body).setName("Sources").setHeading();
+		this.tabsEl = body.createDiv({cls: "amc-moc-tabs", attr: {role: "tablist"}});
+		this.renderTabs(this.tabsEl);
+		const panel = body.createDiv({cls: "amc-moc-tab-panel", attr: {role: "tabpanel"}});
+		if (this.tab === "sources") this.renderSources(section(panel), change, changeAndRerender);
+		else if (this.tab === "groups") this.renderGroups(panel, assignmentsEl, change, changeAndRerender);
+		else this.renderList(section(panel), change);
+
+		const preview = new SettingGroup(body).setHeading("Preview").addClass("amc-moc-preview-group");
+		preview.listEl.replaceWith(previewEl);
+		refresh();
+		if (scrollEl) scrollEl.scrollTop = scrollTop;
+	}
+
+	private renderTabs(el: HTMLElement): void {
+		const {template} = this.opts;
+		el.empty();
+		for (const tab of TABS) {
+			const selected = tab.id === this.tab;
+			const button = el.createEl("button", {
+				cls: "amc-moc-tab",
+				attr: {role: "tab", "aria-selected": String(selected), tabindex: selected ? "0" : "-1"},
+			});
+			button.toggleClass("is-active", selected);
+			button.createSpan({cls: "amc-moc-tab-label", text: tab.label});
+			button.createSpan({cls: "amc-moc-tab-summary", text: tab.summary(template)});
+			button.addEventListener("click", () => this.selectTab(tab.id));
+			button.addEventListener("keydown", (evt) => {
+				if (evt.key !== "ArrowRight" && evt.key !== "ArrowLeft") return;
+				evt.preventDefault();
+				const index = TABS.findIndex((t) => t.id === tab.id);
+				const next = TABS[(index + (evt.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length]!;
+				this.selectTab(next.id);
+				this.host.querySelector<HTMLElement>(".amc-moc-tab.is-active")?.focus();
+			});
+		}
+	}
+
+	private selectTab(tab: MocFormTab): void {
+		if (tab === this.tab) return;
+		this.tab = tab;
+		this.render();
+	}
+
+	// ── Sources ──
+
+	private renderSources(body: HTMLElement, change: () => Promise<void>, changeAndRerender: () => Promise<void>): void {
+		const {app, template} = this.opts;
 		new Setting(body)
 			.setName("Folder")
 			.setDesc(template.folderMode === "note" || template.folderMode === "parent"
@@ -264,108 +253,19 @@ export class MocForm extends Component {
 		this.renderTagPicker(body, changeAndRerender);
 		this.renderPropertyPicker(body, changeAndRerender);
 
-		new Setting(body).setName("Combine sources").addDropdown((dd) => dd
-			.addOptions(MATCH_OPTIONS)
-			.setValue(template.match)
-			.onChange(async (value) => {
-				template.match = value as MocMatch;
-				await change();
-			}));
-
-		// ── Layout ──
-		new Setting(body).setName("Layout").setHeading();
-		new Setting(body).setName("Group by").addDropdown((dd) => dd
-			.addOptions(GROUP_BY_OPTIONS)
-			.setValue(template.groupBy)
-			.onChange(async (value) => {
-				template.groupBy = value as MocGroupBy;
-				await changeAndRerender();
-			}));
-		if (template.groupBy === "property") {
-			new Setting(body).setName("Group property").addText((text) => {
-				text.setPlaceholder("Status").setValue(template.groupProperty);
-				new ListSuggest(app, text.inputEl, () => this.vocab.propertyKeys, (key) => {
-					template.groupProperty = key;
-					void change();
-				});
-				text.onChange(async (value) => {
-					template.groupProperty = value.trim();
-					await change();
-				});
-			});
-		}
-		new Setting(body)
-			.setName("Columns")
-			.setDesc(template.groupBy === "none"
-				? "The list is split evenly across the columns."
-				: "Groups are placed into columns; with fewer groups, fewer columns are used.")
-			.addSlider((slider) => slider
-				.setLimits(1, MAX_MOC_COLUMNS, 1)
-				.setValue(template.columns)
-				.onChange(async (value) => {
-					template.columns = value;
-					await change();
-				}));
-		const sortSetting = new Setting(body).setName("Sort notes by");
-		const reverseSetting = new Setting(body)
-			.setName("Reverse sort order")
-			.setDesc(REVERSE_SORT_DESC[template.sort])
-			.addToggle((toggle) => toggle
-				.setValue(template.sortReverse)
-				.onChange(async (value) => {
-					template.sortReverse = value;
-					await change();
-				}));
-		sortSetting.addDropdown((dd) => dd
-			.addOptions(SORT_OPTIONS)
-			.setValue(template.sort)
-			.onChange(async (value) => {
-				template.sort = value as MocSort;
-				reverseSetting.setDesc(REVERSE_SORT_DESC[template.sort]);
-				await change();
-			}));
-		if (template.groupBy !== "none") {
-			new Setting(body).setName("Show group headings").addToggle((toggle) => toggle
-				.setValue(template.showHeadings)
-				.onChange(async (value) => {
-					template.showHeadings = value;
-					await change();
-				}));
-		}
-		new Setting(body)
-			.setName("Show bullets")
-			.setDesc("List links as a bulleted list. When off, each link is on its own line without a bullet.")
-			.addToggle((toggle) => toggle
-				.setValue(template.showBullets)
-				.onChange(async (value) => {
-					template.showBullets = value;
-					await change();
-				}));
-		new Setting(body)
-			.setName("Notes per group")
-			.setDesc("0 shows all notes.")
-			.addText((text) => {
-				text.inputEl.type = "number";
-				text.inputEl.min = "0";
-				text.setValue(String(template.maxPerGroup)).onChange(async (value) => {
-					const n = parseInt(value, 10);
-					template.maxPerGroup = Number.isFinite(n) && n > 0 ? n : 0;
-					await change();
-				});
-			});
-
-		if (template.groupBy !== "none") {
+		// Only meaningful once there is more than one condition to combine.
+		if (sourceCount(template) > 1) {
 			new Setting(body)
-				.setName("Column for each group")
-				.setDesc("Groups found right now. Automatic places a group in the shortest column.")
-				.setHeading();
-			body.appendChild(assignmentsEl);
+				.setName("Notes must match")
+				.setDesc("Whether a note needs every folder, tag and property above, or just one of them.")
+				.addDropdown((dd) => dd
+					.addOptions(MATCH_OPTIONS)
+					.setValue(template.match)
+					.onChange(async (value) => {
+						template.match = value as MocMatch;
+						await change();
+					}));
 		}
-
-		new Setting(body).setName("Preview").setHeading();
-		previewEl.addClass("amc-moc-preview");
-		body.appendChild(previewEl);
-		refresh();
 	}
 
 	private renderTagPicker(body: HTMLElement, onChange: () => Promise<void>): void {
@@ -402,6 +302,7 @@ export class MocForm extends Component {
 		const setting = new Setting(body)
 			.setName("Properties")
 			.setDesc("Notes whose property has this value. Leave the value empty to only require the property.");
+		setting.settingEl.addClass("amc-moc-property-picker");
 		let key = "";
 		let value = "";
 		let valueInput: HTMLInputElement | null = null;
@@ -452,6 +353,71 @@ export class MocForm extends Component {
 		}
 	}
 
+	// ── Groups ──
+
+	private renderGroups(
+		panel: HTMLElement,
+		assignmentsEl: HTMLElement,
+		change: () => Promise<void>,
+		changeAndRerender: () => Promise<void>,
+	): void {
+		const {app, template} = this.opts;
+		const body = section(panel);
+		new Setting(body)
+			.setName("Group by")
+			.setDesc("Each group gets its own heading and is placed in a column.")
+			.addDropdown((dd) => dd
+				.addOptions(GROUP_BY_OPTIONS)
+				.setValue(template.groupBy)
+				.onChange(async (value) => {
+					template.groupBy = value as MocGroupBy;
+					await changeAndRerender();
+				}));
+		if (template.groupBy === "property") {
+			new Setting(body).setName("Group property").addText((text) => {
+				text.setPlaceholder("Status").setValue(template.groupProperty);
+				new ListSuggest(app, text.inputEl, () => this.vocab.propertyKeys, (key) => {
+					template.groupProperty = key;
+					void change();
+				});
+				text.onChange(async (value) => {
+					template.groupProperty = value.trim();
+					await change();
+				});
+			});
+		}
+		new Setting(body)
+			.setName("Columns")
+			.setDesc(template.groupBy === "none"
+				? "The list is split evenly across the columns."
+				: "With fewer groups than columns, fewer columns are used.")
+			.addSlider((slider) => slider
+				.setLimits(1, MAX_MOC_COLUMNS, 1)
+				.setValue(template.columns)
+				.onChange(async (value) => {
+					template.columns = value;
+					await change();
+				}));
+		if (template.groupBy === "none") return;
+
+		new Setting(body).setName("Show group headings").addToggle((toggle) => toggle
+			.setValue(template.showHeadings)
+			.onChange(async (value) => {
+				template.showHeadings = value;
+				await change();
+			}));
+		const heading = createFragment((f) => {
+			f.appendText("Column for each group");
+			f.createDiv({
+				cls: "setting-item-description",
+				text: "Groups found right now. Automatic places a group in the shortest column. Use the eye to leave a group out of the MOC.",
+			});
+		});
+		const assignments = new SettingGroup(panel).setHeading(heading);
+		assignmentsEl.addClass("setting-items");
+		assignments.listEl.replaceWith(assignmentsEl);
+	}
+
 	private renderAssignments(el: HTMLElement): void {
 		const {app, template, sourcePath} = this.opts;
 		el.empty();
@@ -462,24 +428,98 @@ export class MocForm extends Component {
 			return;
 		}
 		const count = Math.max(1, Math.min(MAX_MOC_COLUMNS, template.columns));
+		// Column keys are not plain numbers: objects list integer keys first,
+		// which would put "Automatic" after the columns.
 		const options: Record<string, string> = {auto: "Automatic"};
-		for (let i = 0; i < count; i++) options[String(i)] = `Column ${i + 1}`;
+		for (let i = 0; i < count; i++) options[`col-${i}`] = `Column ${i + 1}`;
 		for (const group of groups) {
 			const assigned = template.assignments[group.name];
-			new Setting(el)
+			const setting = new Setting(el)
 				.setName(group.name)
-				.setDesc(`${group.files.length} note${group.files.length === 1 ? "" : "s"}`)
-				.addDropdown((dd) => dd
+				.setDesc(`${group.files.length} note${group.files.length === 1 ? "" : "s"}`);
+			let dropdown: DropdownComponent | null = null;
+			let eye: ExtraButtonComponent | null = null;
+			// Hiding keeps the column choice, so showing the group again puts it back.
+			const showState = () => {
+				const hidden = template.hiddenGroups.includes(group.name);
+				setting.settingEl.toggleClass("is-hidden-group", hidden);
+				dropdown?.setDisabled(hidden);
+				eye?.setIcon(hidden ? "eye-off" : "eye").setTooltip(hidden ? "Show in MOC" : "Hide from MOC");
+			};
+			setting.addExtraButton((btn) => {
+				eye = btn.onClick(async () => {
+					const hidden = template.hiddenGroups.includes(group.name);
+					template.hiddenGroups = hidden
+						? template.hiddenGroups.filter((name) => name !== group.name)
+						: [...template.hiddenGroups, group.name];
+					showState();
+					await this.opts.onChange();
+					if (this.tabsEl) this.renderTabs(this.tabsEl);
+					this.refreshDerived();
+				});
+				btn.extraSettingsEl.addClass("amc-moc-group-visibility");
+			});
+			setting.addDropdown((dd) => {
+				dropdown = dd
 					.addOptions(options)
-					.setValue(assigned !== undefined && assigned < count ? String(assigned) : "auto")
+					.setValue(assigned !== undefined && assigned < count ? `col-${assigned}` : "auto")
 					.onChange(async (value) => {
 						if (value === "auto") delete template.assignments[group.name];
-						else template.assignments[group.name] = parseInt(value, 10);
+						else template.assignments[group.name] = parseInt(value.slice("col-".length), 10);
 						await this.opts.onChange();
 						this.refreshDerived();
-					}));
+					});
+			});
+			showState();
 		}
 	}
+
+	// ── List ──
+
+	private renderList(body: HTMLElement, change: () => Promise<void>): void {
+		const {template} = this.opts;
+		const sortSetting = new Setting(body).setName("Sort notes by");
+		const reverseSetting = new Setting(body)
+			.setName("Reverse sort order")
+			.setDesc(REVERSE_SORT_DESC[template.sort])
+			.addToggle((toggle) => toggle
+				.setValue(template.sortReverse)
+				.onChange(async (value) => {
+					template.sortReverse = value;
+					await change();
+				}));
+		sortSetting.addDropdown((dd) => dd
+			.addOptions(SORT_OPTIONS)
+			.setValue(template.sort)
+			.onChange(async (value) => {
+				template.sort = value as MocSort;
+				reverseSetting.setDesc(REVERSE_SORT_DESC[template.sort]);
+				await change();
+			}));
+		new Setting(body)
+			.setName("Show bullets")
+			.setDesc("List links as a bulleted list. When off, each link is on its own line without a bullet.")
+			.addToggle((toggle) => toggle
+				.setValue(template.showBullets)
+				.onChange(async (value) => {
+					template.showBullets = value;
+					await change();
+				}));
+		new Setting(body)
+			.setName(template.groupBy === "none" ? "Maximum notes" : "Notes per group")
+			.setDesc("0 shows all notes.")
+			.addText((text) => {
+				text.inputEl.type = "number";
+				text.inputEl.min = "0";
+				text.setValue(String(template.maxPerGroup)).onChange(async (value) => {
+					const n = parseInt(value, 10);
+					template.maxPerGroup = Number.isFinite(n) && n > 0 ? n : 0;
+					await change();
+				});
+			});
+	}
+
+	// ── Preview ──
 
 	private renderPreview(el: HTMLElement): void {
 		const {app, plugin, template, sourcePath} = this.opts;
@@ -495,7 +535,7 @@ export class MocForm extends Component {
 			el.createDiv({cls: "amc-moc-preview-empty", text: "Open a note to preview a MOC relative to its folder."});
 			return;
 		}
-		const groups = collectMocGroups(app, template, sourcePath, PREVIEW_LIMIT);
+		const groups = visibleMocGroups(template, collectMocGroups(app, template, sourcePath, PREVIEW_LIMIT));
 		const where = relative ? ` Folder: ${folder === "" ? "/" : folder} (from ${sourcePath}).` : "";
 		if (groups.length === 0) {
 			el.createDiv({cls: "amc-moc-preview-empty", text: `No notes match these sources.${where}`});
@@ -511,6 +551,11 @@ export class MocForm extends Component {
 		const previewHost = el.createDiv({cls: "markdown-rendered amc-moc-preview-body"});
 		void renderColumnsRegion(plugin, component, previewHost, region, sourcePath ?? "");
 	}
+}
+
+/** A card of settings, styled like Obsidian's own groups; returns its list. */
+function section(parent: HTMLElement): HTMLElement {
+	return new SettingGroup(parent).listEl;
 }
 
 /** One-line summary of a template's sources and layout. */

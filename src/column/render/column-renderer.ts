@@ -17,8 +17,11 @@ import {isInteractivePreviewTarget} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
 import {refreshRegionPosition} from "../core/region-position";
 import {buildResizeHandle} from "./column-resizer";
-import {applyNoteFootnotes, livePreviewFootnotes, wireLivePreviewFootnotes} from "./footnote-render";
+import {applyNoteFootnotes, livePreviewFootnotes, renderLiveFootnoteDefinitions, wireLivePreviewFootnotes} from "./footnote-render";
+import {extractFootnoteDefinitions} from "../core/footnotes";
 import {wireDragItem} from "./column-drag";
+import {applyBetterBullets} from "./better-bullets";
+import {addFoldControls} from "./fold";
 import {
 	insertColumnAfter,
 	insertColumnAfterOpposite,
@@ -75,6 +78,18 @@ function renderColumnHeader(colEl: HTMLElement, content: string): string {
 	}
 
 	return parsed.restContent;
+}
+
+/**
+ * A column with a header is shown without its `!type: Title` line (see
+ * renderColumnHeader), so edits made in the preview (ticking a task, editing
+ * a text segment, changing a nested block) come back without it. Put the
+ * header line back in front, or it is deleted from the note.
+ */
+function withHeader(fullContent: string, shownContent: string, nextContent: string): string {
+	if (shownContent === fullContent) return nextContent;
+	const header = fullContent.split("\n").find((line) => line.trim().length > 0)?.trim() ?? "";
+	return nextContent.trim().length > 0 ? `${header}\n${nextContent}` : header;
 }
 
 // ── Render Context ──────────────────────────────────────────
@@ -234,9 +249,17 @@ export function renderMarkdown(
 		// definitions and numbers (see core/footnotes).
 		const footnotes = livePreviewFootnotes(ctx);
 		const piece = footnotes?.locate(content);
-		const markdown = footnotes ? footnotes.prepare(content, true) : content;
+		// Definitions show where they are written, as in the editor.
+		const {body, definitions} = extractFootnoteDefinitions(content);
+		const markdown = footnotes ? footnotes.prepare(body, true) : body;
+		const renderFootnotes = (target: HTMLElement, text: string) =>
+			MarkdownRenderer.render(plugin.app, footnotes ? footnotes.prepare(text, true) : text, target, sourcePath, component)
+				.then(() => {
+					if (footnotes) applyNoteFootnotes(target, footnotes, {inlineNumbers: []}, "live");
+				});
 		void MarkdownRenderer.render(plugin.app, markdown, parent, sourcePath, component).then(() => {
 			if (footnotes && piece) applyNoteFootnotes(parent, footnotes, piece, "live");
+			void Promise.all(renderLiveFootnoteDefinitions(parent, definitions, renderFootnotes));
 			// Unwrap <p> inside <li> (loose lists) so parent items render
 			// identically to child items without block-level spacing artifacts.
 			unwrapLooseListParagraphs(parent);
@@ -245,6 +268,9 @@ export function renderMarkdown(
 			// Tag link-only paragraphs so their spacing rules can target a class
 			// instead of relying on the :has() selector.
 			markLinkLines(parent);
+			// Better Bullets only draws its symbols in the editor.
+			applyBetterBullets(plugin.app, parent);
+			addFoldControls(plugin.app, parent);
 			if (onContentChange) {
 				wireTaskCheckboxes(parent, content, onContentChange);
 			}
@@ -275,24 +301,40 @@ function unwrapLooseListParagraphs(parent: HTMLElement): void {
 }
 
 /**
+ * Checkboxes that are not the column's own task lines: results drawn by code
+ * blocks (Dataview, Tasks queries) and tasks of embedded notes. Those plugins
+ * and embeds handle their own checkboxes.
+ */
+const FOREIGN_TASKS = "[class*='block-language-'], .internal-embed, .markdown-embed";
+
+/** A task line, also in a callout or quote: `- [ ] `, `> * [x] `… */
+const TASK_LINE_RE = /^(\s*(?:>\s*)*[-*+] \[)(.)(\] )/;
+
+/**
  * Wire click handlers on task checkboxes in rendered markdown.
  * Clicking a checkbox toggles the character inside `[x]`/`[ ]`/`[/]` etc.
+ * Checkboxes are matched to the column's task lines in order, so only the
+ * column's own ones count: a query result's checkbox shifted the matching
+ * and toggled another line.
  */
 function wireTaskCheckboxes(
 	parent: HTMLElement,
 	content: string,
 	onContentChange: (nextContent: string) => void,
 ): void {
-	const checkboxes = parent.querySelectorAll<HTMLInputElement>(
+	const checkboxes = Array.from(parent.querySelectorAll<HTMLInputElement>(
 		"li.task-list-item > input[type='checkbox'], li.task-list-item > .task-list-item-checkbox",
-	);
+	)).filter((checkbox) => {
+		const foreign = checkbox.closest(FOREIGN_TASKS);
+		return !foreign || !parent.contains(foreign);
+	});
 	if (checkboxes.length === 0) return;
 
 	// Find all task lines in the content: lines matching `- [.] ` or `* [.] ` etc.
 	const lines = content.split("\n");
 	const taskLineIndices: number[] = [];
 	for (let i = 0; i < lines.length; i++) {
-		if (/^\s*[-*+] \[.\] /.test(lines[i]!)) {
+		if (TASK_LINE_RE.test(lines[i]!)) {
 			taskLineIndices.push(i);
 		}
 	}
@@ -305,13 +347,13 @@ function wireTaskCheckboxes(
 			e.preventDefault();
 			e.stopPropagation();
 			const line = lines[lineIdx]!;
-			const match = line.match(/^(\s*[-*+] \[)(.)(\] )/);
+			const match = line.match(TASK_LINE_RE);
 			if (!match) return;
 
 			const currentStatus = match[2]!;
 			// Toggle: unchecked → checked, anything else → unchecked
 			const newStatus = currentStatus === " " ? "x" : " ";
-			lines[lineIdx] = line.replace(/^(\s*[-*+] \[).\]/, `$1${newStatus}]`);
+			lines[lineIdx] = line.replace(TASK_LINE_RE, `$1${newStatus}$3`);
 			onContentChange(lines.join("\n"));
 		});
 	});
@@ -1235,7 +1277,7 @@ function renderNestedRegion(
 					depth,
 					(nextChildContent) => {
 						const updated = region.columns.map((c, idx) =>
-							idx === i ? {...c, content: nextChildContent} : c,
+							idx === i ? {...c, content: withHeader(col.content, colContent, nextChildContent)} : c,
 						);
 						onRegionChange(updated, region.containerStyle);
 					},
@@ -1416,7 +1458,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						sourcePath,
 						0,
 						(nextContent) => {
-							commitEdit(i, nextContent, ctx);
+							commitEdit(i, withHeader(col.content, colContent, nextContent), ctx);
 						},
 						[],
 						i,

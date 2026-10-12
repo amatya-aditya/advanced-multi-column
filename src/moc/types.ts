@@ -44,6 +44,8 @@ export interface MocTemplate {
 	columns: number;
 	/** Group name → 0-based column index; unassigned groups are placed automatically. */
 	assignments: Record<string, number>;
+	/** Group names left out of the MOC (their notes may still appear in other groups). */
+	hiddenGroups: string[];
 	sort: MocSort;
 	/** List in the opposite order: Z–A by name, oldest first by date. */
 	sortReverse: boolean;
@@ -71,6 +73,7 @@ export function createMocTemplate(id: string, name: string): MocTemplate {
 		groupProperty: "",
 		columns: 3,
 		assignments: {},
+		hiddenGroups: [],
 		sort: "name",
 		sortReverse: false,
 		showHeadings: true,
@@ -117,6 +120,7 @@ export function sanitizeMocTemplate(raw: unknown): MocTemplate | null {
 	pick("groupProperty", (v) => typeof v === "string");
 	pick("columns", (v) => typeof v === "number" && v >= 1 && v <= MAX_MOC_COLUMNS);
 	pick("assignments", (v) => isRecord(v) && Object.keys(v).every((k) => typeof v[k] === "number"));
+	pick("hiddenGroups", (v) => Array.isArray(v) && v.every((g) => typeof g === "string"));
 	pick("sort", (v) => v === "name" || v === "modified" || v === "created");
 	pick("sortReverse", (v) => typeof v === "boolean");
 	pick("showHeadings", (v) => typeof v === "boolean");

@@ -1,6 +1,6 @@
 # 08 - Settings guide
 
-Open **Settings → Advanced Multi Column**. The main page holds the general options; **MOC**, **Appearance** and **Column headers** open as sub-pages. Every option can also be found with the settings search at the top of the settings window.
+Open **Settings → Advanced Multi Column**. The main page lists sub-pages in two groups: **General** (**Display**, **New columns**, **Editing**, **Narrow screens**, **Appearance**) and **Features** (**Column headers**, **Maps of content**). Each entry shows its current state where it has one, such as *Below 480px* or the number of templates. Every option can also be found with the settings search at the top of the settings window.
 
 Requires Obsidian 1.13 or newer.
 
@@ -44,13 +44,13 @@ Requires Obsidian 1.13 or newer.
 2. When disabled, new columns are inserted with no style.
 3. Default: **On**.
 
-## MOC
+## Maps of content
 
 **Enable MOC** (on by default) turns the MOC features on or off: the **Insert MOC** menu, the MOC commands, **Edit MOC** and automatic updates. When off, inserted MOCs stay in your notes as ordinary columns and are not updated; turning it back on updates them.
 
-Under **Templates**, use **+** to add a template, the pencil to open its editor, and **×** to delete it. Create and edit reusable MOC templates — saved queries that list notes by folder (fixed, or relative to the note the MOC is in), tags and/or properties, grouped into columns. One-off MOCs built with **Insert MOC → New MOC…** are edited from the note instead (right-click → **Edit MOC**). Each template shows a live preview from your vault, and inserted MOCs update automatically when the template changes.
+Under **Templates**, use **+** to add a template; each template opens as its own page (select it in the list), with **Delete template** at the bottom. Create and edit reusable MOC templates — saved queries that list notes by folder (fixed, or relative to the note the MOC is in), tags and/or properties, grouped into columns. One-off MOCs built with **Insert MOC → New MOC…** are edited from the note instead (right-click → **Edit MOC**). Each template shows a live preview from your vault, and inserted MOCs update automatically when the template changes.
 
-Settings per template: name; **Sources** (folder: this note's folder, its parent, a specific folder or any; include subfolders; tags; properties; combine sources); **Layout** (group by, group property, columns, sort notes by, reverse sort order, show group headings, show bullets, notes per group); **Column for each group**; **Preview**.
+Settings per template: name, then three tabs — **Sources** (folder: this note's folder, its parent, a specific folder or any; include subfolders; tags; properties; notes must match), **Groups** (group by, group property, columns, show group headings, column for each group) and **List** (sort notes by, reverse sort order, show bullets, notes per group) — and the **Preview**.
 
 See [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for what each setting does.
 
@@ -122,6 +122,20 @@ Notes:
 2. Duplicate names are made unique automatically.
 3. Built-in rows do not show the delete button while their original ID is unchanged.
 4. Select the pencil on a header type to edit it; the banner previews the result.
+
+## Remove all column markers
+
+At the very bottom of the page. Use it before uninstalling the plugin: it removes this plugin's markers (`%% col-start %%`, `%% col-break %%`, `%% col-end %%`) from every note and keeps the notes' text.
+
+1. Select **Remove…**. The plugin scans your notes and shows how many markers it found, and in which notes.
+2. Type `delete all amc markers` to enable **Remove markers**, then select it.
+
+What changes and what doesn't:
+
+- Only the marker lines are removed. The text of every column stays, in the same order, as ordinary paragraphs.
+- Column widths and styles are stored in the markers, so they are lost. MOCs stay as plain lists of links and are no longer updated.
+- Other comments, callout columns (`[!col]`) and markers inside code blocks are not changed. Column header lines (`!note: Title`) stay as plain text.
+- It cannot be undone. Back up your vault first.
 
 ## About
 

@@ -12,11 +12,20 @@ import {NoteFootnotes} from "./core/footnotes";
 import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "./core/column-style";
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
+import {addFoldControls, refreshHeadingFolds} from "./render/fold";
 import type {ColumnRegion} from "./core/types";
 import type ColumnsPlugin from "../main";
+import {addMarkdownViewHooks, isLoadingFile} from "./view-hooks";
+import {blockContext, blockKey, BlockReuse, unloadNewBlocks, unloadUntakenBlocks} from "./reading-blocks";
+import type {LayerBlock} from "./reading-blocks";
 import {
+	applyPendingScroll,
 	createLineIndex,
+	FILL_MARGIN_LINES,
 	installReadingScrollMapping,
+	pendingScrollLine,
+	releasePendingScroll,
+	setLayerFiller,
 	tagSourceLines,
 	uninstallReadingScrollMapping,
 } from "./reading-scroll";
@@ -33,7 +42,11 @@ interface RenderState {
 	wrapper: HTMLElement;
 	host: HTMLElement;
 	previewEl: HTMLElement;
+	/** Owns the layer's own parts (footnote list); blocks own theirs. */
 	component: Component;
+	blocks: LayerBlock[];
+	/** Stops rendering the layer's deferred blocks (see buildWrapper). */
+	stopFilling?: () => void;
 	renderId: number;
 	createdAt: number;
 	previewObserver?: MutationObserver;
@@ -110,6 +123,12 @@ function resolveViewForSizer(
 	return null;
 }
 
+/** The sizer of the view's own reading view (not of a note embedded in it). */
+function ownSizerOf(view: MarkdownView): HTMLElement | null {
+	const sizer = view.previewMode.containerEl.querySelector(":scope > .markdown-preview-view > .markdown-preview-sizer");
+	return sizer?.instanceOf(HTMLElement) ? sizer : null;
+}
+
 function resolvePreviewElementForSizer(sizer: HTMLElement): HTMLElement | null {
 	const preview = sizer.closest(".markdown-preview-view");
 	return preview?.instanceOf(HTMLElement) ? preview : null;
@@ -149,6 +168,17 @@ function isSupportedPreview(previewEl: HTMLElement, plugin: ColumnsPlugin): bool
 	const canvasNode = previewEl.closest(".canvas-node");
 	if (canvasNode) return getCanvasNoteSubpath(plugin, canvasNode) === "";
 	return !!previewEl.closest(".markdown-reading-view");
+}
+
+/**
+ * True for blocks the column layer renders itself. Blocks of a note embedded
+ * in the layer are not: the embed is a preview of its own.
+ */
+function isOwnLayerContent(el: HTMLElement): boolean {
+	const layer = el.closest(".columns-rv-wrapper, .columns-rv-segment, .column-preview");
+	if (!layer) return false;
+	const embed = el.closest(".internal-embed");
+	return !embed || !layer.contains(embed);
 }
 
 function getWrapperHost(previewEl: HTMLElement): HTMLElement | null {
@@ -283,18 +313,43 @@ function restoreFooter(previewEl: HTMLElement, sizer: HTMLElement): void {
 
 const RV_HIDDEN_CLASS = "amc-rv-hidden";
 
+const SIZER_PADDING_VAR = "--amc-sizer-padding-top";
+
+/**
+ * While columns are active the sizer is `display: contents` (see layout.css),
+ * so its own top padding no longer applies. Banner plugins set it to start
+ * the note below the banner (Pixel Banner's content start position), and
+ * themes may set it too. Carry it over to a spacer at the top of the preview.
+ * An inline value is copied as written, so a `var()` in it keeps updating.
+ */
+function carrySizerPadding(sizer: HTMLElement): void {
+	const previewEl = sizer.parentElement;
+	if (!previewEl) return;
+	const value = sizer.style.paddingTop || sizer.win.getComputedStyle(sizer).paddingTop;
+	if (previewEl.style.getPropertyValue(SIZER_PADDING_VAR) !== value) {
+		previewEl.setCssProps({[SIZER_PADDING_VAR]: value});
+	}
+}
+
+/**
+ * Sections of Obsidian's own render that the column layer replaces: the
+ * note's content (el-* divs) and the pusher. The frontmatter section stays:
+ * the layer never renders frontmatter, and banner plugins attach to that
+ * section (Banners turns it into the banner's wrapper).
+ */
+function isReplacedSection(el: HTMLElement): boolean {
+	if (el.classList.contains("markdown-preview-pusher")) return true;
+	const cls = el.className;
+	return (cls.startsWith("el-") || cls.includes(" el-")) && !el.classList.contains("mod-frontmatter");
+}
+
 /** Hide el-* content divs and the pusher inside the sizer, preserving
  *  metadata containers, banner plugin elements, inline titles, etc. */
 function hideSizerContent(sizer: HTMLElement): void {
 	for (const child of Array.from(sizer.children)) {
-		if (!child.instanceOf(HTMLElement)) continue;
-		const cls = child.className;
-		const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
-		const isPusher = child.classList.contains("markdown-preview-pusher");
-		if (isElDiv || isPusher) {
-			child.classList.add(RV_HIDDEN_CLASS);
-		}
+		if (child.instanceOf(HTMLElement) && isReplacedSection(child)) child.classList.add(RV_HIDDEN_CLASS);
 	}
+	carrySizerPadding(sizer);
 }
 
 /** Restore hidden elements when tearing down. */
@@ -302,6 +357,9 @@ function restoreSizerContent(sizer: HTMLElement): void {
 	const hidden = sizer.querySelectorAll<HTMLElement>(`:scope > .${RV_HIDDEN_CLASS}`);
 	for (let i = 0; i < hidden.length; i++) {
 		hidden[i]!.classList.remove(RV_HIDDEN_CLASS);
+	}
+	if (sizer.classList.contains("markdown-preview-sizer")) {
+		sizer.parentElement?.setCssProps({[SIZER_PADDING_VAR]: ""});
 	}
 }
 
@@ -320,12 +378,16 @@ function teardownSizer(
 	const state = states.get(sizer);
 	if (state) {
 		disconnectObservers(state);
+		state.stopFilling?.();
+		setLayerFiller(state.previewEl, null);
 		state.component.unload();
+		unloadUntakenBlocks(state.blocks, null);
 		state.wrapper.remove();
 		state.host.classList.remove(RV_PENDING_CLASS);
 		restoreFooter(state.previewEl, sizer);
 		restoreSizerContent(sizer);
 		state.previewEl.classList.remove(RV_ACTIVE_CLASS);
+		releasePendingScroll(state.previewEl);
 		if (!state.host.hasChildNodes()) {
 			state.host.remove();
 		}
@@ -352,25 +414,75 @@ function teardownSizer(
 	restoreFooter(previewEl, sizer);
 	restoreSizerContent(sizer);
 	previewEl.classList.remove(RV_ACTIVE_CLASS);
+	releasePendingScroll(previewEl);
 	rvWarn("teardown stale preview", {reason});
 }
 
+/**
+ * What the layer was built from. The frontmatter counts only by its number of
+ * lines: the layer does not render it (Obsidian draws the properties), but
+ * blocks are tagged with source lines. A property changed in place — as Meta
+ * Bind inputs do on every keystroke — rebuilt the layer, and the input being
+ * typed in lost focus.
+ */
 function textFingerprint(sourcePath: string, text: string, regions: ColumnRegion[]): string {
+	const bodyStart = getFrontmatterEnd(text);
+	let frontmatterLines = 0;
+	for (let i = 0; i < bodyStart; i++) if (text.charCodeAt(i) === 10) frontmatterLines++;
 	// Two independent 32-bit hashes keep the fingerprint compact while still
 	// detecting same-length edits such as GUI width/style changes. The previous
 	// length/first/last fingerprint treated many real edits as unchanged.
 	let hashA = 0x811c9dc5;
 	let hashB = 0x9e3779b9;
-	for (let i = 0; i < text.length; i++) {
+	for (let i = bodyStart; i < text.length; i++) {
 		const code = text.charCodeAt(i);
 		hashA = Math.imul(hashA ^ code, 0x01000193);
 		hashB = Math.imul(hashB ^ code, 0x85ebca6b);
 	}
 	return (
-		`${sourcePath}\u0000${text.length}\u0000${regions.length}`
+		`${sourcePath}\u0000${frontmatterLines}\u0000${text.length - bodyStart}\u0000${regions.length}`
 		+ `\u0000${(hashA >>> 0).toString(16)}${(hashB >>> 0).toString(16)}`
 	);
 }
+
+/** A text field focused inside the layer, and where its caret was. */
+interface FocusedField {
+	el: HTMLInputElement | HTMLTextAreaElement;
+	start: number | null;
+	end: number | null;
+}
+
+function focusedFieldIn(host: HTMLElement): FocusedField | null {
+	const el = host.ownerDocument.activeElement;
+	if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) || !host.contains(el)) return null;
+	try {
+		return {el, start: el.selectionStart, end: el.selectionEnd};
+	} catch {
+		// Inputs such as number have no selection.
+		return {el, start: null, end: null};
+	}
+}
+
+/**
+ * Give focus back to a field whose block was moved into the new layer: moving
+ * an element in the DOM takes focus away, so a field another plugin renders
+ * (a Meta Bind input) stopped taking keystrokes after a save that rebuilt the
+ * layer.
+ */
+function restoreFocusedField(field: FocusedField | null): void {
+	if (!field || !field.el.isConnected || field.el.ownerDocument.activeElement === field.el) return;
+	field.el.focus({preventScroll: true});
+	if (field.start === null || field.end === null) return;
+	try {
+		field.el.setSelectionRange(field.start, field.end);
+	} catch {
+		// The field no longer supports a selection.
+	}
+}
+
+/** A render waits up to HEADER_WAIT_TRIES × HEADER_WAIT_MS for the note's header. */
+const HEADER_WAIT_TRIES = 20;
+const HEADER_WAIT_MS = 25;
 
 /** Longest a new layer waits for its markdown renders before it is shown. */
 const LAYER_RENDER_WAIT_MS = 40;
@@ -396,14 +508,20 @@ function renderMarkdownInto(
 ): void {
 	const footnotes = tasks.footnotes;
 	if (!footnotes) {
-		tasks.push(MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component));
+		tasks.push(
+			MarkdownRenderer.render(plugin.app, markdown, el, sourcePath, component)
+				.then(() => addFoldControls(plugin.app, el)),
+		);
 		return;
 	}
 	// Pieces are located in source order, so do it before rendering starts.
 	const piece = footnotes.locate(markdown);
 	tasks.push(
 		MarkdownRenderer.render(plugin.app, footnotes.prepare(markdown), el, sourcePath, component)
-			.then(() => applyNoteFootnotes(el, footnotes, piece, "reading")),
+			.then(() => {
+				applyNoteFootnotes(el, footnotes, piece, "reading");
+				addFoldControls(plugin.app, el);
+			}),
 	);
 }
 
@@ -592,13 +710,56 @@ function getFrontmatterEnd(text: string): number {
 	return end === -1 ? close + 4 : end + 1;
 }
 
+interface BuiltLayer {
+	wrapper: HTMLElement;
+	/** Top-level blocks in order; empty when built without reuse. */
+	blocks: LayerBlock[];
+	/** Move the blocks taken over from the previous layer into place (at mount). */
+	adopt(): void;
+	/** Render the deferred blocks up to a source line now (in source order). */
+	fill: (line: number) => void;
+	/** Render the remaining deferred blocks in the background; returns a stop function. */
+	fillInBackground: (win: Window) => () => void;
+}
+
+/** Time a background slice of deferred blocks may take before it yields. */
+const FILL_SLICE_MS = 12;
+
+/** Estimated height of a deferred block per source line, until it is rendered. */
+const DEFERRED_EM_PER_LINE = 1.5;
+
+/**
+ * A block rendered after the layer is shown (see buildWrapper's
+ * `renderThroughLine`). Its placeholder holds its place and estimated height.
+ */
+interface DeferredBlock {
+	block: LayerBlock;
+	from: number;
+	to: number;
+	render: (owner: Component, parent: HTMLElement) => HTMLElement | null;
+}
+
+/**
+ * Build the note's column layer. With `reuse` (reading view), every top-level
+ * block gets its own component, and blocks unchanged since the previous build
+ * are taken over: they are moved in by adopt(), when the layers are swapped,
+ * so the layer on screen never loses them while this one builds.
+ *
+ * With `renderThroughLine`, only the blocks starting up to that source line
+ * are rendered now; the rest get placeholders and are rendered by fill() and
+ * fillInBackground(). Rendering a long note in one go froze Obsidian for half
+ * a second before anything showed. The deferred blocks come after the
+ * rendered ones, so they render in source order, as footnotes require.
+ */
 async function buildWrapper(
 	plugin: ColumnsPlugin,
 	sourcePath: string,
 	text: string,
 	regions: ColumnRegion[],
 	component: Component,
-): Promise<HTMLElement> {
+	reuse?: BlockReuse,
+	renderThroughLine?: number,
+): Promise<BuiltLayer> {
 	const wrapper = createDiv({cls: "columns-rv-wrapper"});
 	wrapper.dataset.columnsSourcePath = sourcePath;
 
@@ -607,18 +768,66 @@ async function buildWrapper(
 	const lineOf = createLineIndex(text);
 	const tasks: RenderTasks = [];
 	tasks.footnotes = NoteFootnotes.parse(text);
+	const context = blockContext(plugin, tasks.footnotes);
+	const blocks: LayerBlock[] = [];
+	const adoptions: {placeholder: HTMLElement; block: LayerBlock; from: number; to: number}[] = [];
+	const deferred: DeferredBlock[] = [];
+
+	const addBlock = (
+		kind: "text" | "columns",
+		source: string,
+		from: number,
+		to: number,
+		render: (owner: Component, parent: HTMLElement) => HTMLElement | null,
+	): void => {
+		if (!reuse) {
+			tagSourceLines(render(component, wrapper), from, to);
+			return;
+		}
+		const key = blockKey(kind, source, context);
+		const reused = reuse.take(key);
+		if (reused) {
+			adoptions.push({placeholder: wrapper.createDiv(), block: reused, from, to});
+			blocks.push(reused);
+			return;
+		}
+		const owner = new Component();
+		owner.load();
+		// Once one block is deferred, all later ones are: they render in order.
+		if (renderThroughLine !== undefined && (from > renderThroughLine || deferred.length > 0)) {
+			const placeholder = wrapper.createDiv({cls: "amc-rv-deferred"});
+			placeholder.style.height = `${(to - from + 1) * DEFERRED_EM_PER_LINE}em`;
+			tagSourceLines(placeholder, from, to);
+			const block: LayerBlock = {key, el: placeholder, component: owner, pending: true};
+			blocks.push(block);
+			deferred.push({block, from, to, render});
+			return;
+		}
+		const el = render(owner, wrapper);
+		if (!el) {
+			owner.unload();
+			return;
+		}
+		tagSourceLines(el, from, to);
+		blocks.push({key, el, component: owner});
+	};
+	const addText = (markdown: string, from: number, to: number): void => {
+		if (markdown.trim().length === 0) return;
+		addBlock("text", markdown, from, to, (owner, parent) =>
+			renderMarkdownSegment(plugin, owner, parent, markdown, sourcePath, tasks));
+	};
+
 	let cursor = getFrontmatterEnd(text);
 	for (const region of regions) {
-		const before = text.slice(cursor, region.from);
-		const segment = renderMarkdownSegment(plugin, component, wrapper, before, sourcePath, tasks);
-		tagSourceLines(segment, lineOf(cursor), lineOf(Math.max(cursor, region.from - 1)));
-		buildColumnsRegion(plugin, component, wrapper, region, sourcePath, 0, tasks);
-		tagSourceLines(wrapper.lastElementChild, region.lineStart, region.lineEnd);
+		addText(text.slice(cursor, region.from), lineOf(cursor), lineOf(Math.max(cursor, region.from - 1)));
+		addBlock("columns", text.slice(region.from, region.to), region.lineStart, region.lineEnd, (owner, parent) => {
+			buildColumnsRegion(plugin, owner, parent, region, sourcePath, 0, tasks);
+			const container = parent.lastElementChild;
+			return container instanceof HTMLElement ? container : null;
+		});
 		cursor = region.to;
 	}
-	const after = text.slice(cursor);
-	const tail = renderMarkdownSegment(plugin, component, wrapper, after, sourcePath, tasks);
-	tagSourceLines(tail, lineOf(cursor), lineOf(text.length));
+	addText(text.slice(cursor), lineOf(cursor), lineOf(text.length));
 	// Each piece above was rendered on its own, so the note's footnote list
 	// is built here, as Obsidian does at the end of a note.
 	if (tasks.footnotes) {
@@ -652,7 +861,81 @@ async function buildWrapper(
 		);
 	});
 
-	return wrapper;
+	let next = 0;
+	const renderNext = (): void => {
+		const {block, from, to, render} = deferred[next++]!;
+		const el = render(block.component, createDiv());
+		block.pending = false;
+		if (!el) return;
+		block.el.replaceWith(el);
+		block.el = el;
+		tagSourceLines(el, from, to);
+	};
+
+	return {
+		wrapper,
+		blocks,
+		adopt: () => {
+			for (const {placeholder, block, from, to} of adoptions) {
+				placeholder.replaceWith(block.el);
+				tagSourceLines(block.el, from, to);
+			}
+			// A folded heading hides the blocks after it; the set of blocks changed.
+			if (adoptions.length > 0) refreshHeadingFolds(wrapper);
+		},
+		fill: (line) => {
+			const start = next;
+			while (next < deferred.length && deferred[next]!.from <= line) renderNext();
+			if (next > start) refreshHeadingFolds(wrapper);
+		},
+		fillInBackground: (win) => {
+			let timer: number | null = null;
+			const slice = (): void => {
+				timer = null;
+				const end = performance.now() + FILL_SLICE_MS;
+				const start = next;
+				while (next < deferred.length && performance.now() < end) renderNext();
+				if (next > start) refreshHeadingFolds(wrapper);
+				if (next < deferred.length) timer = win.setTimeout(slice, 0);
+			};
+			if (next < deferred.length) timer = win.setTimeout(slice, 0);
+			return () => {
+				if (timer !== null) win.clearTimeout(timer);
+				timer = null;
+			};
+		},
+	};
+}
+
+/**
+ * Replace a whole note rendered into `el` in one piece (no virtualized sizer)
+ * with the column layout. Children `keep` accepts stay in place.
+ */
+function renderNoteInPlace(
+	plugin: ColumnsPlugin,
+	el: HTMLElement,
+	ctx: MarkdownPostProcessorContext,
+	keep: (node: Element) => boolean,
+): Promise<void> | null {
+	const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+	if (!(file instanceof TFile)) return null;
+
+	return (async () => {
+		const text = await plugin.app.vault.cachedRead(file);
+		if (!text.includes("col-start")) return;
+		const regions = findColumnRegions(text);
+		if (regions.length === 0) return;
+
+		const child = new MarkdownRenderChild(el);
+		ctx.addChild(child);
+		const {wrapper} = await buildWrapper(plugin, ctx.sourcePath, text, regions, child);
+		for (const node of Array.from(el.children)) {
+			if (!keep(node)) node.remove();
+		}
+		el.appendChild(wrapper);
+	})().catch((error) => {
+		rvError("in-place render failed", error);
+	});
 }
 
 /**
@@ -666,29 +949,22 @@ function renderForExport(
 	ctx: MarkdownPostProcessorContext,
 ): void {
 	const promises = (ctx as MarkdownPostProcessorContext & {promises?: Promise<unknown>[]}).promises;
-	const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
-	if (!(file instanceof TFile)) return;
+	// Keep the optional note-title heading the exporter adds; the note body
+	// itself is wrapped in divs (and bare <hr>s).
+	const task = renderNoteInPlace(plugin, el, ctx, (node) => node.tagName === "H1");
+	if (task) promises?.push(task);
+}
 
-	const task = (async () => {
-		const text = await plugin.app.vault.cachedRead(file);
-		if (!text.includes("col-start")) return;
-		const regions = findColumnRegions(text);
-		if (regions.length === 0) return;
-
-		const child = new MarkdownRenderChild(el);
-		ctx.addChild(child);
-		const wrapper = await buildWrapper(plugin, ctx.sourcePath, text, regions, child);
-		// Keep the optional note-title heading the exporter adds; the note body
-		// itself is wrapped in divs (and bare <hr>s).
-		for (const node of Array.from(el.children)) {
-			if (node.tagName !== "H1") node.remove();
-		}
-		el.appendChild(wrapper);
-	})().catch((error) => {
-		rvError("export render failed", error);
-	});
-
-	promises?.push(task);
+/**
+ * Preview of a whole note embedded in markdown rendered on its own, such as
+ * a column or the column layer itself. Obsidian renders such an embed in one
+ * piece, without the sizer a reading view or a top-level embed has.
+ */
+function isUnsizedEmbedPreview(el: HTMLElement): boolean {
+	if (!el.classList.contains("markdown-preview-view")) return false;
+	if (el.querySelector(":scope > .markdown-preview-sizer")) return false;
+	const embed = el.closest(".internal-embed");
+	return !!embed && !(embed.getAttribute("src") ?? "").includes("#");
 }
 
 export function registerReadingView(plugin: ColumnsPlugin): () => void {
@@ -701,6 +977,8 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const activeSizers = new Set<HTMLElement>();
 	const buildTimes = new WeakMap<HTMLElement, {fingerprint: string; time: number}[]>();
 	const suppressedSizers = new WeakSet<HTMLElement>();
+	/** Times a render waited for the note's header (see renderSizer). */
+	const headerWaits = new WeakMap<HTMLElement, number>();
 	// One entry per sizer while a wrapper build is in flight.  Renders whose
 	// fingerprint matches the in-flight build coalesce into it instead of
 	// invalidating it — otherwise frequent async re-renders (e.g. Dataview
@@ -807,6 +1085,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		if (states.get(sizer) !== state) return;
 
 		state.component.unload();
+		unloadUntakenBlocks(state.blocks, null);
 		states.delete(sizer);
 		// Detach the old render tree so it can be garbage collected instead
 		// of lingering as a detached DOM subtree.
@@ -839,15 +1118,12 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		// The AMC host deliberately remains a sibling of the sizer so those virtual
 		// DOM mutations cannot remove it and trigger a recovery-render loop.
 		const sizerObserver = new MutationObserver((mutations) => {
+			// Banner plugins set the sizer's top padding after it rendered.
+			if (mutations.some((m) => m.type === "attributes")) carrySizerPadding(sizer);
+			if (mutations.every((m) => m.type === "attributes")) return;
 			for (const mutation of mutations) {
 				for (const node of Array.from(mutation.addedNodes)) {
-					if (!node.instanceOf(HTMLElement)) continue;
-					const cls = node.className;
-					const isElDiv = cls.startsWith("el-") || cls.includes(" el-");
-					const isPusher = node.classList.contains("markdown-preview-pusher");
-					if (isElDiv || isPusher) {
-						node.classList.add(RV_HIDDEN_CLASS);
-					}
+					if (node.instanceOf(HTMLElement) && isReplacedSection(node)) node.classList.add(RV_HIDDEN_CLASS);
 				}
 			}
 			if (!state.host.isConnected || state.host.parentElement !== state.previewEl) {
@@ -856,7 +1132,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			placeWrapperHost(state.previewEl, sizer, state.host);
 		});
-		sizerObserver.observe(sizer, {childList: true});
+		sizerObserver.observe(sizer, {childList: true, attributes: true, attributeFilter: ["style"]});
 
 		const previewObserver = new MutationObserver((mutations) => {
 			for (const mutation of mutations) {
@@ -1038,6 +1314,34 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 		const sourcePath = sourceHints.get(sizer) || view?.file?.path || "";
 
+		if (view && ownSizerOf(view) === sizer) {
+			// Another note is loading: view.file names it, but the view's data
+			// is still the previous note's. Building now would lay out the old
+			// text (and the next build would redo it) while slowing the load
+			// down; the build starts once the note has loaded (afterFileLoad).
+			if (isLoadingFile(view)) return;
+			// The pane shows the editor, not reading view: build when it
+			// switches to reading view (layout-change), not on every note
+			// opened or changed while editing.
+			if (view.getMode() !== "preview") {
+				prepareHiddenLayer(view);
+				return;
+			}
+			// Opening a note re-renders the note's header (inline title,
+			// properties). Columns laid out before it is back jumped down when
+			// it appeared, and the build held it up. Reading view always has
+			// the header element (empty when both are off); wait a little.
+			if (!sizer.querySelector(":scope > .mod-header")) {
+				const waits = headerWaits.get(sizer) ?? 0;
+				if (waits < HEADER_WAIT_TRIES) {
+					headerWaits.set(sizer, waits + 1);
+					scheduleRender(sizer, sourcePath, "await-header", HEADER_WAIT_MS);
+					return;
+				}
+			}
+			headerWaits.delete(sizer);
+		}
+
 		if (!view && !sourcePath) {
 			// No view and no source hint — retry after a short delay
 			// (workspace may not be fully initialized on first load)
@@ -1104,6 +1408,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			existing.previewEl.classList.add(RV_ACTIVE_CLASS);
 			existing.host.classList.remove(RV_PENDING_CLASS);
+			applyPendingScroll(existing.previewEl);
 			hideSizerContent(sizer);
 			rvWarn("render reused existing wrapper", sizerSnapshot(sizer, existing));
 			return;
@@ -1141,14 +1446,26 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 		const renderId = ++renderIdSeq;
 		let scrollSnapshot: ScrollSnapshot[] = [];
 		inFlightBuilds.set(sizer, {token, fingerprint});
+		// Another build of the same note: take over its unchanged blocks.
+		const reuse = new BlockReuse(previous?.sourcePath === sourcePath ? previous.blocks : []);
+		// A note opened in the pane shows its first screen (or where it is
+		// restored to) right away, and the rest of it is rendered afterwards.
+		// A rebuild of the note on screen renders all of it: it reuses most
+		// blocks, and its scroll position is kept in pixels.
+		const renderThroughLine = view && ownSizerOf(view) === sizer && previous?.sourcePath !== sourcePath
+			? (pendingScrollLine(previewEl) ?? 0) + FILL_MARGIN_LINES
+			: undefined;
+		let built: BuiltLayer | null = null;
 
 		try {
-			const wrapper = await buildWrapper(plugin, sourcePath, text, regions, component);
+			built = await buildWrapper(plugin, sourcePath, text, regions, component, reuse, renderThroughLine);
+			const {wrapper} = built;
 
 			// Drop only if a different build superseded this one (or the view
 			// went away) — same-fingerprint renders coalesced instead.
 			if (!sizer.isConnected || inFlightBuilds.get(sizer)?.token !== token) {
 				component.unload();
+				unloadNewBlocks(built.blocks, reuse);
 				rvWarn("render result dropped: stale after async build", {
 					renderId,
 					token,
@@ -1158,23 +1475,31 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			}
 			inFlightBuilds.delete(sizer);
 
+			// Recovery renders must not force a scroll position captured after the
+			// DOM was damaged. That position may already be stale and was the source
+			// of the repeated scrollbar jumps in the old remount loop.
+			// Capture it before the old layer goes: without it the page is
+			// briefly empty, the browser resets the scroll to the top, and that
+			// was restored (reading view jumped to the top on every save).
+			if (!reason.startsWith("recover:")) {
+				scrollSnapshot = captureScrollSnapshot(previewEl);
+			}
 			if (previous && states.get(sizer) === previous) {
+				previous.stopFilling?.();
 				previous.component.unload();
+				unloadUntakenBlocks(previous.blocks, reuse);
 				states.delete(sizer);
 			}
+			const focused = focusedFieldIn(host);
 			while (host.firstChild) {
 				host.removeChild(host.firstChild);
 			}
 			host.classList.remove(RV_PENDING_CLASS);
 			wrapper.dataset.columnsRenderId = String(renderId);
-			// Recovery renders must not force a scroll position captured after the
-			// DOM was damaged. That position may already be stale and was the source
-			// of the repeated scrollbar jumps in the old remount loop.
-			if (!reason.startsWith("recover:")) {
-				scrollSnapshot = captureScrollSnapshot(previewEl);
-			}
 			previewEl.classList.add(RV_ACTIVE_CLASS);
 			host.appendChild(wrapper);
+			built.adopt();
+			restoreFocusedField(focused);
 			// Re-hide in case anything was added between observer batches
 			hideSizerContent(sizer);
 			// A footer moved out by an older version goes back to Obsidian.
@@ -1187,14 +1512,19 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				host,
 				previewEl,
 				component,
+				blocks: built.blocks,
 				renderId,
 				createdAt: Date.now(),
 			};
 			states.set(sizer, state);
 			mountedState = state;
-			if (scrollSnapshot.length > 0) {
+			setLayerFiller(previewEl, built.fill);
+			// A position Obsidian applied while this layer was being built (e.g.
+			// going back to the note) wins over keeping the current scroll.
+			if (!applyPendingScroll(previewEl) && scrollSnapshot.length > 0) {
 				restoreScrollSnapshotStable(scrollSnapshot, shouldRestoreScroll);
 			}
+			state.stopFilling = built.fillInBackground(previewEl.win);
 			retryCounts.delete(sizer);
 			installLifecycleObservers(sizer, state);
 			rvWarn("rendered wrapper", {
@@ -1209,6 +1539,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 				inFlightBuilds.delete(sizer);
 			}
 			component.unload();
+			if (built) unloadNewBlocks(built.blocks, reuse);
 			teardownSizer(sizer, states, "render failed");
 			previewEl.classList.remove(RV_ACTIVE_CLASS);
 			restoreSizerContent(sizer);
@@ -1231,11 +1562,18 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			// async post-processors (Dataview, Meta Bind, ...) still fire for
 			// the detached column elements.  Scheduling from those would make
 			// every rebuild trigger the next one — an infinite remount loop.
-			if (el.closest(".columns-rv-wrapper, .columns-rv-segment, .column-preview")) return;
+			// A note embedded in the layer is its own preview, though, and
+			// lays out its own columns.
+			if (isOwnLayerContent(el)) return;
 
 			// PDF export renders the whole note into one element outside any view.
 			if (el.closest(".print")) {
 				if (plugin.settings.enableReadingView) renderForExport(plugin, el, ctx);
+				return;
+			}
+
+			if (isUnsizedEmbedPreview(el)) {
+				if (plugin.settings.enableReadingView) void renderNoteInPlace(plugin, el, ctx, () => false);
 				return;
 			}
 
@@ -1296,6 +1634,77 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	plugin.registerEvent(plugin.app.vault.on("modify", (file) => rescheduleForPath(file.path, "file-modified")));
 	// Switching a pane from editing to reading shows the editor's latest text.
 	plugin.registerEvent(plugin.app.workspace.on("layout-change", () => rescheduleForPath(null, "layout-change")));
+
+	/**
+	 * The view's note has columns but reading view has no layer for it yet:
+	 * it was just opened, or the pane shows the editor (the layer is built when
+	 * reading view is shown). Hide Obsidian's own rendering of reading view
+	 * now, so it shows an empty note until the columns are built, never the
+	 * note without columns, and scroll positions applied meanwhile are kept
+	 * for the columns (see reading-scroll).
+	 */
+	const prepareHiddenLayer = (view: MarkdownView): void => {
+		const sizer = ownSizerOf(view);
+		const previewEl = sizer?.parentElement;
+		const path = view.file?.path;
+		if (!sizer || !previewEl || !path || !plugin.settings.enableReadingView) return;
+		const state = states.get(sizer);
+		if (state?.sourcePath === path) return;
+		if (!view.getViewData().includes("col-start")) {
+			if (state) state.host.classList.add(RV_PENDING_CLASS);
+			return;
+		}
+		const host = state?.host ?? ensureWrapperHost(previewEl, sizer);
+		host.classList.add(RV_PENDING_CLASS);
+		previewEl.classList.add(RV_ACTIVE_CLASS);
+		hideSizerContent(sizer);
+		activeSizers.add(sizer);
+		sourceHints.set(sizer, path);
+	};
+
+	/** Reading view is shown and its columns are not ready: build them now. */
+	const renderShownReadingViews = (): void => {
+		for (const leaf of plugin.app.workspace.getLeavesOfType("markdown")) {
+			const view = leaf.view;
+			if (!(view instanceof MarkdownView) || !view.file || view.getMode() !== "preview") continue;
+			const sizer = ownSizerOf(view);
+			if (!sizer || !activeSizers.has(sizer)) continue;
+			const state = states.get(sizer);
+			if (state?.sourcePath === view.file.path && !state.host.classList.contains(RV_PENDING_CLASS)) continue;
+			scheduleRender(sizer, view.file.path, "reading-view-shown", 0);
+		}
+	};
+	plugin.registerEvent(plugin.app.workspace.on("layout-change", renderShownReadingViews));
+
+	addMarkdownViewHooks(plugin, {
+		// Another note opens in the pane: hide the previous note's columns at
+		// once. They stayed on screen under the new note's title until the new
+		// note's sections rendered.
+		beforeFileChange: (view, next) => {
+			const sizer = ownSizerOf(view);
+			const state = sizer ? states.get(sizer) : undefined;
+			if (state && state.sourcePath !== next?.path) state.host.classList.add(RV_PENDING_CLASS);
+		},
+		// Build the new note's columns as soon as its text is in the view, or
+		// get reading view ready for them while the pane shows the editor.
+		afterFileLoad: (view) => {
+			const sizer = ownSizerOf(view);
+			if (!sizer || !view.file) return;
+			if (view.getMode() !== "preview") {
+				prepareHiddenLayer(view);
+			} else if (!view.getViewData().includes("col-start")) {
+				// No columns: take the previous note's layer down before Obsidian
+				// restores the note's scroll position, so it applies to the note.
+				invalidateRenderToken(sizer);
+				teardownSizer(sizer, states, "loaded a note without columns");
+			} else {
+				// Until the columns are built: no raw note, and the scroll
+				// position Obsidian restores is kept for them.
+				prepareHiddenLayer(view);
+				scheduleRender(sizer, view.file.path, "file-loaded", 0);
+			}
+		},
+	});
 
 	// Opening another note in a pane: hide the previous note's columns before
 	// the first frame of the new note, so they never show over it.

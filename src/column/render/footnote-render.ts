@@ -1,8 +1,8 @@
 import {EditorView} from "@codemirror/view";
 import {HoverPopover, MarkdownRenderer} from "obsidian";
 import type {App, HoverParent} from "obsidian";
-import {mayHaveFootnotes, normalizeFootnoteLabel, NoteFootnotes} from "../core/footnotes";
-import type {PieceFootnotes} from "../core/footnotes";
+import {definitionPlaceholder, mayHaveFootnotes, normalizeFootnoteLabel, NoteFootnotes} from "../core/footnotes";
+import type {DefinitionBlock, PieceFootnotes} from "../core/footnotes";
 import type {RenderContext} from "./column-renderer";
 
 /**
@@ -174,6 +174,33 @@ export function livePreviewFootnotes(ctx: RenderContext): NoteFootnotes | null {
 		: null;
 	livePreviewModels.set(ctx, model);
 	return model;
+}
+
+/**
+ * Live Preview: show the footnote definitions a column contains where they
+ * are written, as the editor does (label, then the text). Swaps each
+ * placeholder paragraph left by extractFootnoteDefinitions for the rendered
+ * definition. `render` renders one definition's markdown into an element.
+ */
+export function renderLiveFootnoteDefinitions(
+	el: HTMLElement,
+	definitions: DefinitionBlock[],
+	render: (target: HTMLElement, markdown: string) => Promise<unknown>,
+): Promise<unknown>[] {
+	if (definitions.length === 0) return [];
+	const placeholders = new Map<string, HTMLElement>();
+	el.querySelectorAll<HTMLElement>("p").forEach((p) => placeholders.set(p.textContent?.trim() ?? "", p));
+	const tasks: Promise<unknown>[] = [];
+	definitions.forEach((definition, index) => {
+		const placeholder = placeholders.get(definitionPlaceholder(index));
+		if (!placeholder) return;
+		const item = createDiv({cls: "amc-footnote-def", attr: {dir: "auto"}});
+		item.createEl("sup", {cls: "amc-footnote-def-label", text: definition.label});
+		const body = item.createDiv({cls: "amc-footnote-def-body"});
+		placeholder.replaceWith(item);
+		tasks.push(render(body, definition.markdown));
+	});
+	return tasks;
 }
 
 /**

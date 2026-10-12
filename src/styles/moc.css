@@ -37,10 +37,104 @@
 	height: 12px;
 }
 
+/* The form never grows wider than its container: a long, unbreakable group
+   name (a nested tag, a property value) would otherwise set the min-content
+   width of the preview columns and stretch every row off screen. */
+.amc-moc-form {
+	min-width: 0;
+}
+
+/* Space the form's cards like Obsidian spaces its own setting groups; the
+   tab panel sits closer to the tabs it belongs to. */
+.amc-moc-form > :not(:first-child),
+.amc-moc-form + .setting-group {
+	margin-top: var(--size-4-6);
+}
+
+.amc-moc-form > .amc-moc-tab-panel {
+	margin-top: var(--size-4-3);
+}
+
+.amc-moc-form .setting-item-name,
+.amc-moc-preview-body {
+	overflow-wrap: break-word;
+}
+
+/* Section tabs: a segmented control whose buttons also summarize their
+   section, so the whole MOC can be read without opening every tab. */
+.amc-moc-tabs {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: var(--size-2-2);
+	max-width: var(--setting-group-max-width);
+	margin-inline: auto;
+	padding: var(--size-2-2);
+	border-radius: var(--radius-m);
+	background: var(--background-modifier-hover);
+}
+
+.amc-moc-tabs > .amc-moc-tab {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+	height: auto;
+	min-width: 0;
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	text-align: start;
+	cursor: pointer;
+}
+
+.amc-moc-tabs > .amc-moc-tab:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.amc-moc-tabs > .amc-moc-tab.is-active {
+	background: var(--background-primary);
+	box-shadow: var(--shadow-s);
+	color: var(--text-normal);
+}
+
+.amc-moc-tab-label {
+	font-size: var(--font-ui-small);
+	font-weight: var(--font-semibold);
+}
+
+.amc-moc-tab-summary {
+	max-width: 100%;
+	overflow: hidden;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.amc-moc-tab.is-active .amc-moc-tab-summary {
+	color: var(--text-muted);
+}
+
+/* A group left out of the MOC stays listed, dimmed, so it can be shown again. */
+.amc-moc-form .setting-item.is-hidden-group :is(.setting-item-name, .setting-item-description) {
+	color: var(--text-faint);
+	text-decoration: line-through;
+}
+
 /* Live preview of the generated block */
 .amc-moc-preview {
-	padding: var(--size-4-2) 0;
+	padding-bottom: var(--size-4-2);
 }
+
+.amc-moc-preview > .setting-item-description,
+.amc-moc-preview > .amc-moc-preview-empty {
+	margin-bottom: var(--size-4-2);
+	padding-inline: var(--size-4-4);
+}
+
 
 .amc-moc-preview-body {
 	max-height: 360px;
@@ -57,7 +151,7 @@
 
 /* Builder dialog */
 .modal.amc-moc-builder {
-	width: min(760px, 92vw);
+	width: min(820px, 92vw);
 }
 
 .amc-moc-builder .amc-moc-builder-form {

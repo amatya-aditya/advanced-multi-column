@@ -4,6 +4,47 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.5.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0) - 2026-10-12
+
+Includes everything from 2.5.0-beta.1 to 2.5.0-beta.4.
+
+### Added
+- Fold headings and lists in Reading view, both inside and outside columns, and inside columns in Live Preview. A heading folds everything up to the next heading of the same or a higher level; inside a column it folds only that column. Folding follows **Settings → Editor → Fold heading** and **Fold indent** ([#30](https://github.com/amatya-aditya/advanced-multi-column/issues/30)).
+- Settings: **Remove all column markers**, at the bottom of the settings tab. Use it before uninstalling the plugin: it removes the plugin's markers from your notes and keeps their text. It first shows how many markers it found and in which notes, and you type a phrase to confirm. Other comments and markers inside code blocks are not changed.
+- MOC: hide a group (a tag, a subfolder or a property value) from a MOC with the eye button next to it under **Column for each group**. A hidden group stays in the list, so you can show it again in the column it had.
+- Columns in live preview show the bullet symbols of the [Better Bullets](https://github.com/lualum/better-bullets) plugin also when they are not being edited, not only while you type in them.
+
+### Changed
+- The settings are organized into pages: **General** (Display, New columns, Editing, Narrow screens, Appearance) and **Features** (Column headers, Maps of content). Each entry shows its current state, such as the number of MOC templates. The MOC page is now called **Maps of content**.
+- MOC templates: each template opens on its own page. The MOC options, in settings and in the New MOC and Edit MOC dialogs, are split into three tabs (**Sources**, **Groups** and **List**), each with a one-line summary, and the preview stays below them. **Combine sources** is now **Notes must match** and only shows when there is more than one source.
+- Reading view: when a note changes (for example on every save while it is edited in another pane), only the parts that changed are drawn again. A save of a long note no longer freezes Obsidian, and folded headings and lists stay folded.
+- Reading view: a long note with columns shows its first screen (or where you return to) right away, and the rest of the note is drawn in the background. Before, Obsidian froze for up to a second before the note appeared.
+
+### Fixed
+- Text typed in a column is no longer lost or duplicated ([#25](https://github.com/amatya-aditya/advanced-multi-column/issues/25)):
+  - when Obsidian is closed while a column is being edited;
+  - when the same note is open in two panes, edits in one pane could undo, lose or double text typed in a column in the other;
+  - when another note opens in the pane, or the pane closes, while a column of a note that is also open in another pane is being edited;
+  - text typed while a column was being redrawn could land in the note's hidden column markup instead of the column;
+  - text typed in one pane was never saved if its column was redrawn just as you clicked into the other pane, or when both panes saved at almost the same moment.
+- Ticking a task, or changing a nested column block, in a column with a header (`!type: Title`) no longer deletes the header from the note.
+- Ticking a task in a column now ticks that task when the column also has tasks in callouts or in Dataview or Tasks query results. Before, another task, or none, could be ticked instead.
+- A note with columns that is embedded inside another note's columns now shows its columns instead of plain text ([#31](https://github.com/amatya-aditya/advanced-multi-column/issues/31)).
+- Banner plugins work in Reading view with columns ([#32](https://github.com/amatya-aditya/advanced-multi-column/issues/32)):
+  - **Pixel Banner:** the note starts at the banner's content start position again, instead of at the top behind the banner. Banner height and content start changes apply right away.
+  - **Banners:** the banner shows again; it was hidden in notes with columns.
+- Reading view: fields of other plugins in a note, such as Meta Bind inputs, no longer lose focus after the first letter you type. Changing a property no longer redraws the note's columns.
+- Reading view no longer jumps to the top of a note with columns whenever the note is saved. Going back to a note in Reading view returns to where you were reading.
+- Live Preview: footnote definitions written in a column (`[^1]: …`) show where they are written, as in the editor. Before, they only showed while the column was being edited.
+- Switching notes is smoother:
+  - **Reading view:** the previous note's columns no longer show under the new note's title, the new note's columns are no longer briefly built from the previous note's text, and they no longer jump down when the note's title and properties appear.
+  - **Live Preview:** switching notes no longer lays out the hidden Reading view's columns each time, so it is as fast as for notes without columns. Switching to Reading view never shows the note without its columns first.
+- Reading view: stacked columns no longer stick out of the block's border on the right, and their hover highlight no longer touches the top border.
+- Columns stacked on a narrow screen keep the dividers and separators between them, drawn as horizontal lines. Before, they disappeared.
+- MOC settings: grouping by tag no longer stretches the options off screen when a tag name is long.
+- MOC: in the column menu of a group, **Automatic** is listed before the columns.
+- Settings: the color preview of each column header type fills its row.
+
 ## [2.4.1](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.4.1) - 2026-10-06
 
 ### Fixed

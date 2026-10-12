@@ -90,6 +90,11 @@
 	min-width: 0;
 }
 
+/* Only the edit button: the preview takes the rest of the row. */
+.columns-header-type-info + .setting-item-control {
+	flex: 0 0 auto;
+}
+
 .columns-header-type-preview {
 	display: flex;
 	align-items: center;
@@ -160,4 +165,28 @@
 .columns-icon-suggest-icon .svg-icon {
 	width: 16px;
 	height: 16px;
+}
+
+/* ── Remove all column markers (bottom of the tab) ── */
+
+.amc-remove-markers-notes,
+.amc-remove-markers-effects {
+	margin-block: var(--size-4-2);
+	padding-inline-start: var(--size-4-6);
+}
+
+.amc-remove-markers-notes {
+	max-height: 12em;
+	overflow-y: auto;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	overflow-wrap: anywhere;
+}
+
+.amc-remove-markers-effects {
+	font-size: var(--font-ui-small);
+}
+
+.amc-remove-markers-effects li + li {
+	margin-top: var(--size-2-2);
 }

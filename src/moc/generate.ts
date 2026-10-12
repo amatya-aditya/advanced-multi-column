@@ -1,7 +1,7 @@
 import type {App} from "obsidian";
 import {findColumnRegions, serializeColumns} from "../column/core/parser";
 import type {ColumnData, ColumnRegion} from "../column/core/types";
-import {collectMocGroups, MocGroup, MocQueryCache} from "./query";
+import {collectMocGroups, MocGroup, MocQueryCache, visibleMocGroups} from "./query";
 
 /** What a MOC note currently lists, used to decide which changes affect it. */
 export interface MocNoteUsage {
@@ -98,7 +98,7 @@ export function generateMocBlock(
 	cache?: MocQueryCache,
 	usage?: MocNoteUsage,
 ): string {
-	const groups = collectMocGroups(app, template, sourcePath, limitOverride, cache);
+	const groups = visibleMocGroups(template, collectMocGroups(app, template, sourcePath, limitOverride, cache));
 	if (usage) {
 		usage.templates.add(template.id);
 		for (const group of groups) {

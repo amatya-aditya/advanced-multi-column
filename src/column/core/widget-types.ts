@@ -30,6 +30,14 @@ export interface ActiveEditState {
 	cursorEnd: number;
 	scrollTop: number;
 	value: string;
+	/**
+	 * Column text the draft was started from. When the column changes
+	 * underneath the editor (the note is edited in another pane), the draft is
+	 * merged onto the new text instead of overwriting it (see live-edit).
+	 */
+	base?: string;
+	/** The editor had focus when a rebuild destroyed it. */
+	focused?: boolean;
 	/** The editor wiring that currently owns this state. */
 	owner?: object;
 	/** Set when the owning editor was destroyed by a rebuild. */
@@ -70,6 +78,8 @@ export const INTERACTIVE_PREVIEW_SELECTOR = [
 	"[role='tab']",
 	"[role='menuitem']",
 	".clickable-icon",
+	// Heading and list fold toggles (see render/fold).
+	".collapse-indicator",
 	// Collapsible callout headers toggle their fold instead of opening the editor.
 	".callout.is-collapsible > .callout-title",
 	".mod-slider",

@@ -4,6 +4,7 @@ import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "./ty
 import type {ContainerPath} from "./widget-types";
 import {getPluginInstance} from "./plugin-ref";
 import {refreshRegionPosition} from "./region-position";
+import {syncOtherPanes} from "../editor/pane-sync";
 
 /** Style of a newly added column that does not inherit one. */
 function defaultNewColumnStyle(): ColumnStyleData {
@@ -286,6 +287,7 @@ export function dispatchUpdate(
 	view.dispatch({
 		changes: {from: region.from, to: region.to, insert},
 	});
+	syncOtherPanes(view);
 
 	// Restore the scroll position after the rebuild settles, unless the user
 	// scrolled meanwhile — snapping back would fight their scroll direction.

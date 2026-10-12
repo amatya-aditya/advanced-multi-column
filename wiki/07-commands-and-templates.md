@@ -76,4 +76,4 @@ Child column 2
 | `New MOC` | `Insert MOC → New MOC…` | Opens a dialog to build a MOC (folder, tags, properties, grouping) with a live preview, then inserts it |
 | `Insert MOC from template` | `Insert MOC → <template>` | An auto-updating column block of links from a saved MOC template |
 
-MOC templates are set up in **Settings → Advanced Multi Column → MOC**. See [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for the full guide.
+MOC templates are set up in **Settings → Advanced Multi Column → Maps of content**. See [10 - MOC (map of content)](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for the full guide.
