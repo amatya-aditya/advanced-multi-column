@@ -4,6 +4,23 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.5.0-beta.4](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.4) - 2026-10-12 (pre-release)
+
+### Added
+- Settings: **Remove all column markers**, at the bottom of the settings tab. Use it before uninstalling the plugin: it removes the plugin's markers from your notes and keeps their text. It first shows how many markers it found and in which notes, and you type a phrase to confirm. Other comments and markers inside code blocks are not changed.
+- MOC: hide a group (a tag, a subfolder or a property value) from a MOC with the eye button next to it under **Column for each group**. A hidden group stays in the list, so you can show it again in the column it had.
+- Columns in live preview show the bullet symbols of the [Better Bullets](https://github.com/lualum/better-bullets) plugin also when they are not being edited, not only while you type in them.
+
+### Changed
+- The settings are organized into pages: **General** (Display, New columns, Editing, Narrow screens, Appearance) and **Features** (Column headers, Maps of content). Each entry shows its current state, such as the number of MOC templates. The MOC page is now called **Maps of content**.
+- MOC templates: each template opens on its own page. The MOC options, in settings and in the New MOC and Edit MOC dialogs, are split into three tabs (**Sources**, **Groups** and **List**), each with a one-line summary, and the preview stays below them. **Combine sources** is now **Notes must match** and only shows when there is more than one source.
+
+### Fixed
+- Reading view: fields of other plugins in a note, such as Meta Bind inputs, no longer lose focus after the first letter you type. Changing a property no longer redraws the note's columns.
+- MOC settings: grouping by tag no longer stretches the options off screen when a tag name is long.
+- Settings: the color preview of each column header type fills its row.
+- MOC: in the column menu of a group, **Automatic** is listed before the columns.
+
 ## [2.5.0-beta.3](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0-beta.3) - 2026-10-08 (pre-release)
 
 ### Changed
