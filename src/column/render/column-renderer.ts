@@ -80,6 +80,18 @@ function renderColumnHeader(colEl: HTMLElement, content: string): string {
 	return parsed.restContent;
 }
 
+/**
+ * A column with a header is shown without its `!type: Title` line (see
+ * renderColumnHeader), so edits made in the preview (ticking a task, editing
+ * a text segment, changing a nested block) come back without it. Put the
+ * header line back in front, or it is deleted from the note.
+ */
+function withHeader(fullContent: string, shownContent: string, nextContent: string): string {
+	if (shownContent === fullContent) return nextContent;
+	const header = fullContent.split("\n").find((line) => line.trim().length > 0)?.trim() ?? "";
+	return nextContent.trim().length > 0 ? `${header}\n${nextContent}` : header;
+}
+
 // ── Render Context ──────────────────────────────────────────
 
 export interface RenderContext {
@@ -1265,7 +1277,7 @@ function renderNestedRegion(
 					depth,
 					(nextChildContent) => {
 						const updated = region.columns.map((c, idx) =>
-							idx === i ? {...c, content: nextChildContent} : c,
+							idx === i ? {...c, content: withHeader(col.content, colContent, nextChildContent)} : c,
 						);
 						onRegionChange(updated, region.containerStyle);
 					},
@@ -1446,7 +1458,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						sourcePath,
 						0,
 						(nextContent) => {
-							commitEdit(i, nextContent, ctx);
+							commitEdit(i, withHeader(col.content, colContent, nextContent), ctx);
 						},
 						[],
 						i,
