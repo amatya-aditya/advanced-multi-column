@@ -90,6 +90,11 @@
 	min-width: 0;
 }
 
+/* Only the edit button: the preview takes the rest of the row. */
+.columns-header-type-info + .setting-item-control {
+	flex: 0 0 auto;
+}
+
 .columns-header-type-preview {
 	display: flex;
 	align-items: center;
