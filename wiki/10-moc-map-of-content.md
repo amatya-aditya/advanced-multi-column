@@ -18,7 +18,7 @@ The note now contains a column block with one column per subfolder of `Projects`
 ## Two ways to set up a MOC
 
 - **New MOC… (one MOC).** Build the MOC in a dialog for the note you are in. Its options belong to that MOC only. Change them later with right-click on the MOC → **Edit MOC** (the list icon in the column menu).
-- **Templates (reused in many notes).** Save options once in **Settings → Advanced Multi Column → MOC** — or tick **Save as template** in the New MOC dialog — then insert them with **Insert MOC → a template**. Editing a template updates every MOC made from it.
+- **Templates (reused in many notes).** Save options once in **Settings → Advanced Multi Column → Maps of content** — or tick **Save as template** in the New MOC dialog — then insert them with **Insert MOC → a template**. Editing a template updates every MOC made from it.
 
 Because the folder can be relative to the note (**This note's folder** / **Parent of this note's folder**), one template works everywhere: insert the same template in the index note of every project and each MOC lists its own folder. New installs include such a template, **This folder**.
 
@@ -144,11 +144,11 @@ A MOC is an ordinary column block whose start marker names its template:
 
 ## Tips and limits
 
-- MOC features can be turned off with **Settings → Advanced Multi Column → MOC → Enable MOC**. Inserted MOCs then stay as ordinary columns and are not updated until it is turned back on.
+- MOC features can be turned off with **Settings → Advanced Multi Column → Maps of content → Enable MOC**. Inserted MOCs then stay as ordinary columns and are not updated until it is turned back on.
 - Templates, the options of single MOCs and the list of notes containing MOCs are stored in the plugin's settings (`data.json`). A MOC added on another device is picked up the first time you open that note on this device.
 - Updates are incremental: typing in a note, or changing notes no MOC lists or matches, does not regenerate any MOC. Only MOCs that list a changed note, or whose sources now match it, are rewritten (MOCs sorted by **Last modified** also react to edits of the notes they list).
 - A template that matches thousands of notes writes thousands of links. Narrow the sources or set **Notes per group** for large vaults.
-- Settings → **MOC** templates are separate from the layout templates in the **Insert layout** menu.
+- **Maps of content** templates in settings are separate from the layout templates in the **Insert layout** menu.
 
 ## Troubleshooting
 

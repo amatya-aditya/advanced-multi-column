@@ -74,7 +74,7 @@ Common causes:
 ## MOC does not update
 
 1. Check that the block's first marker still contains `moc:<id>` (for example `%% col-start:moc:moc-1 %%`). Without it the block is a normal column block.
-2. Check that the template still exists in **Settings → Advanced Multi Column → MOC**. Blocks whose template was deleted keep their last list.
+2. Check that the template still exists in **Settings → Advanced Multi Column → Maps of content**. Blocks whose template was deleted keep their last list.
 3. Updates run a second or two after a change. Opening the note with the MOC also refreshes it.
 4. A MOC created on another device is picked up the first time you open that note on this device.
 

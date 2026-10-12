@@ -1,6 +1,6 @@
 # 08 - Settings guide
 
-Open **Settings → Advanced Multi Column**. The main page holds the general options; **MOC**, **Appearance** and **Column headers** open as sub-pages. Every option can also be found with the settings search at the top of the settings window.
+Open **Settings → Advanced Multi Column**. The main page lists sub-pages in two groups: **General** (**Display**, **New columns**, **Editing**, **Narrow screens**, **Appearance**) and **Features** (**Column headers**, **Maps of content**). Each entry shows its current state where it has one, such as *Below 480px* or the number of templates. Every option can also be found with the settings search at the top of the settings window.
 
 Requires Obsidian 1.13 or newer.
 
@@ -44,7 +44,7 @@ Requires Obsidian 1.13 or newer.
 2. When disabled, new columns are inserted with no style.
 3. Default: **On**.
 
-## MOC
+## Maps of content
 
 **Enable MOC** (on by default) turns the MOC features on or off: the **Insert MOC** menu, the MOC commands, **Edit MOC** and automatic updates. When off, inserted MOCs stay in your notes as ordinary columns and are not updated; turning it back on updates them.
 

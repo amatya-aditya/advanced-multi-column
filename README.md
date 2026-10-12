@@ -241,7 +241,7 @@ Right-click any column to:
 
 ## MOC (map of content)
 
-A MOC lists notes as links in columns and keeps itself up to date. Right-click in a note and choose **Insert MOC → New MOC…**: pick the folder (by default the note's own folder, with its subfolders as columns), tags and/or properties from your vault, see a live preview, and insert. Save options you reuse as templates in **Settings → Advanced Multi Column → MOC**; right-click a MOC → **Edit MOC** to change it later.
+A MOC lists notes as links in columns and keeps itself up to date. Right-click in a note and choose **Insert MOC → New MOC…**: pick the folder (by default the note's own folder, with its subfolders as columns), tags and/or properties from your vault, see a live preview, and insert. Save options you reuse as templates in **Settings → Advanced Multi Column → Maps of content**; right-click a MOC → **Edit MOC** to change it later.
 
 The links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
 
@@ -252,7 +252,7 @@ Advanced Multi Column works entirely offline: it makes no network requests and c
 What it accesses, and why:
 
 - **Notes you open** are read to render columns in Reading view and when exporting to PDF.
-- **The list of notes and their metadata** (file paths, tags, properties — from Obsidian's metadata cache) is used only by **MOC** to find the notes a MOC lists. MOC can be turned off in **Settings → Advanced Multi Column → MOC**.
+- **The list of notes and their metadata** (file paths, tags, properties — from Obsidian's metadata cache) is used only by **MOC** to find the notes a MOC lists. MOC can be turned off in **Settings → Advanced Multi Column → Maps of content**.
 - **Notes are written** only when you edit columns, insert a layout or MOC, or when an inserted MOC updates its own list of links.
 - **Pasted images** in a column editor are saved in the note's folder; pasting reads only what you paste.
 
