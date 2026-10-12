@@ -75,6 +75,63 @@ export default [
 		},
 	},
 	{
+		// The style menu saved its pending box style first, then wrote the
+		// layout over the block's old range: the style was lost and the rest
+		// of the old end marker was left behind ("%% col-end %%% col-end %%").
+		name: "changing the layout after a box style keeps both, and the block intact",
+		async run(o) {
+			await o.call("write", "LayoutCols.md", "# L\n\n%% col-start %%\n\n%% col-break %%\n\nLeft\n\n%% col-break %%\n\nRight\n\n%% col-end %%\n\nAfter\n");
+			await o.call("layout", "LayoutCols.md");
+			await o.sleep(1500);
+			const p = await o.ev(`(() => {
+				const r = ${leafEl}.querySelector(".columns-container .column-item").getBoundingClientRect();
+				return {x: r.x + r.width / 2, y: r.y + 20};
+			})()`);
+			await o.send("Input.dispatchMouseEvent", {type: "mousePressed", ...p, button: "right", buttons: 2, clickCount: 1});
+			await o.send("Input.dispatchMouseEvent", {type: "mouseReleased", ...p, button: "right", buttons: 0, clickCount: 1});
+			await o.sleep(500);
+			const menu = (js) => o.ev(`(() => { const m = document.querySelector(".columns-style-popover"); ${js} })()`);
+			await menu(`[...m.querySelectorAll("[role=tab]")].find((b) => b.textContent.trim() === "All columns").click(); return true;`);
+			await o.sleep(300);
+			await menu(`const s = m.querySelector("select[aria-label='Box background']"); s.value = "secondary"; s.dispatchEvent(new Event("change", {bubbles: true})); return true;`);
+			await o.sleep(300);
+			await menu(`[...m.querySelectorAll(".amc-menu-layout button")].find((b) => b.textContent.trim() === "Stacked").click(); return true;`);
+			await o.sleep(1200);
+			const text = await o.ev(`app.workspace.getLeavesOfType("markdown")[0].view.editor.getValue()`);
+			assert.match(text, /%% col-start:[^%]*b:secondary/, "the box background was lost");
+			assert.match(text, /%% col-start:[^%]*l:stack/, "the layout was not saved");
+			assert.ok(text.endsWith("%% col-end %%\n\nAfter\n"), `the block's end is damaged:\n${text}`);
+		},
+	},
+	{
+		// The header buttons saved the pending style first, then acted on the
+		// block's old range and columns: the action was dropped.
+		name: "a style menu button after a style change keeps both",
+		async run(o) {
+			await o.call("write", "MenuCols.md", "# M\n\n%% col-start %%\n\n%% col-break %%\n\nLeft\n\n%% col-break %%\n\nRight\n\n%% col-end %%\n\nAfter\n");
+			await o.call("layout", "MenuCols.md");
+			await o.sleep(1500);
+			const p = await o.ev(`(() => {
+				const r = ${leafEl}.querySelector(".columns-container .column-item").getBoundingClientRect();
+				return {x: r.x + r.width / 2, y: r.y + 20};
+			})()`);
+			await o.send("Input.dispatchMouseEvent", {type: "mousePressed", ...p, button: "right", buttons: 2, clickCount: 1});
+			await o.send("Input.dispatchMouseEvent", {type: "mouseReleased", ...p, button: "right", buttons: 0, clickCount: 1});
+			await o.sleep(500);
+			const menu = (js) => o.ev(`(() => { const m = document.querySelector(".columns-style-popover"); ${js} })()`);
+			await menu(`[...m.querySelectorAll("[role=tab]")].find((b) => b.textContent.trim() === "This column").click(); return true;`);
+			await o.sleep(300);
+			await menu(`const s = m.querySelector("select[aria-label='Background']"); s.value = "blue-soft"; s.dispatchEvent(new Event("change", {bubbles: true})); return true;`);
+			await o.sleep(300);
+			await menu(`m.querySelector("[aria-label='Add column']").click(); return true;`);
+			await o.sleep(1200);
+			const text = await o.ev(`app.workspace.getLeavesOfType("markdown")[0].view.editor.getValue()`);
+			assert.equal((text.match(/col-break/g) ?? []).length, 3, `the column was not added:\n${text}`);
+			assert.match(text, /col-break:[^%]*b:blue-soft/, "the background was lost");
+			assert.ok(text.endsWith("%% col-end %%\n\nAfter\n"), `the block's end is damaged:\n${text}`);
+		},
+	},
+	{
 		name: "switching notes in live preview does not lay out reading view's columns",
 		async run(o) {
 			await o.call("layout", "Long.md");

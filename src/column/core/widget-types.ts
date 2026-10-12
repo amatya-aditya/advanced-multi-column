@@ -1,11 +1,21 @@
-import type {ColumnData} from "./types";
+import type {ColumnData, ColumnStyleData} from "./types";
 
+/** The style menu's columns and box style, with the changes not saved yet. */
+export interface MenuEdits {
+	columns: ColumnData[];
+	containerStyle: ColumnStyleData | undefined;
+}
+
+/**
+ * The style menu's header buttons. The ones that change the block get the
+ * menu's latest edits, so the change and the unsaved styles are saved together.
+ */
 export interface ColumnContextActions {
 	editColumn?: () => void;
 	editMoc?: () => void;
-	addColumn?: () => void;
-	addChild?: () => void;
-	deleteColumn?: () => void;
+	addColumn?: (latest: MenuEdits) => void;
+	addChild?: (latest: MenuEdits) => void;
+	deleteColumn?: (latest: MenuEdits) => void;
 }
 
 export interface ContainerPathEntry {

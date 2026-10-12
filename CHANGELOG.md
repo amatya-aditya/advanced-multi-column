@@ -4,6 +4,12 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.5.1](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.1) - 2026-10-12
+
+### Fixed
+- Style menu: choosing a layout (**Side by side** or **Stacked**) on the **All columns** tab after changing a style in the same menu no longer damages the note. Before, the style change was lost and part of the column block's end marker was left in the note (`%% col-end %%% col-end %%`).
+- Style menu: **Add column**, **Add nested columns** and **Delete column** work after changing a style in the same menu, and keep that style. Before, they did nothing.
+
 ## [2.5.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.0) - 2026-10-12
 
 Includes everything from 2.5.0-beta.1 to 2.5.0-beta.4.

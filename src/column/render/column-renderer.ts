@@ -8,11 +8,11 @@ import {restoreEditState, wireEditCore} from "../editor/column-editor";
 import {isEmbeddedEditorAvailable} from "../editor/embedded-editor";
 import {wireLivePreviewEdit} from "../editor/live-edit";
 import type {LiveEditHandle} from "../editor/live-edit";
-import {openColumnStyleContextMenu} from "./style-context-menu";
+import {openColumnStyleContextMenu, type LayoutChangeHandler} from "./style-context-menu";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "../core/column-style";
 import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "../core/types";
 import type {StyleColorOption} from "../../settings";
-import type {ColumnContextActions, ContainerPath} from "../core/widget-types";
+import type {ColumnContextActions, ContainerPath, MenuEdits} from "../core/widget-types";
 import {isInteractivePreviewTarget} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
 import {refreshRegionPosition} from "../core/region-position";
@@ -607,7 +607,7 @@ export function wireContextMenu(
 	parentIndex?: number,
 	containerEl?: HTMLElement,
 	layout?: ColumnLayout,
-	onLayoutChange?: (nextLayout: ColumnLayout | undefined) => void,
+	onLayoutChange?: LayoutChangeHandler,
 	view?: EditorView,
 ): void {
 	item.addEventListener("contextmenu", (e: MouseEvent) => {
@@ -1111,10 +1111,10 @@ function renderColumnContent(
 			},
 			nestedContainerPath,
 			ctx,
-			(nextLayout) => {
+			(nextLayout, nextRegionColumns, nextRegionContainerStyle) => {
 				const nextContent =
 					content.slice(0, region.from) +
-					serializeColumns(region.columns, region.containerStyle, nextLayout, region.mocId) +
+					serializeColumns(nextRegionColumns, nextRegionContainerStyle, nextLayout, region.mocId) +
 					content.slice(region.to);
 				onContentChange(nextContent);
 			},
@@ -1136,7 +1136,7 @@ function renderNestedRegion(
 	onRemoveRegion: () => void,
 	containerPath: ContainerPath,
 	ctx: RenderContext,
-	onLayoutChange?: (nextLayout: ColumnLayout | undefined) => void,
+	onLayoutChange?: LayoutChangeHandler,
 ): void {
 	const container = parent.createDiv({cls: "columns-container columns-ui columns-nested"});
 	const isContainerStacked = region.layout === "stack";
@@ -1216,13 +1216,14 @@ function renderNestedRegion(
 				onRegionChange(updated, region.containerStyle);
 			});
 
-			const deleteNestedColumn = () => {
-				if (region.columns.length <= 1) {
+			const deleteNestedColumn = (latest?: MenuEdits) => {
+				const current = latest?.columns ?? region.columns;
+				if (current.length <= 1) {
 					onRemoveRegion();
 					return;
 				}
-				const updated = removeColumnPreservingWidths(region.columns, i);
-				onRegionChange(updated, region.containerStyle);
+				const updated = removeColumnPreservingWidths(current, i);
+				onRegionChange(updated, latest ? latest.containerStyle : region.containerStyle);
 			};
 
 			const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
@@ -1244,16 +1245,15 @@ function renderNestedRegion(
 				},
 				{
 					editColumn: hasNestedRegions ? undefined : () => liveEdit?.enterEdit(),
-					addColumn: () => {
-						const updated = insertColumnAfter(region.columns, i);
-						onRegionChange(updated, region.containerStyle);
+					addColumn: (latest) => {
+						const updated = insertColumnAfter(latest.columns, i);
+						onRegionChange(updated, latest.containerStyle);
 					},
-					addChild: () => {
-						const nextChildContent = addChildColumnToContent(col.content);
-						const updated = region.columns.map((c, idx) =>
-							idx === i ? {...c, content: nextChildContent} : c,
+					addChild: (latest) => {
+						const updated = latest.columns.map((c, idx) =>
+							idx === i ? {...c, content: addChildColumnToContent(c.content)} : c,
 						);
-						onRegionChange(updated, region.containerStyle);
+						onRegionChange(updated, latest.containerStyle);
 					},
 					deleteColumn: deleteNestedColumn,
 				},
@@ -1435,10 +1435,11 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					dispatchUpdate(ctx.region, updated, ctx.view);
 				});
 
-				const deleteColumn = () => {
-					if (columns.length <= 1) return;
-					const updated = removeColumnPreservingWidths(columns, i);
-					dispatchUpdate(ctx.region, updated, ctx.view);
+				const deleteColumn = (latest?: MenuEdits) => {
+					const current = latest?.columns ?? columns;
+					if (current.length <= 1) return;
+					const updated = removeColumnPreservingWidths(current, i);
+					dispatchUpdate(ctx.region, updated, ctx.view, latest?.containerStyle);
 				};
 
 				const toolbarActions = toolbar.createDiv({cls: "column-toolbar-actions"});
@@ -1521,26 +1522,28 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 							? () => plugin.editMoc(ctx.region.mocId!, ctx.sourcePath)
 							: undefined,
 						editColumn: liveEdit ? () => liveEdit?.enterEdit() : undefined,
-						addColumn: () => {
-							const updated = insertColumnAfter(columns, i);
-							dispatchUpdate(ctx.region, updated, ctx.view);
+						addColumn: (latest) => {
+							const updated = insertColumnAfter(latest.columns, i);
+							dispatchUpdate(ctx.region, updated, ctx.view, latest.containerStyle);
 						},
-						addChild: () => {
-							const nextContent = addChildColumnToContent(col.content);
-							commitEdit(i, nextContent, ctx);
+						addChild: (latest) => {
+							const updated = latest.columns.map((c, idx) =>
+								idx === i ? {...c, content: addChildColumnToContent(c.content)} : c,
+							);
+							dispatchUpdate(ctx.region, updated, ctx.view, latest.containerStyle);
 						},
 						deleteColumn,
 					},
 					undefined,
 					container,
 					ctx.region.layout,
-					(nextLayout) => {
+					(nextLayout, nextColumns, nextContainerStyle) => {
 						refreshRegionPosition(ctx.region);
 						ctx.view.dispatch({
 							changes: {
 								from: ctx.region.from,
 								to: ctx.region.to,
-								insert: serializeColumns(columns, ctx.region.containerStyle, nextLayout, ctx.region.mocId),
+								insert: serializeColumns(nextColumns, nextContainerStyle, nextLayout, ctx.region.mocId),
 							},
 						});
 					},
