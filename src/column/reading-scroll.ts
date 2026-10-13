@@ -66,8 +66,21 @@ export function createLineIndex(text: string): (offset: number) => number {
 	};
 }
 
+/**
+ * Brings the layout around the layer up to date before it is measured
+ * (see keepHeaderSpace in reading-view.ts). Obsidian changes it and reads
+ * the position in the same scroll handler, before observers run.
+ */
+const layoutSyncs = new WeakMap<HTMLElement, () => void>();
+
+export function setLayoutSync(previewEl: HTMLElement, sync: (() => void) | null): void {
+	if (sync) layoutSyncs.set(previewEl, sync);
+	else layoutSyncs.delete(previewEl);
+}
+
 function activeBlocks(previewEl: HTMLElement): Block[] | null {
 	if (!previewEl.classList.contains(ACTIVE_CLASS)) return null;
+	layoutSyncs.get(previewEl)?.();
 	const wrapper = previewEl.querySelector(":scope > .amc-reading-columns-host > .columns-rv-wrapper");
 	if (!wrapper) return null;
 	const originTop = previewEl.getBoundingClientRect().top - previewEl.scrollTop;
@@ -99,12 +112,12 @@ function lineAtScroll(previewEl: HTMLElement, blocks: Block[]): number {
 
 /** Scroll offset showing `line` at the top (or centre) of the view. */
 function scrollForLine(previewEl: HTMLElement, blocks: Block[], line: number, center: boolean): number {
-	let target = blocks[blocks.length - 1]!;
+	// The block the line starts in, as lineAtScroll picks it: a line in
+	// the last part of a block (past its last line's start) stays in it.
+	let target = blocks[0]!;
 	for (const block of blocks) {
-		if (line <= block.to) {
-			target = block;
-			break;
-		}
+		if (block.from <= line) target = block;
+		else break;
 	}
 	const span = target.to - target.from + 1;
 	const fraction = Math.max(0, Math.min(1, (line - target.from) / span));

@@ -120,6 +120,12 @@
 	margin: 0 auto;
 }
 
+/* Space of the note's header while Obsidian has removed it (see keepHeaderSpace). */
+.markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host,
+.markdown-preview-view.amc-reading-columns-active.is-readable-line-width > .amc-reading-columns-host {
+	margin-top: var(--amc-header-space, 0px);
+}
+
 .markdown-preview-view.amc-reading-columns-active > .markdown-preview-sizer > .amc-reading-columns-host > .columns-rv-wrapper,
 .markdown-preview-view.amc-reading-columns-active > .amc-reading-columns-host > .columns-rv-wrapper {
 	display: block;

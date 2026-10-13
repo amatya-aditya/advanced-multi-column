@@ -146,7 +146,7 @@ export default [
 		},
 	},
 	{
-		name: "a reading view in a background tab keeps its position",
+		name: "a reading view in a background tab keeps its position, and is there again when shown",
 		async run(o) {
 			await o.call("layout", "Long.md", undefined, "preview");
 			await o.sleep(2500);
@@ -157,9 +157,32 @@ export default [
 			await o.ev(`(async () => { window.__amcTab = app.workspace.getLeaf("tab"); await window.__amcTab.openFile(app.vault.getAbstractFileByPath("Plain.md")); return true; })()`);
 			await o.sleep(800);
 			const hidden = await line();
+			await o.ev(`(() => { app.workspace.setActiveLeaf(app.workspace.getLeavesOfType("markdown")[0], {focus: true}); return true; })()`);
+			await o.sleep(1500);
+			const shown = await o.call("reading", "L");
 			// Later tests lay out their panes from the first one; leave it active.
 			await o.ev(`(() => { window.__amcTab.detach(); app.workspace.setActiveLeaf(app.workspace.getLeavesOfType("markdown")[0], {focus: true}); return true; })()`);
 			assert.ok(Math.abs(hidden - before) < 1, `background tab reports line ${hidden}, was ${before}`);
+			assert.ok(Math.abs(shown.scrollTop - 6000) <= 2, `shown again at ${shown.scrollTop}, was 6000`);
+		},
+	},
+	{
+		name: "the columns stay put when the note's header scrolls out of Obsidian's render",
+		async run(o) {
+			await o.call("layout", "Long.md", undefined, "preview");
+			await o.sleep(2500);
+			const tops = await o.ev(`(async () => {
+				const pv = ${leafSelector}.querySelector(".markdown-reading-view .markdown-preview-view");
+				const host = pv.querySelector(".amc-reading-columns-host");
+				const tops = new Set();
+				for (const y of [0, 1500, 4000, 1500, 0]) {
+					pv.scrollTop = y;
+					await new Promise((r) => setTimeout(r, 300));
+					tops.add(Math.round(host.getBoundingClientRect().top - pv.getBoundingClientRect().top + pv.scrollTop));
+				}
+				return [...tops];
+			})()`);
+			assert.equal(tops.length, 1, `the columns moved: ${tops}`);
 		},
 	},
 	{
