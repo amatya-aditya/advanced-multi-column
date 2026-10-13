@@ -146,6 +146,23 @@ export default [
 		},
 	},
 	{
+		name: "a reading view in a background tab keeps its position",
+		async run(o) {
+			await o.call("layout", "Long.md", undefined, "preview");
+			await o.sleep(2500);
+			await o.call("scrollReading", "L", 6000);
+			await o.sleep(1000);
+			const line = () => o.ev(`app.workspace.getLeavesOfType("markdown")[0].view.previewMode.getScroll()`);
+			const before = await line();
+			await o.ev(`(async () => { window.__amcTab = app.workspace.getLeaf("tab"); await window.__amcTab.openFile(app.vault.getAbstractFileByPath("Plain.md")); return true; })()`);
+			await o.sleep(800);
+			const hidden = await line();
+			// Later tests lay out their panes from the first one; leave it active.
+			await o.ev(`(() => { window.__amcTab.detach(); app.workspace.setActiveLeaf(app.workspace.getLeavesOfType("markdown")[0], {focus: true}); return true; })()`);
+			assert.ok(Math.abs(hidden - before) < 1, `background tab reports line ${hidden}, was ${before}`);
+		},
+	},
+	{
 		name: "shows the columns of a note embedded in another note's columns (#31)",
 		async run(o) {
 			await o.call("layout", "I31A.md", undefined, "preview");

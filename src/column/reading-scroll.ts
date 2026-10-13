@@ -27,6 +27,8 @@ interface ScrollOptions {
 
 interface PreviewRenderer {
 	previewEl: HTMLElement;
+	/** Set while Obsidian's own scroll jump is in flight; its next scroll event is ignored. */
+	scrolling?: boolean;
 	getScroll: (this: PreviewRenderer) => number | null;
 	applyScroll: (this: PreviewRenderer, line: number, options?: ScrollOptions) => boolean;
 }
@@ -186,6 +188,9 @@ export function releasePendingScroll(previewEl: HTMLElement): void {
 
 const RELEASE_SCROLL_TRIES = 10;
 
+/** Line at the top of each view when it was last measured on screen. */
+const shownLines = new WeakMap<HTMLElement, number>();
+
 let patchedProto: (PreviewRenderer & Record<string, unknown>) | null = null;
 let originalGetScroll: PreviewRenderer["getScroll"] | null = null;
 let originalApplyScroll: PreviewRenderer["applyScroll"] | null = null;
@@ -219,7 +224,13 @@ export function installReadingScrollMapping(renderer: unknown): void {
 		// Obsidian reads the position and applies it again while it renders.
 		if (isLayerPending(this.previewEl)) return pendingScrolls.get(this.previewEl)?.line ?? null;
 		const blocks = activeBlocks(this.previewEl);
-		return blocks ? lineAtScroll(this.previewEl, blocks) : getScroll.call(this);
+		if (!blocks) return getScroll.call(this);
+		// A hidden view (a background tab) has no layout to measure: report
+		// where it was last shown, as Obsidian does for its own sections.
+		if (this.previewEl.clientHeight === 0) return shownLines.get(this.previewEl) ?? blocks[0]!.from;
+		const line = lineAtScroll(this.previewEl, blocks);
+		shownLines.set(this.previewEl, line);
+		return line;
 	};
 	proto.applyScroll = function (this: PreviewRenderer, line: number, options?: ScrollOptions): boolean {
 		if (typeof line !== "number" || Number.isNaN(line)) return applyScroll.call(this, line, options);
@@ -229,7 +240,16 @@ export function installReadingScrollMapping(renderer: unknown): void {
 		}
 		fillTo(this.previewEl, line);
 		const blocks = activeBlocks(this.previewEl);
-		if (!blocks) return applyScroll.call(this, line, options);
+		if (!blocks) {
+			// Obsidian sets `scrolling` to ignore the scroll event its jump
+			// causes. A jump to where the view already is causes none, and
+			// the flag then swallowed the reader's next scroll, so that
+			// position was never saved (a deferred scroll often lands there).
+			const before = this.previewEl.scrollTop;
+			const applied = applyScroll.call(this, line, options);
+			if (this.previewEl.scrollTop === before) this.scrolling = false;
+			return applied;
+		}
 		this.previewEl.scrollTop = scrollForLine(this.previewEl, blocks, line, !!options?.center);
 		return true;
 	};
