@@ -33,12 +33,19 @@ const NOTES = {
 	"I31B.md": `# B\n\n${cols("Left column of B.", "Right column of B.")}\n\n![[I31C]]\n`,
 	"I31C.md": `# C\n\n${cols("Left column of C.", "Right column of C.")}\n`,
 	"I30.md": `# Outside heading\n\nText under outside heading.\n\n- outer item\n\t- child item\n\t- child item 2\n\n${cols("## Inside heading\n\nText under inside heading.\n\n- in item\n\t- in child", "Right side.")}\n\n## Second outside heading\n\nTail text.\n`,
+	"Hover.md": `# Hover\n\nOutside link [[Plain]] here.\n\n${cols("Inside link [[Plain2]] here.", "Right [[A]].")}\n`,
+	"Links.md": `# Links\n\n${cols("Link [[Plain]], [site](https://example.com/amc) and #amctag.\n\nPlain words.\n\n![[pic.png|40]]", "![[Linky]]")}\n`,
+	"Linky.md": "Embedded [[Plain2]] link.\n",
 	"FnCols.md": `# Footnotes in columns\n\n${cols("This is the reference notes cited in [^1]\n\n[^1]: I also added information here", "This is reference in 2nd column [^2]\n\n[^2]: This is something I added, **bold**, see also [^1]\n\n[^orphan]: A definition nobody references")}\n`,
 	"ReuseFn.md": `# Reuse test\n\nIntro with a footnote[^a].\n\n${cols("## Left heading\n\nLeft text with[^b].", "Right text.")}\n\nMiddle text.\n\n${cols("Second block left[^c].", "Second block right.")}\n\n![[I31C]]\n\nTail.\n\n[^a]: Footnote A.\n[^b]: Footnote B.\n[^c]: Footnote C.\n`,
 };
 
+/** A 16×16 PNG, for image clicks. */
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAF0lEQVR4nGP8z4AKmBgYGBgYGEYFUAEAOgsBH0b2v7QAAAAASUVORK5CYII=";
+
 export function writeFixtures(vaultDir) {
 	mkdirSync(join(vaultDir, ".obsidian"), {recursive: true});
+	writeFileSync(join(vaultDir, "pic.png"), Buffer.from(PNG, "base64"));
 	for (const [name, text] of Object.entries(NOTES)) writeFileSync(join(vaultDir, name), text);
 	const long = longNote("Long note", "Section", 400);
 	const long2 = longNote("Long note 2", "Part", 400);

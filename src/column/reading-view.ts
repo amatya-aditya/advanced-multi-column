@@ -10,6 +10,7 @@ import {
 import {findColumnRegions} from "./core/parser";
 import {NoteFootnotes} from "./core/footnotes";
 import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
+import {wireReadingLinkEvents} from "./render/reading-link-events";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "./core/column-style";
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
 import {addFoldControls, refreshHeadingFolds} from "./render/fold";
@@ -845,21 +846,8 @@ async function buildWrapper(
 		new Promise((resolve) => window.setTimeout(resolve, LAYER_RENDER_WAIT_MS)),
 	]);
 
-	// Keep internal links working even when the wrapper is rebuilt outside
-	// Obsidian's normal rendered block sequence.
-	wrapper.addEventListener("click", (evt) => {
-		const target = evt.target as HTMLElement;
-		const link = target.closest("a.internal-link");
-		if (!(link instanceof HTMLAnchorElement)) return;
-		evt.preventDefault();
-		const href = link.dataset.href ?? link.getAttr("href");
-		if (!href) return;
-		void plugin.app.workspace.openLinkText(
-			href,
-			sourcePath,
-			evt.ctrlKey || evt.metaKey,
-		);
-	});
+	// Links, tags and images: Obsidian wires these on the sizer, not the layer.
+	wireReadingLinkEvents(wrapper, plugin.app, sourcePath);
 
 	let next = 0;
 	const renderNext = (): void => {
