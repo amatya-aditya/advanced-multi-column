@@ -15,12 +15,176 @@ function switchWhileWatching(o, to, ms = 3000) {
 	})()`);
 }
 
+/** Screen point of the first element in pane L's column layer matching `selector`, or null. */
+function layerPoint(o, selector) {
+	return o.ev(`(() => {
+		const el = ${leafSelector}.querySelector(".columns-rv-wrapper " + ${JSON.stringify(selector)});
+		if (!el) return null;
+		const r = el.getBoundingClientRect();
+		return {x: Math.round(r.left + Math.min(5, r.width / 2)), y: Math.round(r.top + r.height / 2)};
+	})()`);
+}
+
+/** Press and release a mouse button ("left", "middle", "right") at a point. */
+async function press(o, pt, button) {
+	await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", x: pt.x, y: pt.y});
+	await o.send("Input.dispatchMouseEvent", {type: "mousePressed", x: pt.x, y: pt.y, button, clickCount: 1});
+	await o.sleep(40);
+	await o.send("Input.dispatchMouseEvent", {type: "mouseReleased", x: pt.x, y: pt.y, button, clickCount: 1});
+	await o.sleep(600);
+}
+
+const menuTitles = (o) => o.ev(`[...document.querySelectorAll(".menu .menu-item-title")].map((t) => t.textContent)`);
+
 /** The first frame where another note's columns, or the note without columns, were on screen. */
 function badFrame(samples) {
 	return samples.find((s) => s.error || (s.layer && s.layer !== s.file) || s.nativeVisible > 0) ?? null;
 }
 
 export default [
+	{
+		name: "hovering a link shows the page preview, in columns and outside them",
+		async run(o) {
+			await o.call("layout", "Hover.md", undefined, "preview");
+			await o.sleep(1000);
+			for (const name of ["Plain", "Plain2"]) {
+				await o.ev(`document.querySelectorAll(".hover-popover").forEach((p) => p.remove())`);
+				await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", x: 5, y: 300});
+				await o.sleep(200);
+				const pt = await o.ev(`(() => {
+					const a = [...${leafSelector}.querySelectorAll(".columns-rv-wrapper a.internal-link")].find((a) => a.textContent === ${JSON.stringify(name)});
+					const r = a.getBoundingClientRect();
+					return {x: Math.round(r.left + 5), y: Math.round(r.top + r.height / 2)};
+				})()`);
+				await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", x: pt.x, y: pt.y});
+				let shown = 0;
+				for (let i = 0; i < 20 && !shown; i++) {
+					await o.sleep(100);
+					shown = await o.ev(`document.querySelectorAll(".hover-popover").length`);
+				}
+				assert.ok(shown > 0, `no page preview for [[${name}]]`);
+			}
+		},
+	},
+	{
+		name: "a link in columns: middle-click opens a tab, right-click shows the link menu, dragging drags the link",
+		async run(o) {
+			await o.call("layout", "Links.md", undefined, "preview");
+			await o.sleep(1000);
+			const link = await layerPoint(o, "a.internal-link");
+
+			await press(o, link, "right");
+			const titles = await menuTitles(o);
+			await o.key("Escape");
+			assert.ok(titles.includes("Open in new tab") && titles.includes("Copy"), `link menu: ${titles}`);
+
+			const dragged = await o.ev(`(() => {
+				const a = ${leafSelector}.querySelector(".columns-rv-wrapper a.internal-link");
+				a.dispatchEvent(new DragEvent("dragstart", {bubbles: true, cancelable: true, dataTransfer: new DataTransfer()}));
+				const d = app.dragManager.draggable;
+				app.dragManager.draggable = null;
+				document.querySelectorAll(".drag-ghost").forEach((g) => g.remove());
+				return d ? d.type + ":" + d.linktext : null;
+			})()`);
+			assert.equal(dragged, "link:Plain");
+
+			await press(o, link, "middle");
+			const files = await o.ev(`app.workspace.getLeavesOfType("markdown").map((l) => l.view.file?.path)`);
+			assert.deepEqual(files, ["Links.md", "Plain.md"]);
+		},
+	},
+	{
+		name: "external links, tags and images in columns act as in Obsidian's view; text has no menu",
+		async run(o) {
+			await o.call("layout", "Links.md", undefined, "preview");
+			await o.sleep(1000);
+			await o.ev(`(() => { window.__amcOpen = window.open; window.__amcOpened = []; window.open = (...a) => { window.__amcOpened.push(a); return null; }; return true; })()`);
+			try {
+				await press(o, await layerPoint(o, "a.external-link"), "left");
+				assert.deepEqual(await o.ev(`window.__amcOpened`), [["https://example.com/amc", ""]]);
+			} finally {
+				await o.ev(`(() => { window.open = window.__amcOpen; return true; })()`);
+			}
+
+			await press(o, await layerPoint(o, "a.tag"), "left");
+			assert.equal(await o.ev(`app.workspace.getLeavesOfType("search")[0]?.view.getQuery()`), "tag:#amctag");
+
+			await press(o, await layerPoint(o, "img"), "left");
+			assert.equal(await o.ev(`document.querySelectorAll(".lightbox").length`), 1, "the image viewer did not open");
+			await o.key("Escape");
+			await o.sleep(300);
+			await o.ev(`document.querySelectorAll(".lightbox").forEach((l) => l.remove())`);
+
+			const words = await o.ev(`(() => {
+				const p = [...${leafSelector}.querySelectorAll(".columns-rv-wrapper p")].find((e) => e.textContent === "Plain words.");
+				const r = p.getBoundingClientRect();
+				return {x: Math.round(r.left + 10), y: Math.round(r.top + r.height / 2)};
+			})()`);
+			await press(o, words, "right");
+			assert.deepEqual(await menuTitles(o), []);
+		},
+	},
+	{
+		name: "a link in a note embedded in columns opens once, from the embedded note",
+		async run(o) {
+			await o.call("layout", "Links.md", undefined, "preview");
+			await o.sleep(1000);
+			const calls = await o.ev(`(async () => {
+				const ws = app.workspace;
+				const original = ws.openLinkText;
+				const calls = [];
+				ws.openLinkText = function (...args) { calls.push(args.slice(0, 2)); return original.apply(this, args); };
+				try {
+					${leafSelector}.querySelector(".columns-rv-wrapper .internal-embed a.internal-link").click();
+					await new Promise((r) => setTimeout(r, 500));
+				} finally {
+					ws.openLinkText = original;
+				}
+				return calls;
+			})()`);
+			assert.deepEqual(calls, [["Plain2", "Linky.md"]]);
+		},
+	},
+	{
+		name: "a reading view in a background tab keeps its position, and is there again when shown",
+		async run(o) {
+			await o.call("layout", "Long.md", undefined, "preview");
+			await o.sleep(2500);
+			await o.call("scrollReading", "L", 6000);
+			await o.sleep(1000);
+			const line = () => o.ev(`app.workspace.getLeavesOfType("markdown")[0].view.previewMode.getScroll()`);
+			const before = await line();
+			await o.ev(`(async () => { window.__amcTab = app.workspace.getLeaf("tab"); await window.__amcTab.openFile(app.vault.getAbstractFileByPath("Plain.md")); return true; })()`);
+			await o.sleep(800);
+			const hidden = await line();
+			await o.ev(`(() => { app.workspace.setActiveLeaf(app.workspace.getLeavesOfType("markdown")[0], {focus: true}); return true; })()`);
+			await o.sleep(1500);
+			const shown = await o.call("reading", "L");
+			// Later tests lay out their panes from the first one; leave it active.
+			await o.ev(`(() => { window.__amcTab.detach(); app.workspace.setActiveLeaf(app.workspace.getLeavesOfType("markdown")[0], {focus: true}); return true; })()`);
+			assert.ok(Math.abs(hidden - before) < 1, `background tab reports line ${hidden}, was ${before}`);
+			assert.ok(Math.abs(shown.scrollTop - 6000) <= 2, `shown again at ${shown.scrollTop}, was 6000`);
+		},
+	},
+	{
+		name: "the columns stay put when the note's header scrolls out of Obsidian's render",
+		async run(o) {
+			await o.call("layout", "Long.md", undefined, "preview");
+			await o.sleep(2500);
+			const tops = await o.ev(`(async () => {
+				const pv = ${leafSelector}.querySelector(".markdown-reading-view .markdown-preview-view");
+				const host = pv.querySelector(".amc-reading-columns-host");
+				const tops = new Set();
+				for (const y of [0, 1500, 4000, 1500, 0]) {
+					pv.scrollTop = y;
+					await new Promise((r) => setTimeout(r, 300));
+					tops.add(Math.round(host.getBoundingClientRect().top - pv.getBoundingClientRect().top + pv.scrollTop));
+				}
+				return [...tops];
+			})()`);
+			assert.equal(tops.length, 1, `the columns moved: ${tops}`);
+		},
+	},
 	{
 		name: "shows the columns of a note embedded in another note's columns (#31)",
 		async run(o) {

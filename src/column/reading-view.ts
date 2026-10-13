@@ -10,6 +10,7 @@ import {
 import {findColumnRegions} from "./core/parser";
 import {NoteFootnotes} from "./core/footnotes";
 import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
+import {wireReadingLinkEvents} from "./render/reading-link-events";
 import {applyColumnStyle, applyContainerStyle, BACKGROUND_CSS, COLOR_CSS, HEADER_BORDER_CSS} from "./core/column-style";
 import {buildSeparatorElement, groupColumns, parseColumnHeader} from "./render/column-renderer";
 import {addFoldControls, refreshHeadingFolds} from "./render/fold";
@@ -26,6 +27,7 @@ import {
 	pendingScrollLine,
 	releasePendingScroll,
 	setLayerFiller,
+	setLayoutSync,
 	tagSourceLines,
 	uninstallReadingScrollMapping,
 } from "./reading-scroll";
@@ -331,6 +333,42 @@ function carrySizerPadding(sizer: HTMLElement): void {
 	}
 }
 
+const HEADER_SPACE_VAR = "--amc-header-space";
+
+/**
+ * The note's header (inline title, properties) is one of Obsidian's virtual
+ * sections: it is removed once scrolled far out of view, and the pusher keeps
+ * its space. The pusher is hidden while columns are active, so keep the space
+ * above the layer instead; else everything below moved up by the header's
+ * height (a jump while scrolling, and a tab shown again landed lower).
+ * Obsidian keeps the header's measured height while it is removed. When it
+ * is put back with no section after it, Obsidian's last-child rule drops its
+ * bottom margin; keep that part too.
+ */
+function keepHeaderSpace(sizer: HTMLElement, view: MarkdownView | null): void {
+	const previewEl = sizer.parentElement;
+	if (!previewEl) return;
+	const renderer = (view?.previewMode as unknown as {renderer?: RendererHeader} | undefined)?.renderer;
+	const header = renderer?.sizerEl === sizer ? renderer.header : null;
+	const height = header?.height ?? 0;
+	let missing = 0;
+	if (header?.el && height > 0) {
+		if (!header.el.isConnected) missing = height;
+		else if (header.el.parentElement === sizer && !header.el.nextElementSibling) {
+			missing = Math.max(0, height - header.el.offsetHeight);
+		}
+	}
+	const space = missing > 0 ? `${missing}px` : "";
+	if (previewEl.style.getPropertyValue(HEADER_SPACE_VAR) !== space) {
+		previewEl.setCssProps({[HEADER_SPACE_VAR]: space});
+	}
+}
+
+interface RendererHeader {
+	sizerEl?: HTMLElement;
+	header?: {el?: HTMLElement; height?: number} | null;
+}
+
 /**
  * Sections of Obsidian's own render that the column layer replaces: the
  * note's content (el-* divs) and the pusher. The frontmatter section stays:
@@ -359,7 +397,7 @@ function restoreSizerContent(sizer: HTMLElement): void {
 		hidden[i]!.classList.remove(RV_HIDDEN_CLASS);
 	}
 	if (sizer.classList.contains("markdown-preview-sizer")) {
-		sizer.parentElement?.setCssProps({[SIZER_PADDING_VAR]: ""});
+		sizer.parentElement?.setCssProps({[SIZER_PADDING_VAR]: "", [HEADER_SPACE_VAR]: ""});
 	}
 }
 
@@ -380,6 +418,7 @@ function teardownSizer(
 		disconnectObservers(state);
 		state.stopFilling?.();
 		setLayerFiller(state.previewEl, null);
+		setLayoutSync(state.previewEl, null);
 		state.component.unload();
 		unloadUntakenBlocks(state.blocks, null);
 		state.wrapper.remove();
@@ -845,21 +884,8 @@ async function buildWrapper(
 		new Promise((resolve) => window.setTimeout(resolve, LAYER_RENDER_WAIT_MS)),
 	]);
 
-	// Keep internal links working even when the wrapper is rebuilt outside
-	// Obsidian's normal rendered block sequence.
-	wrapper.addEventListener("click", (evt) => {
-		const target = evt.target as HTMLElement;
-		const link = target.closest("a.internal-link");
-		if (!(link instanceof HTMLAnchorElement)) return;
-		evt.preventDefault();
-		const href = link.dataset.href ?? link.getAttr("href");
-		if (!href) return;
-		void plugin.app.workspace.openLinkText(
-			href,
-			sourcePath,
-			evt.ctrlKey || evt.metaKey,
-		);
-	});
+	// Links, tags and images: Obsidian wires these on the sizer, not the layer.
+	wireReadingLinkEvents(wrapper, plugin.app, sourcePath);
 
 	let next = 0;
 	const renderNext = (): void => {
@@ -1126,6 +1152,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 					if (node.instanceOf(HTMLElement) && isReplacedSection(node)) node.classList.add(RV_HIDDEN_CLASS);
 				}
 			}
+			keepHeaderSpace(sizer, resolveViewForSizer(sizer, plugin));
 			if (!state.host.isConnected || state.host.parentElement !== state.previewEl) {
 				handleWrapperDisappearance(sizer, state, "sizer-observer");
 				return;
@@ -1527,6 +1554,8 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			state.stopFilling = built.fillInBackground(previewEl.win);
 			retryCounts.delete(sizer);
 			installLifecycleObservers(sizer, state);
+			keepHeaderSpace(sizer, view);
+			setLayoutSync(previewEl, () => keepHeaderSpace(sizer, view));
 			rvWarn("rendered wrapper", {
 				renderId,
 				sourcePath,
