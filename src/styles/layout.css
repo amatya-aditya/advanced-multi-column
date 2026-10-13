@@ -1120,9 +1120,10 @@
 }
 
 
+/* Reading view columns are not editable: hovering them changes nothing. */
 .columns-container.columns-reading .column-item:not(.columns-custom-style):hover {
-	border: none;
-	background: var(--background-modifier-active-hover);
+	border-color: transparent;
+	background: var(--columns-col-bg, transparent);
 }
 
 .columns-container.columns-reading .column-toolbar {
