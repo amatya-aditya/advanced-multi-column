@@ -4,6 +4,25 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.5.2](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.2) - 2026-10-13
+
+### Changed
+- Reading view: hovering a column no longer highlights it. Columns in Reading view can't be edited, so they now look the same under the mouse. Live Preview still shows a border on hover.
+
+### Fixed
+- Reading view: links, tags and images in a note with columns work as in a note without columns. This applies to the whole note, not only the columns. Before, most of these did nothing or showed the wrong menu:
+  - hovering a link shows its page preview;
+  - middle-clicking a link opens it in a new tab;
+  - right-clicking a link or a web link shows its menu (**Open in new tab**, **Rename…**, **Copy URL** and so on);
+  - dragging a link drags it, for example into another note;
+  - clicking a tag searches for it;
+  - clicking an image opens the image viewer.
+- Reading view: right-clicking text in a note with columns no longer shows the **Readable line length** / **Inline title** menu.
+- Reading view: a link in a note embedded inside a column opens once. Before, it was opened twice and could end on the wrong note.
+- Reading view: the note no longer jumps up about one screen into a note with columns, when the note's title and properties scroll out of view.
+- Reading view: switching back to a tab with a note with columns returns to where you were reading. Before, it landed a few lines lower.
+- Reading view: going back to a note returns to where you were reading, also after you had moved through other tabs and notes. Before, it could return to the top.
+
 ## [2.5.1](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.1) - 2026-10-12
 
 ### Fixed
