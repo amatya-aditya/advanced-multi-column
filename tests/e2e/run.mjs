@@ -19,6 +19,7 @@ import reading from "./suites/reading.mjs";
 import quit from "./suites/quit.mjs";
 import settings from "./suites/settings.mjs";
 import mobile from "./suites/mobile.mjs";
+import moc from "./suites/moc.mjs";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const args = process.argv.slice(2);
@@ -28,7 +29,7 @@ const keep = args.includes("--keep") || args.includes("--leave-open");
 const port = Number(process.env.AMC_E2E_PORT ?? 9339);
 const TEST_TIMEOUT_MS = 60_000;
 
-const suites = [["editing", editing], ["reading", reading], ["live preview", livepreview], ["settings", settings], ["mobile", mobile], ["quit", quit]];
+const suites = [["editing", editing], ["reading", reading], ["live preview", livepreview], ["settings", settings], ["moc", moc], ["mobile", mobile], ["quit", quit]];
 const selected = suites
 	.map(([name, tests]) => [name, tests.filter((t) => !grep || grep.test(`${name} ${t.name}`))])
 	.filter(([, tests]) => tests.length > 0);

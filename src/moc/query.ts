@@ -1,5 +1,5 @@
 import {App, CachedMetadata, getAllTags, TFile} from "obsidian";
-import type {MocTemplate} from "./types";
+import type {MocFolderRule, MocRuleOp, MocTemplate} from "./types";
 
 export interface MocGroup {
 	name: string;
@@ -16,21 +16,40 @@ function parentFolder(path: string): string {
 }
 
 /**
- * Folder the template lists, resolved for the note containing the MOC.
- * Returns null when the template has no folder source ("" is the vault root).
- * Note-relative modes need `sourcePath`; without one they select nothing.
+ * Folder a folder rule points at, resolved for the note containing the MOC
+ * ("" is the vault root). Note-relative modes need `sourcePath`; without one
+ * they resolve to null.
  */
-export function resolveMocFolder(template: MocTemplate, sourcePath?: string): string | null {
-	switch (template.folderMode) {
-		case "none":
-			return null;
+export function resolveRuleFolder(rule: MocFolderRule, sourcePath?: string): string | null {
+	switch (rule.mode) {
 		case "fixed":
-			return normalizeFolder(template.folder);
+			return normalizeFolder(rule.folder);
 		case "note":
 			return sourcePath === undefined ? null : parentFolder(sourcePath);
 		case "parent":
 			return sourcePath === undefined ? null : parentFolder(parentFolder(sourcePath));
 	}
+}
+
+/** Whether any folder rule is relative to the note the MOC is in. */
+export function hasRelativeFolder(template: MocTemplate): boolean {
+	return template.rules.some((r) => r.type === "folder" && r.mode !== "fixed");
+}
+
+interface ResolvedFolder {
+	folder: string;
+	includeSubfolders: boolean;
+}
+
+/** The template's folder rules, resolved for the MOC in `sourcePath`. */
+export function resolvedFolders(template: MocTemplate, sourcePath?: string): ResolvedFolder[] {
+	const folders: ResolvedFolder[] = [];
+	for (const rule of template.rules) {
+		if (rule.type !== "folder") continue;
+		const folder = resolveRuleFolder(rule, sourcePath);
+		if (folder !== null) folders.push({folder, includeSubfolders: rule.includeSubfolders});
+	}
+	return folders;
 }
 
 function normalizeTag(tag: string): string {
@@ -73,39 +92,57 @@ export type MocQueryCache = Map<string, TFile[]>;
 
 type FileCheck = (file: TFile, cache: CachedMetadata | null) => boolean;
 
-/** The template's source checks for a MOC in `sourcePath`; null matches nothing. */
-function buildChecks(template: MocTemplate, sourcePath?: string): FileCheck[] | null {
-	const checks: FileCheck[] = [];
+interface RuleCheck {
+	op: MocRuleOp;
+	check: FileCheck;
+}
 
-	const folder = resolveMocFolder(template, sourcePath);
-	if (folder !== null) {
-		checks.push((file) => inFolder(file, folder, template.includeSubfolders));
-	} else if (template.folderMode === "note" || template.folderMode === "parent") {
-		return null;
-	}
-	for (const tag of template.tags.map(normalizeTag).filter(Boolean)) {
-		checks.push((_file, cache) => hasTag(fileTags(cache), tag));
-	}
-	for (const filter of template.properties) {
-		const key = filter.key.trim();
-		if (!key) continue;
-		const wanted = filter.value.trim().toLowerCase();
-		checks.push((_file, cache) => {
-			const values = propertyValues(cache, key);
-			if (wanted === "") return values.length > 0;
-			return values.some((v) => v.toLowerCase() === wanted);
-		});
+/**
+ * The template's rules as checks for a MOC in `sourcePath`; null matches
+ * nothing. Empty rules (no tag, no property name) are left out.
+ */
+function buildChecks(template: MocTemplate, sourcePath?: string): RuleCheck[] | null {
+	const checks: RuleCheck[] = [];
+	for (const rule of template.rules) {
+		switch (rule.type) {
+			case "folder": {
+				const folder = resolveRuleFolder(rule, sourcePath);
+				// A folder relative to the note, with no note: the MOC lists nothing.
+				if (folder === null) return null;
+				checks.push({op: rule.op, check: (file) => inFolder(file, folder, rule.includeSubfolders)});
+				break;
+			}
+			case "tag": {
+				const tag = normalizeTag(rule.tag);
+				if (tag) checks.push({op: rule.op, check: (_file, cache) => hasTag(fileTags(cache), tag)});
+				break;
+			}
+			case "property": {
+				const key = rule.key.trim();
+				if (!key) break;
+				const wanted = rule.value.trim().toLowerCase();
+				checks.push({op: rule.op, check: (_file, cache) => {
+					const values = propertyValues(cache, key);
+					if (wanted === "") return values.length > 0;
+					return values.some((v) => v.toLowerCase() === wanted);
+				}});
+				break;
+			}
+		}
 	}
 	return checks.length > 0 ? checks : null;
 }
 
-function combine(app: App, checks: FileCheck[], match: MocTemplate["match"]): (file: TFile) => boolean {
-	const every = match === "all";
+/** Combine the checks top to bottom: `A`, `OR B`, `AND C` is (A or B) and C. */
+function combine(app: App, checks: RuleCheck[]): (file: TFile) => boolean {
 	return (file) => {
 		const cache = app.metadataCache.getFileCache(file);
-		return every
-			? checks.every((check) => check(file, cache))
-			: checks.some((check) => check(file, cache));
+		let result = checks[0]!.check(file, cache);
+		for (let i = 1; i < checks.length; i++) {
+			const {op, check} = checks[i]!;
+			result = op === "and" ? result && check(file, cache) : result || check(file, cache);
+		}
+		return result;
 	};
 }
 
@@ -116,7 +153,7 @@ function combine(app: App, checks: FileCheck[], match: MocTemplate["match"]): (f
 export function createMocMatcher(app: App, template: MocTemplate, sourcePath?: string): (file: TFile) => boolean {
 	const checks = buildChecks(template, sourcePath);
 	if (!checks) return () => false;
-	const matches = combine(app, checks, template.match);
+	const matches = combine(app, checks);
 	return (file) => file.path !== sourcePath && file.extension === "md" && matches(file);
 }
 
@@ -132,20 +169,34 @@ export function queryMocFiles(
 ): TFile[] {
 	const checks = buildChecks(template, sourcePath);
 	if (!checks) return [];
-	const key = `${template.id}\u0000${resolveMocFolder(template, sourcePath) ?? ""}`;
+	const folders = resolvedFolders(template, sourcePath).map((f) => f.folder);
+	const key = [template.id, ...folders].join("\u0000");
 	let matched = cache?.get(key);
 	if (!matched) {
-		matched = app.vault.getMarkdownFiles().filter(combine(app, checks, template.match));
+		matched = app.vault.getMarkdownFiles().filter(combine(app, checks));
 		cache?.set(key, matched);
 	}
 	return matched.filter((file) => file.path !== sourcePath);
 }
 
-function groupKeys(app: App, template: MocTemplate, file: TFile, base: string): string[] {
+/**
+ * Folder a note's subfolder group is named relative to: the deepest folder
+ * rule that contains the note, else the vault root.
+ */
+function groupBase(file: TFile, folders: ReadonlyArray<ResolvedFolder>): string {
+	let base = "";
+	for (const {folder, includeSubfolders} of folders) {
+		if (inFolder(file, folder, includeSubfolders) && folder.length > base.length) base = folder;
+	}
+	return base;
+}
+
+function groupKeys(app: App, template: MocTemplate, file: TFile, folders: ReadonlyArray<ResolvedFolder>): string[] {
 	switch (template.groupBy) {
 		case "none":
 			return [""];
 		case "subfolder": {
+			const base = groupBase(file, folders);
 			const parent = file.parent?.path === "/" ? "" : file.parent?.path ?? "";
 			const rel = base === "" ? parent : parent.slice(base.length).replace(/^\//, "");
 			const first = rel.split("/")[0] ?? "";
@@ -154,7 +205,7 @@ function groupKeys(app: App, template: MocTemplate, file: TFile, base: string): 
 		}
 		case "tag": {
 			const tags = fileTags(app.metadataCache.getFileCache(file));
-			const wanted = template.tags.map(normalizeTag).filter(Boolean);
+			const wanted = template.rules.flatMap((r) => (r.type === "tag" ? [normalizeTag(r.tag)] : [])).filter(Boolean);
 			const keys = wanted.length > 0 ? wanted.filter((t) => hasTag(tags, t)) : [...new Set(tags)];
 			return keys.length > 0 ? keys.map((t) => `#${t}`) : ["Untagged"];
 		}
@@ -199,9 +250,9 @@ export function collectMocGroups(
 	cache?: MocQueryCache,
 ): MocGroup[] {
 	const groups = new Map<string, TFile[]>();
-	const base = resolveMocFolder(template, sourcePath) ?? "";
+	const folders = resolvedFolders(template, sourcePath);
 	for (const file of queryMocFiles(app, template, sourcePath, cache)) {
-		for (const key of groupKeys(app, template, file, base)) {
+		for (const key of groupKeys(app, template, file, folders)) {
 			const list = groups.get(key) ?? [];
 			list.push(file);
 			groups.set(key, list);

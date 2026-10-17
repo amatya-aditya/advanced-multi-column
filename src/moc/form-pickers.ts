@@ -1,6 +1,6 @@
-import {AbstractInputSuggest, App, getAllTags, setIcon, TFolder} from "obsidian";
+import {AbstractInputSuggest, App, getAllTags, TFolder} from "obsidian";
 
-// Pickers used by the MOC form: vault vocabulary, suggesters and chips.
+// Pickers used by the MOC form: vault vocabulary and suggesters.
 
 /** Tags, property keys and values in use, read from the metadata cache. */
 export class VaultVocabulary {
@@ -86,18 +86,4 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 		this.onPick(folder);
 		this.close();
 	}
-}
-
-export function renderChips(
-	parent: HTMLElement,
-	items: ReadonlyArray<string>,
-	onRemove: (index: number) => void,
-): void {
-	const list = parent.createDiv({cls: "amc-moc-chips"});
-	items.forEach((label, index) => {
-		const chip = list.createSpan({cls: "amc-moc-chip", text: label});
-		const remove = chip.createSpan({cls: "amc-moc-chip-remove", attr: {"aria-label": `Remove ${label}`}});
-		setIcon(remove, "x");
-		remove.addEventListener("click", () => onRemove(index));
-	});
 }
