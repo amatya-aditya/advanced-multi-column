@@ -43,6 +43,18 @@ function badFrame(samples) {
 
 export default [
 	{
+		name: "markers inside an HTML block don't show above the columns (#38)",
+		async run(o) {
+			await o.call("layout", "Center.md", undefined, "preview");
+			await o.sleep(1000);
+			const shown = await o.ev(`[...${leafSelector}.querySelectorAll(".markdown-preview-sizer > div")]
+				.filter((d) => d.offsetHeight > 0 && !d.closest(".amc-reading-columns-host") && d.innerText.includes("%%"))
+				.map((d) => d.innerText)`);
+			assert.deepEqual(shown, []);
+			assert.equal(await o.ev(`${leafSelector}.querySelectorAll(".columns-rv-wrapper img").length`), 2);
+		},
+	},
+	{
 		name: "hovering a link shows the page preview, in columns and outside them",
 		async run(o) {
 			await o.call("layout", "Hover.md", undefined, "preview");

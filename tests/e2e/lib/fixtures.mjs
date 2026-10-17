@@ -37,6 +37,8 @@ const NOTES = {
 	"Links.md": `# Links\n\n${cols("Link [[Plain]], [site](https://example.com/amc) and #amctag.\n\nPlain words.\n\n![[pic.png|40]]", "![[Linky]]")}\n`,
 	"Linky.md": "Embedded [[Plain2]] link.\n",
 	"FnCols.md": `# Footnotes in columns\n\n${cols("This is the reference notes cited in [^1]\n\n[^1]: I also added information here", "This is reference in 2nd column [^2]\n\n[^2]: This is something I added, **bold**, see also [^1]\n\n[^orphan]: A definition nobody references")}\n`,
+	// Issue #38: <center> HTML blocks in columns, with a blank line before their markdown.
+	"Center.md": "# Center\n\n> [!example] Overview\n>\n\n---\n\n%% col-start %%\n%% col-break %%\n<center>\n\n![[pic.png|40]]\n<small>Left caption.</small>\n</center>\n%% col-break %%\n<center>\n\n![[pic.png|40]]\n<small>Right caption.</small>\n</center>\n%% col-end %%\n\n> [!NOTE] Key Concepts\n>\n\n## Prelude\n\nAfter the columns.\n",
 	"ReuseFn.md": `# Reuse test\n\nIntro with a footnote[^a].\n\n${cols("## Left heading\n\nLeft text with[^b].", "Right text.")}\n\nMiddle text.\n\n${cols("Second block left[^c].", "Second block right.")}\n\n![[I31C]]\n\nTail.\n\n[^a]: Footnote A.\n[^b]: Footnote B.\n[^c]: Footnote C.\n`,
 };
 
