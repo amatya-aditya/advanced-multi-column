@@ -13,7 +13,58 @@ const noteCursorLine = (o) => o.ev(`(() => {
 	return v.editor.getLine(v.editor.getCursor().line);
 })()`);
 
+/**
+ * Drag the resize handle between a two-column block's columns by `dx` with the
+ * mouse or a finger, and return the left column's width saved in the note.
+ */
+async function dragResize(o, input, dx) {
+	await o.call("write", `Resize-${input}.md`, "%% col-start %%\n%% col-break %%\nLeft\n%% col-break %%\nRight\n%% col-end %%\n");
+	await o.call("layout", `Resize-${input}.md`);
+	await o.sleep(1200);
+	const h = await o.ev(`(() => { const r = ${leafEl}.querySelector(".columns-container > .column-resize-handle").getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2)}; })()`);
+	const steps = [1, 2, 3, 4].map((i) => ({x: h.x + Math.round((dx * i) / 4), y: h.y}));
+	if (input === "touch") {
+		await o.send("Emulation.setTouchEmulationEnabled", {enabled: true, maxTouchPoints: 5});
+		try {
+			await o.send("Input.dispatchTouchEvent", {type: "touchStart", touchPoints: [h]});
+			for (const p of steps) {
+				await o.sleep(30);
+				await o.send("Input.dispatchTouchEvent", {type: "touchMove", touchPoints: [p]});
+			}
+			await o.send("Input.dispatchTouchEvent", {type: "touchEnd", touchPoints: []});
+		} finally {
+			await o.send("Emulation.setTouchEmulationEnabled", {enabled: false});
+		}
+	} else {
+		await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", ...h});
+		await o.send("Input.dispatchMouseEvent", {type: "mousePressed", ...h, button: "left", clickCount: 1});
+		for (const p of steps) {
+			await o.sleep(30);
+			await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", ...p, button: "left", buttons: 1});
+		}
+		await o.send("Input.dispatchMouseEvent", {type: "mouseReleased", ...steps[3], button: "left", clickCount: 1});
+	}
+	await o.sleep(800);
+	const text = await o.ev(`${viewExpr}.editor.getValue()`);
+	return Number(/%% col-break:(\d+)/.exec(text)?.[1] ?? 0);
+}
+
 export default [
+	{
+		name: "dragging the resize handle with the mouse resizes the columns",
+		async run(o) {
+			const left = await dragResize(o, "mouse", 120);
+			assert.ok(left > 55, `left column width after dragging right: ${left}`);
+		},
+	},
+	{
+		// Touch screens (iPad) send no mouse events for a drag.
+		name: "dragging the resize handle with a finger resizes the columns",
+		async run(o) {
+			const left = await dragResize(o, "touch", 120);
+			assert.ok(left > 55, `left column width after dragging right: ${left}`);
+		},
+	},
 	{
 		name: "arrow keys move the cursor into and out of columns (#39)",
 		async run(o) {

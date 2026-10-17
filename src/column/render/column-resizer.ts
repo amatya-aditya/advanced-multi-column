@@ -111,6 +111,7 @@ export function buildResizeHandle(
 	let startLeftPct = 0;
 	let totalPct = 0;
 	let containerWidth = 0;
+	let activePointer: number | null = null;
 
 	const groups = groupColumns(columns);
 	const handleShrink = (groups.length - 1) * 8 / groups.length;
@@ -132,8 +133,8 @@ export function buildResizeHandle(
 		return {newLeft, newRight: totalPct - newLeft};
 	};
 
-	const onMouseMove = (e: MouseEvent) => {
-		if (containerWidth === 0) return;
+	const onPointerMove = (e: PointerEvent) => {
+		if (e.pointerId !== activePointer || containerWidth === 0) return;
 		const {newLeft, newRight} = computeNewSizes(e.clientX - startX);
 
 		const items = getColumnElements(container);
@@ -143,10 +144,13 @@ export function buildResizeHandle(
 		if (rightEl) rightEl.style.flex = `0 0 calc(${newRight}% - ${handleShrink.toFixed(1)}px)`;
 	};
 
-	const onMouseUp = (e: MouseEvent) => {
-		const doc = container.doc;
-		doc.removeEventListener("mousemove", onMouseMove);
-		doc.removeEventListener("mouseup", onMouseUp);
+	const onPointerUp = (e: PointerEvent) => {
+		if (e.pointerId !== activePointer) return;
+		activePointer = null;
+		handle.removeEventListener("pointermove", onPointerMove);
+		handle.removeEventListener("pointerup", onPointerUp);
+		handle.removeEventListener("pointercancel", onPointerUp);
+		if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
 		container.classList.remove("columns-resizing");
 		handle.classList.remove("is-active");
 
@@ -172,9 +176,12 @@ export function buildResizeHandle(
 		onColumnsChange(updated);
 	};
 
-	handle.addEventListener("mousedown", (e) => {
+	// Pointer events: a touch drag (iPad, phones) sends no mouse events.
+	handle.addEventListener("pointerdown", (e) => {
+		if (activePointer !== null || (e.pointerType === "mouse" && e.button !== 0)) return;
 		e.preventDefault();
 		e.stopPropagation();
+		activePointer = e.pointerId;
 		startX = e.clientX;
 		containerWidth = container.getBoundingClientRect().width;
 		container.classList.add("columns-resizing");
@@ -200,8 +207,10 @@ export function buildResizeHandle(
 			startLeftPct = gLeftPct;
 		}
 
-		const doc = container.doc;
-		doc.addEventListener("mousemove", onMouseMove);
-		doc.addEventListener("mouseup", onMouseUp);
+		// Captured: the moves keep coming here when the pointer leaves the handle.
+		handle.setPointerCapture(e.pointerId);
+		handle.addEventListener("pointermove", onPointerMove);
+		handle.addEventListener("pointerup", onPointerUp);
+		handle.addEventListener("pointercancel", onPointerUp);
 	});
 }
