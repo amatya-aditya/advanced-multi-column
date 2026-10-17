@@ -257,7 +257,8 @@ export default class ColumnsPlugin extends Plugin {
 		if (typeof s.foldNotePropertiesByDefault !== "boolean") {
 			s.foldNotePropertiesByDefault = DEFAULT_SETTINGS.foldNotePropertiesByDefault;
 		}
-		if (typeof s.enableSlashSuggest !== "boolean") s.enableSlashSuggest = DEFAULT_SETTINGS.enableSlashSuggest;
+		// Removed setting: slash commands in columns come from the core Slash commands plugin.
+		delete (s as {enableSlashSuggest?: unknown}).enableSlashSuggest;
 		if (typeof s.inheritStyleOnAdd !== "boolean") s.inheritStyleOnAdd = DEFAULT_SETTINGS.inheritStyleOnAdd;
 		if (typeof s.showContainerBorder !== "boolean") s.showContainerBorder = DEFAULT_SETTINGS.showContainerBorder;
 		if (typeof s.enableMoc !== "boolean") s.enableMoc = DEFAULT_SETTINGS.enableMoc;
@@ -291,7 +292,7 @@ export default class ColumnsPlugin extends Plugin {
 	/** Settings that are baked into rendered live preview widgets (not CSS). */
 	private liveRenderFingerprint(): string {
 		const s = this.settings;
-		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes, s.enableSlashSuggest]);
+		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes]);
 	}
 
 	/** Re-render live preview columns so rendering settings take effect. */

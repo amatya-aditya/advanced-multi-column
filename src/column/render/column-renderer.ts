@@ -115,17 +115,11 @@ function editKey(containerPath: ContainerPath, columnIndex: number): string {
 
 type SlashSuggestController = Pick<SlashCommandSuggest, "active" | "handleKeydown" | "handleInput">;
 
-const DISABLED_SLASH_SUGGEST: SlashSuggestController = {
-	active: false,
-	handleKeydown: () => false,
-	handleInput: () => {},
-};
-
+/**
+ * Slash commands for the textarea fallback editor. Obsidian's editor (used
+ * whenever available) has the core Slash commands plugin instead.
+ */
 function createSlashSuggest(textarea: HTMLTextAreaElement): SlashSuggestController {
-	const plugin = getPluginInstance();
-	if (!plugin.settings.enableSlashSuggest) {
-		return DISABLED_SLASH_SUGGEST;
-	}
 	return new SlashCommandSuggest(textarea);
 }
 

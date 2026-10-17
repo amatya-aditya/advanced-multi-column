@@ -58,7 +58,6 @@ export interface ColumnsPluginSettings {
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
 	foldNotePropertiesByDefault: boolean;
-	enableSlashSuggest: boolean;
 	inheritStyleOnAdd: boolean;
 	styleTargetMode: StyleTargetMode;
 	styleTargetColumnIndex: number;
@@ -90,7 +89,6 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	enableLivePreview: true,
 	enableReadingView: true,
 	foldNotePropertiesByDefault: false,
-	enableSlashSuggest: true,
 	inheritStyleOnAdd: true,
 	styleTargetMode: "all",
 	styleTargetColumnIndex: 1,
