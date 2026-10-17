@@ -873,7 +873,12 @@
 /* Obsidian pads editors inside embeds with --file-margins. The extra
    .markdown-source-view.mod-cm6 qualifiers outrank those rules (and theme
    variants) in any embed or pane context without a priority flag. */
-.columns-container .amc-embedded-editor .markdown-source-view.mod-cm6 .cm-editor .cm-scroller {
+.columns-container .amc-embedded-editor .markdown-source-view.mod-cm6 .cm-editor .cm-scroller,
+/* On phones Obsidian pushes every note editor's text below the view header
+   (`.is-phone .mod-root .workspace-leaf-content .view-content
+   .markdown-source-view > .cm-editor > .cm-scroller`), which also matched
+   column editors: the text started ~120px down (#41). */
+.is-phone .columns-container .column-item .amc-embedded-editor .markdown-source-view.mod-cm6 > .cm-editor > .cm-scroller {
 	padding: 0;
 	min-height: 0;
 }
