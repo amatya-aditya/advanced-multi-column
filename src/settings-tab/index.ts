@@ -7,11 +7,15 @@ import {
 	DIVIDER_STYLE_OPTIONS,
 	STYLE_COLOR_OPTIONS,
 	COLUMN_CONTROLS_OPTIONS,
+	EDITOR_MENU_ITEMS,
 	STYLE_TARGET_OPTIONS,
 } from "../settings";
 import {renderAbout} from "./about";
 import {headerTypesList} from "./header-types";
 import {renderRemoveMarkers} from "./remove-markers";
+
+/** Control keys of the per-item right-click menu toggles: `menu:<item id>`, on when shown. */
+const MENU_KEY_PREFIX = "menu:";
 
 /** Name of the MOC sub-page, used to open settings directly on it. */
 export const MOC_PAGE_NAME = "Maps of content";
@@ -63,6 +67,19 @@ export class ColumnsSettingTab extends PluginSettingTab {
 								items: [
 									{name: "Show drag handles", desc: "Show grip icons for drag-and-drop reordering.", control: {type: "toggle", key: "showDragHandles"}},
 									{name: "Column buttons", desc: "Where a column's add and remove buttons appear. Above the column keeps them away from the resize handle between columns.", control: {type: "dropdown", key: "columnControlsPosition", options: COLUMN_CONTROLS_OPTIONS}},
+								],
+							},
+							{
+								type: "group",
+								heading: "Right-click menu",
+								items: [
+									{name: "Show in right-click menu", desc: "Add the plugin's insert items to the editor's right-click menu. They are also in the command palette.", aliases: ["context menu"], control: {type: "toggle", key: "showInEditorMenu"}},
+									...EDITOR_MENU_ITEMS.map((item) => ({
+										name: item.name,
+										aliases: ["context menu"],
+										visible: () => settings.showInEditorMenu && (item.id !== "insert-moc" || settings.enableMoc),
+										control: {type: "toggle" as const, key: `${MENU_KEY_PREFIX}${item.id}`},
+									})),
 								],
 							},
 						],
@@ -178,7 +195,21 @@ export class ColumnsSettingTab extends PluginSettingTab {
 		];
 	}
 
+	getControlValue(key: string): unknown {
+		if (key.startsWith(MENU_KEY_PREFIX)) {
+			return !this.plugin.settings.hiddenEditorMenuItems.includes(key.slice(MENU_KEY_PREFIX.length));
+		}
+		return super.getControlValue(key);
+	}
+
 	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (key.startsWith(MENU_KEY_PREFIX)) {
+			const id = key.slice(MENU_KEY_PREFIX.length);
+			const hidden = this.plugin.settings.hiddenEditorMenuItems.filter((h) => h !== id);
+			this.plugin.settings.hiddenEditorMenuItems = value === true ? hidden : [...hidden, id];
+			await this.plugin.saveSettings();
+			return;
+		}
 		const settings = this.plugin.settings as unknown as Record<string, unknown>;
 		settings[key] = value;
 		await this.plugin.saveSettings();

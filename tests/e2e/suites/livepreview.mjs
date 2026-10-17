@@ -51,6 +51,55 @@ async function dragResize(o, input, dx) {
 
 export default [
 	{
+		name: "the right-click menu items can be turned off (#44)",
+		async run(o) {
+			const setMenu = (on) => o.ev(`(async () => { const p = app.plugins.plugins["advanced-multi-column"]; p.settings.showInEditorMenu = ${on}; await p.saveSettings(); return true; })()`);
+			const menuTitles = async () => {
+				await o.call("layout", "Plain.md");
+				const pt = await o.ev(`(() => { const l = [...${leafEl}.querySelectorAll(".cm-line")].find((e) => e.textContent.includes("A note without columns")); const r = l.getBoundingClientRect(); return {x: Math.round(r.left + 20), y: Math.round(r.top + r.height / 2)}; })()`);
+				await o.send("Input.dispatchMouseEvent", {type: "mousePressed", ...pt, button: "right", clickCount: 1});
+				await o.send("Input.dispatchMouseEvent", {type: "mouseReleased", ...pt, button: "right", clickCount: 1});
+				await o.sleep(500);
+				const titles = await o.ev(`[...document.querySelectorAll(".menu .menu-item-title")].map((t) => t.textContent)`);
+				await o.key("Escape");
+				await o.sleep(200);
+				return titles;
+			};
+			const ours = (titles) => titles.filter((t) => /^Insert (\d columns|layout|MOC)$/.test(t));
+			/** Click the toggle of a row on the plugin's Display settings page. */
+			const clickSettingToggle = (name) => o.ev(`(async () => {
+				app.setting.open();
+				await new Promise((r) => setTimeout(r, 500));
+				app.setting.openPagePath("advanced-multi-column", ["Display"]);
+				await new Promise((r) => setTimeout(r, 800));
+				// The settings page can be in a popout window: search the tab's own document.
+				const row = [...app.setting.activeTab.containerEl.ownerDocument.querySelectorAll(".setting-item")].find((s) => s.querySelector(".setting-item-name")?.textContent === ${JSON.stringify(name)});
+				row.querySelector(".checkbox-container").click();
+				await new Promise((r) => setTimeout(r, 300));
+				app.setting.close();
+				return true;
+			})()`);
+			try {
+				const on = await menuTitles();
+				assert.deepEqual(ours(on), ["Insert 2 columns", "Insert 3 columns", "Insert 4 columns", "Insert layout", "Insert MOC"]);
+
+				// Single items, switched off in settings.
+				await clickSettingToggle("Insert 3 columns");
+				await clickSettingToggle("Insert MOC");
+				assert.deepEqual(await o.ev(`app.plugins.plugins["advanced-multi-column"].settings.hiddenEditorMenuItems`), ["insert-3-columns", "insert-moc"]);
+				assert.deepEqual(ours(await menuTitles()), ["Insert 2 columns", "Insert 4 columns", "Insert layout"]);
+
+				await setMenu(false);
+				const off = await menuTitles();
+				assert.ok(off.length > 0, "no right-click menu opened");
+				assert.deepEqual(ours(off), []);
+			} finally {
+				await o.ev(`(async () => { const p = app.plugins.plugins["advanced-multi-column"]; p.settings.hiddenEditorMenuItems = []; await p.saveSettings(); return true; })()`);
+				await setMenu(true);
+			}
+		},
+	},
+	{
 		name: "dragging the resize handle with the mouse resizes the columns",
 		async run(o) {
 			const left = await dragResize(o, "mouse", 120);

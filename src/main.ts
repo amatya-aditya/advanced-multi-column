@@ -1,6 +1,6 @@
 import {App, Editor, MarkdownFileInfo, MarkdownView, Menu, MenuItem, Notice, Plugin, SuggestModal, TFile} from "obsidian";
 import type {EditorView} from "@codemirror/view";
-import {ColumnsPluginSettings, DEFAULT_SETTINGS} from "./settings";
+import {ColumnsPluginSettings, DEFAULT_SETTINGS, EDITOR_MENU_ITEMS} from "./settings";
 import {ColumnsSettingTab, MOC_PAGE_NAME} from "./settings-tab";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
@@ -109,7 +109,10 @@ export default class ColumnsPlugin extends Plugin {
 		// ── Editor context menu ──────────────────────────────────
 		this.registerEvent(
 			this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor, info: MarkdownView | MarkdownFileInfo) => {
-				for (const layout of LAYOUT_TEMPLATES.filter((l) => l.quick)) {
+				// Everything below is also in the command palette.
+				if (!this.settings.showInEditorMenu) return;
+				const shown = (id: string) => !this.settings.hiddenEditorMenuItems.includes(id);
+				for (const layout of LAYOUT_TEMPLATES.filter((l) => l.quick && shown(l.id))) {
 					menu.addItem((item) =>
 						item
 							.setSection("insert")
@@ -118,20 +121,22 @@ export default class ColumnsPlugin extends Plugin {
 							.onClick(() => this.insertLayout(editor, layout)),
 					);
 				}
-				menu.addItem((item) => {
-					item
-						.setSection("insert")
-						.setTitle("Insert layout")
-						.setIcon("layout-grid");
-					const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
-					for (const layout of LAYOUT_TEMPLATES.filter((l) => !l.quick)) {
-						sub.addItem((s: MenuItem) => s
-							.setTitle(layout.menuTitle)
-							.setIcon(layout.icon)
-							.onClick(() => this.insertLayout(editor, layout)));
-					}
-				});
-				if (!this.settings.enableMoc) return;
+				if (shown("insert-layout")) {
+					menu.addItem((item) => {
+						item
+							.setSection("insert")
+							.setTitle("Insert layout")
+							.setIcon("layout-grid");
+						const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
+						for (const layout of LAYOUT_TEMPLATES.filter((l) => !l.quick)) {
+							sub.addItem((s: MenuItem) => s
+								.setTitle(layout.menuTitle)
+								.setIcon(layout.icon)
+								.onClick(() => this.insertLayout(editor, layout)));
+						}
+					});
+				}
+				if (!this.settings.enableMoc || !shown("insert-moc")) return;
 				menu.addItem((item) => {
 					item
 						.setSection("insert")
@@ -249,6 +254,11 @@ export default class ColumnsPlugin extends Plugin {
 		s.minColumnWidthPercent = Math.max(5, Math.min(30, s.minColumnWidthPercent));
 		// Type-check boolean fields
 		if (typeof s.showDragHandles !== "boolean") s.showDragHandles = DEFAULT_SETTINGS.showDragHandles;
+		if (typeof s.showInEditorMenu !== "boolean") s.showInEditorMenu = DEFAULT_SETTINGS.showInEditorMenu;
+		const rawHidden: unknown = s.hiddenEditorMenuItems;
+		s.hiddenEditorMenuItems = Array.isArray(rawHidden)
+			? rawHidden.filter((id): id is string => EDITOR_MENU_ITEMS.some((item) => item.id === id))
+			: [];
 		if (s.columnControlsPosition !== "side" && s.columnControlsPosition !== "top") {
 			s.columnControlsPosition = DEFAULT_SETTINGS.columnControlsPosition;
 		}

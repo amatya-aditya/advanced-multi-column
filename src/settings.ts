@@ -55,6 +55,10 @@ export interface ColumnsPluginSettings {
 	minColumnWidthPercent: number;
 	showDragHandles: boolean;
 	columnControlsPosition: ColumnControlsPosition;
+	/** Insert items (columns, layouts, MOC) in the editor's right-click menu. */
+	showInEditorMenu: boolean;
+	/** Right-click menu items left out while the menu items are shown (EDITOR_MENU_ITEMS ids). */
+	hiddenEditorMenuItems: string[];
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
 	foldNotePropertiesByDefault: boolean;
@@ -86,6 +90,8 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	minColumnWidthPercent: 10,
 	showDragHandles: true,
 	columnControlsPosition: "side",
+	showInEditorMenu: true,
+	hiddenEditorMenuItems: [],
 	enableLivePreview: true,
 	enableReadingView: true,
 	foldNotePropertiesByDefault: false,
@@ -111,6 +117,18 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 };
 
 // ── Option maps ──────────────────────────────────────────────────────
+
+/**
+ * Items the plugin adds to the editor's right-click menu. The column items
+ * use the ids of their layouts (see LAYOUT_TEMPLATES).
+ */
+export const EDITOR_MENU_ITEMS: ReadonlyArray<{id: string; name: string}> = [
+	{id: "insert-2-columns", name: "Insert 2 columns"},
+	{id: "insert-3-columns", name: "Insert 3 columns"},
+	{id: "insert-4-columns", name: "Insert 4 columns"},
+	{id: "insert-layout", name: "Insert layout"},
+	{id: "insert-moc", name: "Insert MOC"},
+];
 
 export const COLUMN_CONTROLS_OPTIONS: Record<ColumnControlsPosition, string> = {
 	side: "Beside the column",
