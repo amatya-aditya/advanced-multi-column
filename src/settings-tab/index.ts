@@ -46,7 +46,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 					{
 						type: "page",
 						name: "Display",
-						desc: "Where columns are rendered, and note properties.",
+						desc: "Where columns are rendered, column controls and note properties.",
 						displayValue: displayView,
 						items: [
 							{
@@ -55,6 +55,14 @@ export class ColumnsSettingTab extends PluginSettingTab {
 									{name: "Enable in live preview", desc: "Render columns in live preview (editing) mode.", control: {type: "toggle", key: "enableLivePreview"}},
 									{name: "Enable in reading view", desc: "Render columns in reading (preview) mode.", control: {type: "toggle", key: "enableReadingView"}},
 									{name: "Fold note properties by default", desc: "Collapse the properties section when a note is opened, including new notes.", control: {type: "toggle", key: "foldNotePropertiesByDefault"}},
+								],
+							},
+							{
+								type: "group",
+								heading: "Column controls",
+								items: [
+									{name: "Show drag handles", desc: "Show grip icons for drag-and-drop reordering.", control: {type: "toggle", key: "showDragHandles"}},
+									{name: "Column buttons", desc: "Where a column's add and remove buttons appear. Above the column keeps them away from the resize handle between columns.", control: {type: "dropdown", key: "columnControlsPosition", options: COLUMN_CONTROLS_OPTIONS}},
 								],
 							},
 						],
@@ -72,19 +80,6 @@ export class ColumnsSettingTab extends PluginSettingTab {
 									{name: "Minimum column width", desc: "Minimum width percentage for any column.", control: {type: "slider", key: "minColumnWidthPercent", min: 5, max: 30, step: 5, displayFormat: (v) => `${v}%`}},
 									{name: "Inherit style on add", desc: "New columns inherit the style of the column they are added after.", control: {type: "toggle", key: "inheritStyleOnAdd"}},
 								],
-							},
-						],
-					},
-					{
-						type: "page",
-						name: "Editing",
-						desc: "Drag handles and column buttons.",
-						items: [
-							{
-								type: "group",
-								items: [
-									{name: "Show drag handles", desc: "Show grip icons for drag-and-drop reordering.", control: {type: "toggle", key: "showDragHandles"}},
-									{name: "Column buttons", desc: "Where a column's add and remove buttons appear. Above the column keeps them away from the resize handle between columns.", control: {type: "dropdown", key: "columnControlsPosition", options: COLUMN_CONTROLS_OPTIONS}},								],
 							},
 						],
 					},
