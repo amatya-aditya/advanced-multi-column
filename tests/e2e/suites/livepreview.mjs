@@ -4,7 +4,41 @@ import assert from "node:assert/strict";
 
 const leafEl = "app.workspace.getLeavesOfType('markdown')[0].view.containerEl";
 
+const viewExpr = "app.workspace.getLeavesOfType('markdown')[0].view";
+
+/** Text of the note editor's cursor line, or null while a column editor has the focus. */
+const noteCursorLine = (o) => o.ev(`(() => {
+	const v = ${viewExpr};
+	if (document.activeElement?.closest(".amc-embedded-editor")) return null;
+	return v.editor.getLine(v.editor.getCursor().line);
+})()`);
+
 export default [
+	{
+		name: "arrow keys move the cursor into and out of columns (#39)",
+		async run(o) {
+			await o.call("write", "ArrowCols.md", "Before line\n%% col-start %%\n%% col-break %%\nLeft one\nLeft two\n%% col-break %%\nRight\n%% col-end %%\nAfter line\n");
+			await o.call("layout", "ArrowCols.md");
+			await o.sleep(1200);
+			await o.ev(`(() => { const e = ${viewExpr}.editor; e.focus(); e.setCursor({line: 0, ch: 11}); return true; })()`);
+			const step = async (key) => { await o.key(key); await o.sleep(500); };
+
+			await step("ArrowDown");
+			assert.equal(await o.ev(`document.activeElement?.closest(".column-item")?.getAttribute("data-amc-edit-key")`), "c0", "Arrow Down did not open the first column");
+			await o.type("<");
+			await step("ArrowDown");
+			await step("ArrowDown");
+			assert.equal(await noteCursorLine(o), "After line", "Arrow Down on the column's last line did not leave it");
+
+			await step("ArrowUp");
+			assert.equal(await o.ev(`document.activeElement?.closest(".column-item")?.getAttribute("data-amc-edit-key")`), "c1", "Arrow Up did not open the last column");
+			await o.type(">");
+			await step("ArrowUp");
+			assert.equal(await noteCursorLine(o), "Before line", "Arrow Up on the column's first line did not leave it");
+			const text = await o.ev(`${viewExpr}.editor.getValue()`);
+			assert.ok(text.includes("\n<Left one\n") && text.includes("\nRight>\n"), text);
+		},
+	},
 	{
 		name: "shows footnote definitions written in columns",
 		async run(o) {

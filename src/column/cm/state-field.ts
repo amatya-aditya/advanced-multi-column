@@ -220,6 +220,17 @@ const atomicColumns = EditorView.atomicRanges.of(
 	(view) => view.state.field(columnDecorationField, false) ?? Decoration.none,
 );
 
+/** Document ranges of the column blocks rendered in live preview, in order. */
+export function columnBlocks(state: EditorState): {from: number; to: number}[] {
+	const blocks: {from: number; to: number}[] = [];
+	const cursor = (state.field(columnDecorationField, false) ?? Decoration.none).iter();
+	while (cursor.value) {
+		blocks.push({from: cursor.from, to: cursor.to});
+		cursor.next();
+	}
+	return blocks;
+}
+
 /** Rebuild all column widgets in the given editors (e.g. after a settings change). */
 export function refreshColumnWidgets(views: Iterable<EditorView>): void {
 	renderGeneration++;

@@ -161,6 +161,21 @@ export interface EmbeddedEditorOptions {
 	onPaste?: (e: ClipboardEvent, editor: InternalMarkdownEditor) => boolean;
 	/** Highest-precedence Tab handler. Return true when handled. */
 	onTab?: (shift: boolean) => boolean;
+	/** Arrow Up on the first line (-1) or Down on the last line (1). */
+	onArrowExit?: (dir: 1 | -1) => void;
+}
+
+/**
+ * Whether the cursor is on the editor's first (-1) or last (1) visual line,
+ * so an arrow key would leave it. Not while a suggestion list is open: the
+ * arrow keys move through it.
+ */
+function atEditorEdge(view: EditorView, dir: 1 | -1): boolean {
+	const sel = view.state.selection.main;
+	if (!sel.empty) return false;
+	if (view.dom.doc.querySelector(".suggestion-container")) return false;
+	const edge = view.moveToLineBoundary(sel, dir === 1, true).head;
+	return dir === 1 ? edge === view.state.doc.length : edge === 0;
 }
 
 export interface EmbeddedEditorHandle {
@@ -270,6 +285,19 @@ export function createEmbeddedEditor(
 					run: () => options.onTab!(false),
 					shift: () => options.onTab!(true),
 				});
+			}
+			const onArrowExit = options.onArrowExit;
+			if (onArrowExit) {
+				for (const [key, dir] of [["ArrowUp", -1], ["ArrowDown", 1]] as const) {
+					keys.push({
+						key,
+						run: (view) => {
+							if (!atEditorEdge(view, dir)) return false;
+							onArrowExit(dir);
+							return true;
+						},
+					});
+				}
 			}
 			extensions.push(Prec.highest(keymap.of(keys)));
 

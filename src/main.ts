@@ -5,6 +5,7 @@ import {ColumnsSettingTab, MOC_PAGE_NAME} from "./settings-tab";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
+import {columnKeyboardNav} from "./column/cm/keyboard-nav";
 import {registerColumnEditFlush} from "./column/editor/edit-flush";
 import {installMarkdownViewHooks} from "./column/view-hooks";
 import {buildRuntimeStyles, RuntimeStyleSheets} from "./column/runtime-styles";
@@ -55,7 +56,7 @@ export default class ColumnsPlugin extends Plugin {
 		setPluginInstance(this);
 
 		// CM6 extension for Live Preview
-		this.registerEditorExtension(columnDecorations);
+		this.registerEditorExtension([columnDecorations, columnKeyboardNav]);
 		installMarkdownViewHooks(this);
 		registerColumnEditFlush(this);
 

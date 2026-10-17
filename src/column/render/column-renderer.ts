@@ -16,6 +16,7 @@ import type {ColumnContextActions, ContainerPath, MenuEdits} from "../core/widge
 import {isInteractivePreviewTarget} from "../core/widget-types";
 import {getInteractionState} from "../editor/interaction-state";
 import {refreshRegionPosition} from "../core/region-position";
+import {leaveColumnBlock} from "../cm/keyboard-nav";
 import {buildResizeHandle} from "./column-resizer";
 import {applyNoteFootnotes, livePreviewFootnotes, renderLiveFootnoteDefinitions, wireLivePreviewFootnotes} from "./footnote-render";
 import {extractFootnoteDefinitions} from "../core/footnotes";
@@ -1486,6 +1487,10 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 								// Columns holding nested blocks have no single editor.
 								if (findColumnRegions(nextCol.content).length > 0) return null;
 								return {key: editKey([], next), value: nextCol.content};
+							},
+							onArrowExit: (dir) => {
+								refreshRegionPosition(ctx.region);
+								leaveColumnBlock(ctx.view, ctx.region.from, dir);
 							},
 						});
 					} else {
