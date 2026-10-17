@@ -4,6 +4,24 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [2.6.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.6.0) - 2026-10-17
+
+### Added
+- Live Preview: move into and out of columns with the arrow keys ([#39](https://github.com/amatya-aditya/advanced-multi-column/issues/39)). **Arrow Down** on the line above a column block opens its first column, and **Arrow Up** on the line below opens its last. In a column, **Arrow Up** on the first line or **Arrow Down** on the last line saves the column and returns to the note. Before, the cursor jumped over the whole block.
+- MOC: choose notes with any number of folder, tag and property rules, each joined to the rules above it with **And** or **Or** ([#43](https://github.com/amatya-aditya/advanced-multi-column/issues/43)). Rules are checked from top to bottom: `Folder A`, `Or Folder B`, `And #project` lists notes in A or B that have #project. With **Group by subfolder**, each note is grouped under the folder rule that contains it.
+- Settings → Display → **Column buttons**: show a column's add and remove buttons above the column, away from the resize handle between columns ([#40](https://github.com/amatya-aditya/advanced-multi-column/issues/40)). The default stays beside the column.
+- Settings → Display → **Right-click menu**: turn off all of the plugin's items in the editor's right-click menu, or only some of them (**Insert 2 / 3 / 4 columns**, **Insert layout**, **Insert MOC**) ([#44](https://github.com/amatya-aditya/advanced-multi-column/issues/44)). Everything stays in the command palette.
+
+### Changed
+- MOC: **Notes must match** (every source / any source) is replaced by the And / Or on each rule. Existing MOC templates are converted automatically and keep listing the same notes.
+- Settings: the **Editing** page is gone. **Show drag handles** and **Column buttons** are under **Display → Column controls**.
+- Settings: **Enable slash suggest** is removed ([#42](https://github.com/amatya-aditya/advanced-multi-column/issues/42)). It had no effect: slash commands in columns come from Obsidian's core **Slash commands** plugin, as in the rest of the note.
+
+### Fixed
+- Resizing columns by dragging the handle between them works with a finger on tablets and phones, such as an iPad. Before, only a mouse could resize.
+- Phones: editing a column no longer adds a large empty space above its text ([#41](https://github.com/amatya-aditya/advanced-multi-column/issues/41)).
+- Reading view: `%% col-break %%` and `%% col-end %%` no longer show at the top of the note when a column contains an HTML block such as `<center>` followed by a blank line ([#38](https://github.com/amatya-aditya/advanced-multi-column/issues/38)).
+
 ## [2.5.2](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.5.2) - 2026-10-13
 
 ### Changed
