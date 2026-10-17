@@ -4,7 +4,165 @@ import assert from "node:assert/strict";
 
 const leafEl = "app.workspace.getLeavesOfType('markdown')[0].view.containerEl";
 
+const viewExpr = "app.workspace.getLeavesOfType('markdown')[0].view";
+
+/** Text of the note editor's cursor line, or null while a column editor has the focus. */
+const noteCursorLine = (o) => o.ev(`(() => {
+	const v = ${viewExpr};
+	if (document.activeElement?.closest(".amc-embedded-editor")) return null;
+	return v.editor.getLine(v.editor.getCursor().line);
+})()`);
+
+/**
+ * Drag the resize handle between a two-column block's columns by `dx` with the
+ * mouse or a finger, and return the left column's width saved in the note.
+ */
+async function dragResize(o, input, dx) {
+	await o.call("write", `Resize-${input}.md`, "%% col-start %%\n%% col-break %%\nLeft\n%% col-break %%\nRight\n%% col-end %%\n");
+	await o.call("layout", `Resize-${input}.md`);
+	await o.sleep(1200);
+	const h = await o.ev(`(() => { const r = ${leafEl}.querySelector(".columns-container > .column-resize-handle").getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2)}; })()`);
+	const steps = [1, 2, 3, 4].map((i) => ({x: h.x + Math.round((dx * i) / 4), y: h.y}));
+	if (input === "touch") {
+		await o.send("Emulation.setTouchEmulationEnabled", {enabled: true, maxTouchPoints: 5});
+		try {
+			await o.send("Input.dispatchTouchEvent", {type: "touchStart", touchPoints: [h]});
+			for (const p of steps) {
+				await o.sleep(30);
+				await o.send("Input.dispatchTouchEvent", {type: "touchMove", touchPoints: [p]});
+			}
+			await o.send("Input.dispatchTouchEvent", {type: "touchEnd", touchPoints: []});
+		} finally {
+			await o.send("Emulation.setTouchEmulationEnabled", {enabled: false});
+		}
+	} else {
+		await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", ...h});
+		await o.send("Input.dispatchMouseEvent", {type: "mousePressed", ...h, button: "left", clickCount: 1});
+		for (const p of steps) {
+			await o.sleep(30);
+			await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", ...p, button: "left", buttons: 1});
+		}
+		await o.send("Input.dispatchMouseEvent", {type: "mouseReleased", ...steps[3], button: "left", clickCount: 1});
+	}
+	await o.sleep(800);
+	const text = await o.ev(`${viewExpr}.editor.getValue()`);
+	return Number(/%% col-break:(\d+)/.exec(text)?.[1] ?? 0);
+}
+
 export default [
+	{
+		name: "the right-click menu items can be turned off (#44)",
+		async run(o) {
+			const setMenu = (on) => o.ev(`(async () => { const p = app.plugins.plugins["advanced-multi-column"]; p.settings.showInEditorMenu = ${on}; await p.saveSettings(); return true; })()`);
+			const menuTitles = async () => {
+				await o.call("layout", "Plain.md");
+				const pt = await o.ev(`(() => { const l = [...${leafEl}.querySelectorAll(".cm-line")].find((e) => e.textContent.includes("A note without columns")); const r = l.getBoundingClientRect(); return {x: Math.round(r.left + 20), y: Math.round(r.top + r.height / 2)}; })()`);
+				await o.send("Input.dispatchMouseEvent", {type: "mousePressed", ...pt, button: "right", clickCount: 1});
+				await o.send("Input.dispatchMouseEvent", {type: "mouseReleased", ...pt, button: "right", clickCount: 1});
+				await o.sleep(500);
+				const titles = await o.ev(`[...document.querySelectorAll(".menu .menu-item-title")].map((t) => t.textContent)`);
+				await o.key("Escape");
+				await o.sleep(200);
+				return titles;
+			};
+			const ours = (titles) => titles.filter((t) => /^Insert (\d columns|layout|MOC)$/.test(t));
+			/** Click the toggle of a row on the plugin's Display settings page. */
+			const clickSettingToggle = (name) => o.ev(`(async () => {
+				app.setting.open();
+				await new Promise((r) => setTimeout(r, 500));
+				app.setting.openPagePath("advanced-multi-column", ["Display"]);
+				await new Promise((r) => setTimeout(r, 800));
+				// The settings page can be in a popout window: search the tab's own document.
+				const row = [...app.setting.activeTab.containerEl.ownerDocument.querySelectorAll(".setting-item")].find((s) => s.querySelector(".setting-item-name")?.textContent === ${JSON.stringify(name)});
+				row.querySelector(".checkbox-container").click();
+				await new Promise((r) => setTimeout(r, 300));
+				app.setting.close();
+				return true;
+			})()`);
+			try {
+				const on = await menuTitles();
+				assert.deepEqual(ours(on), ["Insert 2 columns", "Insert 3 columns", "Insert 4 columns", "Insert layout", "Insert MOC"]);
+
+				// Single items, switched off in settings.
+				await clickSettingToggle("Insert 3 columns");
+				await clickSettingToggle("Insert MOC");
+				assert.deepEqual(await o.ev(`app.plugins.plugins["advanced-multi-column"].settings.hiddenEditorMenuItems`), ["insert-3-columns", "insert-moc"]);
+				assert.deepEqual(ours(await menuTitles()), ["Insert 2 columns", "Insert 4 columns", "Insert layout"]);
+
+				await setMenu(false);
+				const off = await menuTitles();
+				assert.ok(off.length > 0, "no right-click menu opened");
+				assert.deepEqual(ours(off), []);
+			} finally {
+				await o.ev(`(async () => { const p = app.plugins.plugins["advanced-multi-column"]; p.settings.hiddenEditorMenuItems = []; await p.saveSettings(); return true; })()`);
+				await setMenu(true);
+			}
+		},
+	},
+	{
+		name: "dragging the resize handle with the mouse resizes the columns",
+		async run(o) {
+			const left = await dragResize(o, "mouse", 120);
+			assert.ok(left > 55, `left column width after dragging right: ${left}`);
+		},
+	},
+	{
+		// Touch screens (iPad) send no mouse events for a drag.
+		name: "dragging the resize handle with a finger resizes the columns",
+		async run(o) {
+			const left = await dragResize(o, "touch", 120);
+			assert.ok(left > 55, `left column width after dragging right: ${left}`);
+		},
+	},
+	{
+		name: "arrow keys move the cursor into and out of columns (#39)",
+		async run(o) {
+			await o.call("write", "ArrowCols.md", "Before line\n%% col-start %%\n%% col-break %%\nLeft one\nLeft two\n%% col-break %%\nRight\n%% col-end %%\nAfter line\n");
+			await o.call("layout", "ArrowCols.md");
+			await o.sleep(1200);
+			await o.ev(`(() => { const e = ${viewExpr}.editor; e.focus(); e.setCursor({line: 0, ch: 11}); return true; })()`);
+			const step = async (key) => { await o.key(key); await o.sleep(500); };
+
+			await step("ArrowDown");
+			assert.equal(await o.ev(`document.activeElement?.closest(".column-item")?.getAttribute("data-amc-edit-key")`), "c0", "Arrow Down did not open the first column");
+			await o.type("<");
+			await step("ArrowDown");
+			await step("ArrowDown");
+			assert.equal(await noteCursorLine(o), "After line", "Arrow Down on the column's last line did not leave it");
+
+			await step("ArrowUp");
+			assert.equal(await o.ev(`document.activeElement?.closest(".column-item")?.getAttribute("data-amc-edit-key")`), "c1", "Arrow Up did not open the last column");
+			await o.type(">");
+			await step("ArrowUp");
+			assert.equal(await noteCursorLine(o), "Before line", "Arrow Up on the column's first line did not leave it");
+			const text = await o.ev(`${viewExpr}.editor.getValue()`);
+			assert.ok(text.includes("\n<Left one\n") && text.includes("\nRight>\n"), text);
+		},
+	},
+	{
+		name: "column buttons can be placed above the column, away from the resize handle (#40)",
+		async run(o) {
+			const setPos = (pos) => o.ev(`(async () => { const p = app.plugins.plugins["advanced-multi-column"]; p.settings.columnControlsPosition = ${JSON.stringify(pos)}; await p.saveSettings(); return true; })()`);
+			await o.call("layout", "C2.md");
+			await o.sleep(1200);
+			await setPos("top");
+			try {
+				const pt = await o.ev(`(() => { const c = ${leafEl}.querySelector(".amc-columns-host .column-item"); const r = c.getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2)}; })()`);
+				await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", x: pt.x, y: pt.y});
+				await o.sleep(400);
+				const rects = await o.ev(`(() => {
+					const c = ${leafEl}.querySelector(".amc-columns-host .column-item");
+					const b = c.querySelector(".column-remove-btn").getBoundingClientRect(), r = c.getBoundingClientRect();
+					return {btnTop: b.top, btnRight: b.right, colTop: r.top, colRight: r.right, shown: getComputedStyle(c.querySelector(".column-toolbar")).opacity};
+				})()`);
+				assert.equal(rects.shown, "1");
+				assert.ok(rects.btnTop < rects.colTop, `remove button not above the column: ${JSON.stringify(rects)}`);
+				assert.ok(rects.colRight - rects.btnRight >= 10, `remove button too close to the column's edge: ${JSON.stringify(rects)}`);
+			} finally {
+				await setPos("side");
+			}
+		},
+	},
 	{
 		name: "shows footnote definitions written in columns",
 		async run(o) {

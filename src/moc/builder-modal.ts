@@ -7,8 +7,7 @@ import {createMocTemplate, MocTemplate, newMocTemplateId} from "./types";
 function cloneTemplate(template: MocTemplate): MocTemplate {
 	return {
 		...template,
-		tags: [...template.tags],
-		properties: template.properties.map((p) => ({...p})),
+		rules: template.rules.map((r) => ({...r})),
 		assignments: {...template.assignments},
 		hiddenGroups: [...template.hiddenGroups],
 	};

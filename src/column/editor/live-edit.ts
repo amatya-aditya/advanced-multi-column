@@ -71,6 +71,8 @@ export interface LiveEditConfig {
 	editState: LiveEditState;
 	/** Tab outside a list moves to the sibling editor this returns. */
 	onNavigate?: (dir: 1 | -1) => LiveEditNavigationTarget | null;
+	/** Arrow keys left the column's first (-1) or last (1) line; it is committed first. */
+	onArrowExit?: (dir: 1 | -1) => void;
 }
 
 export interface LiveEditHandle {
@@ -81,6 +83,9 @@ export const EDIT_KEY_ATTR = "data-amc-edit-key";
 /** Asks an open column editor to commit and close. */
 export const FORCE_COMMIT_EVENT = "amc-force-commit";
 const RESTORE_EVENT = "amc-restore-edit";
+/** Opens a column's editor from the keyboard; `detail` is where the cursor goes. */
+export const ENTER_EDIT_EVENT = "amc-enter-edit";
+export type EnterEditAt = "start" | "end";
 
 function matchesEditState(
 	st: ActiveEditState | null,
@@ -333,6 +338,12 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			onBlur: () => scheduleBlurCommit(),
 			onChange: trackChange,
 			onPaste: handleEditorImagePaste,
+			onArrowExit: config.onArrowExit
+				? (dir) => {
+					commitAndClose();
+					config.onArrowExit?.(dir);
+				}
+				: undefined,
 			onTab: config.onNavigate
 				? (shift) => {
 					const current = active;
@@ -430,6 +441,11 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 	// Force-commit: triggered by another editor opening in the same container.
 	config.hostEl.addEventListener(FORCE_COMMIT_EVENT, () => commitAndClose());
 	config.hostEl.addEventListener(RESTORE_EVENT, () => restorePending());
+	config.hostEl.addEventListener(ENTER_EDIT_EVENT, (e) => {
+		const value = config.getContent();
+		const at = (e as CustomEvent<EnterEditAt>).detail === "end" ? value.length : 0;
+		enterEdit({value, cursorStart: at, cursorEnd: at, focus: true});
+	});
 
 	// Re-open an editor that was open when the widget was rebuilt. Claim the
 	// state now (synchronously, inside the rebuild) and open it once the new

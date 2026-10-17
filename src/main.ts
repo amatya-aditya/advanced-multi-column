@@ -1,10 +1,11 @@
 import {App, Editor, MarkdownFileInfo, MarkdownView, Menu, MenuItem, Notice, Plugin, SuggestModal, TFile} from "obsidian";
 import type {EditorView} from "@codemirror/view";
-import {ColumnsPluginSettings, DEFAULT_SETTINGS} from "./settings";
+import {ColumnsPluginSettings, DEFAULT_SETTINGS, EDITOR_MENU_ITEMS} from "./settings";
 import {ColumnsSettingTab, MOC_PAGE_NAME} from "./settings-tab";
 import {setPluginInstance} from "./column/core/plugin-ref";
 import {registerReadingView} from "./column/reading-view";
 import {columnDecorations, refreshColumnWidgets} from "./column/cm/state-field";
+import {columnKeyboardNav} from "./column/cm/keyboard-nav";
 import {registerColumnEditFlush} from "./column/editor/edit-flush";
 import {installMarkdownViewHooks} from "./column/view-hooks";
 import {buildRuntimeStyles, RuntimeStyleSheets} from "./column/runtime-styles";
@@ -55,7 +56,7 @@ export default class ColumnsPlugin extends Plugin {
 		setPluginInstance(this);
 
 		// CM6 extension for Live Preview
-		this.registerEditorExtension(columnDecorations);
+		this.registerEditorExtension([columnDecorations, columnKeyboardNav]);
 		installMarkdownViewHooks(this);
 		registerColumnEditFlush(this);
 
@@ -108,7 +109,10 @@ export default class ColumnsPlugin extends Plugin {
 		// ── Editor context menu ──────────────────────────────────
 		this.registerEvent(
 			this.app.workspace.on("editor-menu", (menu: Menu, editor: Editor, info: MarkdownView | MarkdownFileInfo) => {
-				for (const layout of LAYOUT_TEMPLATES.filter((l) => l.quick)) {
+				// Everything below is also in the command palette.
+				if (!this.settings.showInEditorMenu) return;
+				const shown = (id: string) => !this.settings.hiddenEditorMenuItems.includes(id);
+				for (const layout of LAYOUT_TEMPLATES.filter((l) => l.quick && shown(l.id))) {
 					menu.addItem((item) =>
 						item
 							.setSection("insert")
@@ -117,20 +121,22 @@ export default class ColumnsPlugin extends Plugin {
 							.onClick(() => this.insertLayout(editor, layout)),
 					);
 				}
-				menu.addItem((item) => {
-					item
-						.setSection("insert")
-						.setTitle("Insert layout")
-						.setIcon("layout-grid");
-					const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
-					for (const layout of LAYOUT_TEMPLATES.filter((l) => !l.quick)) {
-						sub.addItem((s: MenuItem) => s
-							.setTitle(layout.menuTitle)
-							.setIcon(layout.icon)
-							.onClick(() => this.insertLayout(editor, layout)));
-					}
-				});
-				if (!this.settings.enableMoc) return;
+				if (shown("insert-layout")) {
+					menu.addItem((item) => {
+						item
+							.setSection("insert")
+							.setTitle("Insert layout")
+							.setIcon("layout-grid");
+						const sub = (item as MenuItem & {setSubmenu: () => Menu}).setSubmenu();
+						for (const layout of LAYOUT_TEMPLATES.filter((l) => !l.quick)) {
+							sub.addItem((s: MenuItem) => s
+								.setTitle(layout.menuTitle)
+								.setIcon(layout.icon)
+								.onClick(() => this.insertLayout(editor, layout)));
+						}
+					});
+				}
+				if (!this.settings.enableMoc || !shown("insert-moc")) return;
 				menu.addItem((item) => {
 					item
 						.setSection("insert")
@@ -248,12 +254,21 @@ export default class ColumnsPlugin extends Plugin {
 		s.minColumnWidthPercent = Math.max(5, Math.min(30, s.minColumnWidthPercent));
 		// Type-check boolean fields
 		if (typeof s.showDragHandles !== "boolean") s.showDragHandles = DEFAULT_SETTINGS.showDragHandles;
+		if (typeof s.showInEditorMenu !== "boolean") s.showInEditorMenu = DEFAULT_SETTINGS.showInEditorMenu;
+		const rawHidden: unknown = s.hiddenEditorMenuItems;
+		s.hiddenEditorMenuItems = Array.isArray(rawHidden)
+			? rawHidden.filter((id): id is string => EDITOR_MENU_ITEMS.some((item) => item.id === id))
+			: [];
+		if (s.columnControlsPosition !== "side" && s.columnControlsPosition !== "top") {
+			s.columnControlsPosition = DEFAULT_SETTINGS.columnControlsPosition;
+		}
 		if (typeof s.enableLivePreview !== "boolean") s.enableLivePreview = DEFAULT_SETTINGS.enableLivePreview;
 		if (typeof s.enableReadingView !== "boolean") s.enableReadingView = DEFAULT_SETTINGS.enableReadingView;
 		if (typeof s.foldNotePropertiesByDefault !== "boolean") {
 			s.foldNotePropertiesByDefault = DEFAULT_SETTINGS.foldNotePropertiesByDefault;
 		}
-		if (typeof s.enableSlashSuggest !== "boolean") s.enableSlashSuggest = DEFAULT_SETTINGS.enableSlashSuggest;
+		// Removed setting: slash commands in columns come from the core Slash commands plugin.
+		delete (s as {enableSlashSuggest?: unknown}).enableSlashSuggest;
 		if (typeof s.inheritStyleOnAdd !== "boolean") s.inheritStyleOnAdd = DEFAULT_SETTINGS.inheritStyleOnAdd;
 		if (typeof s.showContainerBorder !== "boolean") s.showContainerBorder = DEFAULT_SETTINGS.showContainerBorder;
 		if (typeof s.enableMoc !== "boolean") s.enableMoc = DEFAULT_SETTINGS.enableMoc;
@@ -287,7 +302,7 @@ export default class ColumnsPlugin extends Plugin {
 	/** Settings that are baked into rendered live preview widgets (not CSS). */
 	private liveRenderFingerprint(): string {
 		const s = this.settings;
-		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes, s.enableSlashSuggest]);
+		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes]);
 	}
 
 	/** Re-render live preview columns so rendering settings take effect. */

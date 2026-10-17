@@ -1,15 +1,16 @@
-import {App, Component, debounce, DropdownComponent, ExtraButtonComponent, Setting, SettingGroup} from "obsidian";
+import {App, ButtonComponent, Component, debounce, DropdownComponent, ExtraButtonComponent, Setting, SettingGroup} from "obsidian";
 import type ColumnsPlugin from "../main";
 import {findColumnRegions} from "../column/core/parser";
 import {renderColumnsRegion} from "../column/reading-view";
-import {FolderSuggest, ListSuggest, renderChips, VaultVocabulary} from "./form-pickers";
-import {collectMocGroups, resolveMocFolder, visibleMocGroups} from "./query";
+import {FolderSuggest, ListSuggest, VaultVocabulary} from "./form-pickers";
+import {collectMocGroups, hasRelativeFolder, resolvedFolders, visibleMocGroups} from "./query";
 import {generateMocBlock, mocColumnCount} from "./generate";
 import {
 	MAX_MOC_COLUMNS,
 	MocFolderMode,
 	MocGroupBy,
-	MocMatch,
+	MocRule,
+	MocRuleOp,
 	MocSort,
 	MocTemplate,
 } from "./types";
@@ -20,7 +21,17 @@ const FOLDER_MODE_OPTIONS: Record<MocFolderMode, string> = {
 	note: "This note's folder",
 	parent: "Parent of this note's folder",
 	fixed: "A specific folder",
-	none: "Any folder",
+};
+
+const OP_OPTIONS: Record<MocRuleOp, string> = {
+	and: "And",
+	or: "Or",
+};
+
+const RULE_NAMES: Record<MocRule["type"], string> = {
+	folder: "Folder",
+	tag: "Tag",
+	property: "Property",
 };
 
 const GROUP_BY_OPTIONS: Record<MocGroupBy, string> = {
@@ -43,11 +54,6 @@ const REVERSE_SORT_DESC: Record<MocSort, string> = {
 	created: "Off: newest first. On: oldest first.",
 };
 
-const MATCH_OPTIONS: Record<MocMatch, string> = {
-	all: "Every source",
-	any: "Any source",
-};
-
 /** Sections of the form, shown one at a time. */
 type MocFormTab = "sources" | "groups" | "list";
 
@@ -57,20 +63,28 @@ const TABS: Array<{id: MocFormTab; label: string; summary: (t: MocTemplate) => s
 	{id: "list", label: "List", summary: summarizeList},
 ];
 
-/** Number of separate conditions a note is checked against. */
-function sourceCount(template: MocTemplate): number {
-	return (template.folderMode === "none" ? 0 : 1) + template.tags.length
-		+ template.properties.filter((p) => p.key.trim()).length;
+function summarizeSources(template: MocTemplate): string {
+	const count = (type: MocRule["type"]) => template.rules.filter((r) => r.type === type).length;
+	const parts: string[] = [];
+	const folders = count("folder"), tags = count("tag"), props = count("property");
+	if (folders > 0) parts.push(`${folders} folder${folders === 1 ? "" : "s"}`);
+	if (tags > 0) parts.push(`${tags} tag${tags === 1 ? "" : "s"}`);
+	if (props > 0) parts.push(`${props} propert${props === 1 ? "y" : "ies"}`);
+	return parts.length > 0 ? parts.join(", ") : "Nothing selected";
 }
 
-function summarizeSources(template: MocTemplate): string {
-	const parts: string[] = [];
-	if (template.folderMode === "fixed") parts.push(template.folder.trim() || "No folder yet");
-	else if (template.folderMode !== "none") parts.push(template.folderMode === "note" ? "This folder" : "Parent folder");
-	if (template.tags.length > 0) parts.push(`${template.tags.length} tag${template.tags.length === 1 ? "" : "s"}`);
-	const props = template.properties.length;
-	if (props > 0) parts.push(`${props} propert${props === 1 ? "y" : "ies"}`);
-	return parts.length > 0 ? parts.join(" + ") : "Nothing selected";
+/** What a rule selects, for summaries. */
+function describeRule(rule: MocRule): string {
+	switch (rule.type) {
+		case "folder": {
+			const where = rule.mode === "fixed" ? rule.folder.trim() || "/" : FOLDER_MODE_OPTIONS[rule.mode];
+			return `${where}${rule.includeSubfolders ? " (with subfolders)" : ""}`;
+		}
+		case "tag":
+			return `#${rule.tag.replace(/^#/, "")}`;
+		case "property":
+			return rule.value ? `${rule.key}: ${rule.value}` : rule.key;
+	}
 }
 
 function summarizeGroups(template: MocTemplate): string {
@@ -212,145 +226,143 @@ export class MocForm extends Component {
 	// ── Sources ──
 
 	private renderSources(body: HTMLElement, change: () => Promise<void>, changeAndRerender: () => Promise<void>): void {
-		const {app, template} = this.opts;
-		new Setting(body)
-			.setName("Folder")
-			.setDesc(template.folderMode === "note" || template.folderMode === "parent"
-				? "Resolved from the note the MOC is in, so the same MOC works in any folder."
-				: "")
-			.addDropdown((dd) => dd
-				.addOptions(FOLDER_MODE_OPTIONS)
-				.setValue(template.folderMode)
-				.onChange(async (value) => {
-					template.folderMode = value as MocFolderMode;
-					await changeAndRerender();
-				}));
-		if (template.folderMode === "fixed") {
+		const {template} = this.opts;
+		if (template.rules.length === 0) {
 			new Setting(body)
-				.setName("Folder path")
-				.setDesc("Use / for the whole vault.")
-				.addText((text) => {
-					text.setPlaceholder("Projects").setValue(template.folder);
-					new FolderSuggest(app, text.inputEl, (folder) => {
-						template.folder = folder.path;
+				.setName("No rules yet")
+				.setDesc("Add a folder, tag or property below to choose the notes this MOC lists.");
+		}
+		template.rules.forEach((rule, index) => this.renderRule(body, rule, index, change, changeAndRerender));
+
+		const add = (rule: MocRule) => {
+			// A rule of the same kind as the one above it usually widens the list
+			// (another folder or tag); a different kind usually narrows it.
+			const above = template.rules[template.rules.length - 1];
+			rule.op = above?.type === rule.type ? "or" : "and";
+			template.rules.push(rule);
+			void changeAndRerender();
+		};
+		const addSetting = new Setting(body)
+			.setName("Add rule")
+			.setDesc("Rules are checked from top to bottom. And: the note must also match the rule. Or: the note may match the rule instead.");
+		const addButton = (label: string, rule: () => MocRule) => addSetting.addButton((btn: ButtonComponent) => btn
+			.setButtonText(label)
+			.onClick(() => add(rule())));
+		addButton("Folder", () => ({type: "folder", op: "and", mode: "fixed", folder: "", includeSubfolders: true}));
+		addButton("Tag", () => ({type: "tag", op: "and", tag: ""}));
+		addButton("Property", () => ({type: "property", op: "and", key: "", value: ""}));
+	}
+
+	/** One rule: how it joins the rules above, what it matches, and a remove button. */
+	private renderRule(
+		body: HTMLElement,
+		rule: MocRule,
+		index: number,
+		change: () => Promise<void>,
+		changeAndRerender: () => Promise<void>,
+	): void {
+		const {app, template} = this.opts;
+		const setting = new Setting(body);
+		setting.settingEl.addClass("amc-moc-rule");
+		setting.nameEl.empty();
+		if (index > 0) {
+			new DropdownComponent(setting.nameEl.createSpan({cls: "amc-moc-rule-op"}))
+				.addOptions(OP_OPTIONS)
+				.setValue(rule.op)
+				.onChange(async (value) => {
+					rule.op = value as MocRuleOp;
+					await change();
+				});
+		}
+		setting.nameEl.createSpan({text: RULE_NAMES[rule.type]});
+
+		switch (rule.type) {
+			case "folder": {
+				// The toggle has no label of its own: the description says what it does.
+				const describe = () => setting.setDesc([
+					rule.includeSubfolders ? "Includes subfolders." : "Only notes directly in the folder.",
+					rule.mode === "fixed" ? "" : "Resolved from the note the MOC is in, so the same MOC works in any folder.",
+				].join(" ").trim());
+				describe();
+				setting.addDropdown((dd) => dd
+					.addOptions(FOLDER_MODE_OPTIONS)
+					.setValue(rule.mode)
+					.onChange(async (value) => {
+						rule.mode = value as MocFolderMode;
+						await changeAndRerender();
+					}));
+				if (rule.mode === "fixed") {
+					setting.addText((text) => {
+						text.setPlaceholder("Folder (/ for the vault)").setValue(rule.folder);
+						new FolderSuggest(app, text.inputEl, (folder) => {
+							rule.folder = folder.path;
+							void change();
+						});
+						text.onChange(async (value) => {
+							rule.folder = value;
+							await change();
+						});
+					});
+				}
+				setting.addToggle((toggle) => toggle
+					.setTooltip("Include subfolders")
+					.setValue(rule.includeSubfolders)
+					.onChange(async (value) => {
+						rule.includeSubfolders = value;
+						describe();
+						await change();
+					}));
+				break;
+			}
+			case "tag":
+				setting.setDesc("Also matches its subtags.");
+				setting.addText((text) => {
+					text.setPlaceholder("Tag").setValue(rule.tag);
+					new ListSuggest(app, text.inputEl, () => this.vocab.tags, (tag) => {
+						rule.tag = tag;
 						void change();
 					});
 					text.onChange(async (value) => {
-						template.folder = value;
+						rule.tag = value.trim().replace(/^#/, "");
 						await change();
 					});
 				});
-		}
-		if (template.folderMode !== "none") {
-			new Setting(body).setName("Include subfolders").addToggle((toggle) => toggle
-				.setValue(template.includeSubfolders)
-				.onChange(async (value) => {
-					template.includeSubfolders = value;
-					await change();
-				}));
-		}
-
-		this.renderTagPicker(body, changeAndRerender);
-		this.renderPropertyPicker(body, changeAndRerender);
-
-		// Only meaningful once there is more than one condition to combine.
-		if (sourceCount(template) > 1) {
-			new Setting(body)
-				.setName("Notes must match")
-				.setDesc("Whether a note needs every folder, tag and property above, or just one of them.")
-				.addDropdown((dd) => dd
-					.addOptions(MATCH_OPTIONS)
-					.setValue(template.match)
-					.onChange(async (value) => {
-						template.match = value as MocMatch;
+				break;
+			case "property": {
+				setting.setDesc("Leave the value empty to only require the property.");
+				setting.addText((text) => {
+					text.setPlaceholder("Property").setValue(rule.key);
+					new ListSuggest(app, text.inputEl, () => this.vocab.propertyKeys, (key) => {
+						rule.key = key;
+						void change();
+					});
+					text.onChange(async (value) => {
+						rule.key = value.trim();
 						await change();
-					}));
+					});
+				});
+				setting.addText((text) => {
+					text.setPlaceholder("Value (optional)").setValue(rule.value);
+					new ListSuggest(app, text.inputEl, () => this.vocab.propertyValues(rule.key.trim()), (value) => {
+						rule.value = value;
+						void change();
+					});
+					text.onChange(async (value) => {
+						rule.value = value.trim();
+						await change();
+					});
+				});
+				break;
+			}
 		}
-	}
 
-	private renderTagPicker(body: HTMLElement, onChange: () => Promise<void>): void {
-		const {app, template} = this.opts;
-		const setting = new Setting(body)
-			.setName("Tags")
-			.setDesc("Notes with these tags. A tag also matches its subtags.");
-		const add = async (raw: string) => {
-			const tag = raw.trim().replace(/^#/, "");
-			if (!tag || template.tags.includes(tag)) return;
-			template.tags.push(tag);
-			await onChange();
-		};
-		setting.addText((text) => {
-			text.setPlaceholder("Add a tag");
-			new ListSuggest(app, text.inputEl, () => this.vocab.tags.filter((t) => !template.tags.includes(t)),
-				(tag) => void add(tag));
-			text.inputEl.addEventListener("keydown", (evt) => {
-				if (evt.key !== "Enter") return;
-				evt.preventDefault();
-				void add(text.getValue());
-			});
-		});
-		if (template.tags.length > 0) {
-			renderChips(setting.descEl, template.tags.map((t) => `#${t}`), (index) => {
-				template.tags.splice(index, 1);
-				void onChange();
-			});
-		}
-	}
-
-	private renderPropertyPicker(body: HTMLElement, onChange: () => Promise<void>): void {
-		const {app, template} = this.opts;
-		const setting = new Setting(body)
-			.setName("Properties")
-			.setDesc("Notes whose property has this value. Leave the value empty to only require the property.");
-		setting.settingEl.addClass("amc-moc-property-picker");
-		let key = "";
-		let value = "";
-		let valueInput: HTMLInputElement | null = null;
-		const add = async () => {
-			const k = key.trim();
-			if (!k) return;
-			template.properties.push({key: k, value: value.trim()});
-			await onChange();
-		};
-		setting.addText((text) => {
-			text.setPlaceholder("Property");
-			new ListSuggest(app, text.inputEl, () => this.vocab.propertyKeys, (picked) => {
-				key = picked;
-				valueInput?.focus();
-			});
-			text.onChange((v) => {
-				key = v;
-			});
-		});
-		setting.addText((text) => {
-			valueInput = text.inputEl;
-			text.setPlaceholder("Value (optional)");
-			new ListSuggest(app, text.inputEl, () => this.vocab.propertyValues(key.trim()), (picked) => {
-				value = picked;
-			});
-			text.onChange((v) => {
-				value = v;
-			});
-			text.inputEl.addEventListener("keydown", (evt) => {
-				if (evt.key !== "Enter") return;
-				evt.preventDefault();
-				void add();
-			});
-		});
 		setting.addExtraButton((btn) => btn
-			.setIcon("plus")
-			.setTooltip("Add property")
-			.onClick(() => void add()));
-		if (template.properties.length > 0) {
-			renderChips(
-				setting.descEl,
-				template.properties.map((p) => (p.value ? `${p.key}: ${p.value}` : p.key)),
-				(index) => {
-					template.properties.splice(index, 1);
-					void onChange();
-				},
-			);
-		}
+			.setIcon("x")
+			.setTooltip("Remove rule")
+			.onClick(() => {
+				template.rules.splice(index, 1);
+				void changeAndRerender();
+			}));
 	}
 
 	// ── Groups ──
@@ -529,14 +541,14 @@ export class MocForm extends Component {
 		this.previewComponent = component;
 		el.empty();
 
-		const folder = resolveMocFolder(template, sourcePath);
-		const relative = template.folderMode === "note" || template.folderMode === "parent";
+		const relative = hasRelativeFolder(template);
 		if (relative && sourcePath === undefined) {
 			el.createDiv({cls: "amc-moc-preview-empty", text: "Open a note to preview a MOC relative to its folder."});
 			return;
 		}
 		const groups = visibleMocGroups(template, collectMocGroups(app, template, sourcePath, PREVIEW_LIMIT));
-		const where = relative ? ` Folder: ${folder === "" ? "/" : folder} (from ${sourcePath}).` : "";
+		const folders = resolvedFolders(template, sourcePath).map((f) => (f.folder === "" ? "/" : f.folder));
+		const where = relative ? ` Folders: ${folders.join(", ")} (from ${sourcePath}).` : "";
 		if (groups.length === 0) {
 			el.createDiv({cls: "amc-moc-preview-empty", text: `No notes match these sources.${where}`});
 			return;
@@ -558,16 +570,10 @@ function section(parent: HTMLElement): HTMLElement {
 	return new SettingGroup(parent).listEl;
 }
 
-/** One-line summary of a template's sources and layout. */
+/** One-line summary of a template's rules and layout. */
 export function describeMocTemplate(template: MocTemplate): string {
-	const sources: string[] = [];
-	if (template.folderMode === "fixed" && template.folder.trim()) {
-		sources.push(`${template.folder}${template.includeSubfolders ? " (with subfolders)" : ""}`);
-	} else if (template.folderMode === "note" || template.folderMode === "parent") {
-		sources.push(`${FOLDER_MODE_OPTIONS[template.folderMode]}${template.includeSubfolders ? " (with subfolders)" : ""}`);
-	}
-	if (template.tags.length > 0) sources.push(template.tags.map((t) => `#${t}`).join(" "));
-	if (template.properties.length > 0) sources.push(template.properties.map((p) => p.key).join(", "));
-	const what = sources.length > 0 ? sources.join(template.match === "all" ? " + " : " or ") : "No sources yet";
+	const what = template.rules.length > 0
+		? template.rules.map((rule, i) => (i === 0 ? "" : ` ${rule.op} `) + describeRule(rule)).join("")
+		: "No sources yet";
 	return `${what} · ${GROUP_BY_OPTIONS[template.groupBy]} · ${template.columns} column(s)`;
 }

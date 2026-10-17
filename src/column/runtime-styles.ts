@@ -166,6 +166,28 @@ export function buildRuntimeStyles(settings: ColumnsPluginSettings): string {
 `);
 	}
 
+	// On the column's top edge, away from the resize handle beside it. It
+	// overlaps the column (within its top padding, so no text is covered),
+	// which keeps the column hovered on the way to it.
+	if (settings.columnControlsPosition === "top") {
+		rules.push(`
+.columns-container .column-item > .column-toolbar {
+	top: 0;
+	right: 12px;
+	transform: translateY(-60%);
+	flex-direction: row;
+	padding: 1px 4px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s, 4px);
+}
+
+.columns-container .column-item > .column-toolbar > .column-toolbar-actions {
+	flex-direction: row;
+}
+`);
+	}
+
 	if (settings.foldNotePropertiesByDefault) {
 		rules.push(`
 .workspace-leaf-content[data-type="markdown"] .metadata-container {

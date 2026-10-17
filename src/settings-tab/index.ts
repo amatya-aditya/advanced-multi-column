@@ -6,11 +6,16 @@ import {
 	ColumnsPluginSettings,
 	DIVIDER_STYLE_OPTIONS,
 	STYLE_COLOR_OPTIONS,
+	COLUMN_CONTROLS_OPTIONS,
+	EDITOR_MENU_ITEMS,
 	STYLE_TARGET_OPTIONS,
 } from "../settings";
 import {renderAbout} from "./about";
 import {headerTypesList} from "./header-types";
 import {renderRemoveMarkers} from "./remove-markers";
+
+/** Control keys of the per-item right-click menu toggles: `menu:<item id>`, on when shown. */
+const MENU_KEY_PREFIX = "menu:";
 
 /** Name of the MOC sub-page, used to open settings directly on it. */
 export const MOC_PAGE_NAME = "Maps of content";
@@ -45,7 +50,7 @@ export class ColumnsSettingTab extends PluginSettingTab {
 					{
 						type: "page",
 						name: "Display",
-						desc: "Where columns are rendered, and note properties.",
+						desc: "Where columns are rendered, column controls and note properties.",
 						displayValue: displayView,
 						items: [
 							{
@@ -54,6 +59,27 @@ export class ColumnsSettingTab extends PluginSettingTab {
 									{name: "Enable in live preview", desc: "Render columns in live preview (editing) mode.", control: {type: "toggle", key: "enableLivePreview"}},
 									{name: "Enable in reading view", desc: "Render columns in reading (preview) mode.", control: {type: "toggle", key: "enableReadingView"}},
 									{name: "Fold note properties by default", desc: "Collapse the properties section when a note is opened, including new notes.", control: {type: "toggle", key: "foldNotePropertiesByDefault"}},
+								],
+							},
+							{
+								type: "group",
+								heading: "Column controls",
+								items: [
+									{name: "Show drag handles", desc: "Show grip icons for drag-and-drop reordering.", control: {type: "toggle", key: "showDragHandles"}},
+									{name: "Column buttons", desc: "Where a column's add and remove buttons appear. Above the column keeps them away from the resize handle between columns.", control: {type: "dropdown", key: "columnControlsPosition", options: COLUMN_CONTROLS_OPTIONS}},
+								],
+							},
+							{
+								type: "group",
+								heading: "Right-click menu",
+								items: [
+									{name: "Show in right-click menu", desc: "Add the plugin's insert items to the editor's right-click menu. They are also in the command palette.", aliases: ["context menu"], control: {type: "toggle", key: "showInEditorMenu"}},
+									...EDITOR_MENU_ITEMS.map((item) => ({
+										name: item.name,
+										aliases: ["context menu"],
+										visible: () => settings.showInEditorMenu && (item.id !== "insert-moc" || settings.enableMoc),
+										control: {type: "toggle" as const, key: `${MENU_KEY_PREFIX}${item.id}`},
+									})),
 								],
 							},
 						],
@@ -70,20 +96,6 @@ export class ColumnsSettingTab extends PluginSettingTab {
 									{name: "Default column count", desc: "Number of columns when inserting a new layout.", control: {type: "slider", key: "defaultColumnCount", min: 2, max: 6, step: 1}},
 									{name: "Minimum column width", desc: "Minimum width percentage for any column.", control: {type: "slider", key: "minColumnWidthPercent", min: 5, max: 30, step: 5, displayFormat: (v) => `${v}%`}},
 									{name: "Inherit style on add", desc: "New columns inherit the style of the column they are added after.", control: {type: "toggle", key: "inheritStyleOnAdd"}},
-								],
-							},
-						],
-					},
-					{
-						type: "page",
-						name: "Editing",
-						desc: "Drag handles and slash suggestions in columns.",
-						items: [
-							{
-								type: "group",
-								items: [
-									{name: "Show drag handles", desc: "Show grip icons for drag-and-drop reordering.", control: {type: "toggle", key: "showDragHandles"}},
-									{name: "Enable slash suggest", desc: "Show plugin slash command suggestions in column editors.", control: {type: "toggle", key: "enableSlashSuggest"}},
 								],
 							},
 						],
@@ -183,7 +195,21 @@ export class ColumnsSettingTab extends PluginSettingTab {
 		];
 	}
 
+	getControlValue(key: string): unknown {
+		if (key.startsWith(MENU_KEY_PREFIX)) {
+			return !this.plugin.settings.hiddenEditorMenuItems.includes(key.slice(MENU_KEY_PREFIX.length));
+		}
+		return super.getControlValue(key);
+	}
+
 	async setControlValue(key: string, value: unknown): Promise<void> {
+		if (key.startsWith(MENU_KEY_PREFIX)) {
+			const id = key.slice(MENU_KEY_PREFIX.length);
+			const hidden = this.plugin.settings.hiddenEditorMenuItems.filter((h) => h !== id);
+			this.plugin.settings.hiddenEditorMenuItems = value === true ? hidden : [...hidden, id];
+			await this.plugin.saveSettings();
+			return;
+		}
 		const settings = this.plugin.settings as unknown as Record<string, unknown>;
 		settings[key] = value;
 		await this.plugin.saveSettings();

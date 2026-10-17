@@ -1,6 +1,8 @@
 import {createMocTemplate, MocTemplate} from "./moc/types";
 
 export type StyleTargetMode = "all" | "specific";
+/** Where a column shows its add and remove buttons in live preview. */
+export type ColumnControlsPosition = "side" | "top";
 export type ColumnBackgroundOption =
 	| "transparent"
 	| "primary"
@@ -52,10 +54,14 @@ export interface ColumnsPluginSettings {
 	defaultColumnCount: number;
 	minColumnWidthPercent: number;
 	showDragHandles: boolean;
+	columnControlsPosition: ColumnControlsPosition;
+	/** Insert items (columns, layouts, MOC) in the editor's right-click menu. */
+	showInEditorMenu: boolean;
+	/** Right-click menu items left out while the menu items are shown (EDITOR_MENU_ITEMS ids). */
+	hiddenEditorMenuItems: string[];
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
 	foldNotePropertiesByDefault: boolean;
-	enableSlashSuggest: boolean;
 	inheritStyleOnAdd: boolean;
 	styleTargetMode: StyleTargetMode;
 	styleTargetColumnIndex: number;
@@ -83,10 +89,12 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	defaultColumnCount: 2,
 	minColumnWidthPercent: 10,
 	showDragHandles: true,
+	columnControlsPosition: "side",
+	showInEditorMenu: true,
+	hiddenEditorMenuItems: [],
 	enableLivePreview: true,
 	enableReadingView: true,
 	foldNotePropertiesByDefault: false,
-	enableSlashSuggest: true,
 	inheritStyleOnAdd: true,
 	styleTargetMode: "all",
 	styleTargetColumnIndex: 1,
@@ -109,6 +117,23 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 };
 
 // ── Option maps ──────────────────────────────────────────────────────
+
+/**
+ * Items the plugin adds to the editor's right-click menu. The column items
+ * use the ids of their layouts (see LAYOUT_TEMPLATES).
+ */
+export const EDITOR_MENU_ITEMS: ReadonlyArray<{id: string; name: string}> = [
+	{id: "insert-2-columns", name: "Insert 2 columns"},
+	{id: "insert-3-columns", name: "Insert 3 columns"},
+	{id: "insert-4-columns", name: "Insert 4 columns"},
+	{id: "insert-layout", name: "Insert layout"},
+	{id: "insert-moc", name: "Insert MOC"},
+];
+
+export const COLUMN_CONTROLS_OPTIONS: Record<ColumnControlsPosition, string> = {
+	side: "Beside the column",
+	top: "Above the column",
+};
 
 export const STYLE_TARGET_OPTIONS: Record<StyleTargetMode, string> = {
 	all: "All columns",

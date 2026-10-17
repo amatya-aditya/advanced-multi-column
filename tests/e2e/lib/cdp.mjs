@@ -43,6 +43,7 @@ export async function connect(port) {
 	};
 	const KEYS = {
 		Escape: ["Escape", 27], Enter: ["Enter", 13],
+		ArrowUp: ["ArrowUp", 38], ArrowDown: ["ArrowDown", 40],
 		w: ["KeyW", 87], o: ["KeyO", 79], e: ["KeyE", 69],
 	};
 	/**

@@ -234,14 +234,14 @@ Right-click any column to:
 
 **Settings → Community Plugins → Advanced Multi Column**
 
-- **General** — enable/disable live preview and reading view, default column count, minimum column width, drag handles
-- **MOC** — reusable MOC templates: sources (a fixed folder or the note's own folder, tags, properties), grouping, columns, and a live preview
+- **General** — enable/disable live preview and reading view, drag handles and where the column buttons appear, default column count, minimum column width, stacking on narrow screens
+- **MOC** — reusable MOC templates: sources (rules on folders, tags and properties, joined by And / Or), grouping, columns, and a live preview
 - **Column headers** — turn column headers on or off, edit the built-in header types and add your own
 - **Appearance** — style target (all or specific column), container background/border/radius/text, vertical and horizontal divider configuration
 
 ## MOC (map of content)
 
-A MOC lists notes as links in columns and keeps itself up to date. Right-click in a note and choose **Insert MOC → New MOC…**: pick the folder (by default the note's own folder, with its subfolders as columns), tags and/or properties from your vault, see a live preview, and insert. Save options you reuse as templates in **Settings → Advanced Multi Column → Maps of content**; right-click a MOC → **Edit MOC** to change it later.
+A MOC lists notes as links in columns and keeps itself up to date. Right-click in a note and choose **Insert MOC → New MOC…**: choose its notes with rules on folders, tags and properties joined by **And** / **Or** (by default the note's own folder, with its subfolders as columns), see a live preview, and insert. Save options you reuse as templates in **Settings → Advanced Multi Column → Maps of content**; right-click a MOC → **Edit MOC** to change it later.
 
 The links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
 

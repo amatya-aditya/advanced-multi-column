@@ -374,10 +374,14 @@ interface RendererHeader {
  * note's content (el-* divs) and the pusher. The frontmatter section stays:
  * the layer never renders frontmatter, and banner plugins attach to that
  * section (Banners turns it into the banner's wrapper).
+ * A section of raw HTML that doesn't start with a tag (such as
+ * "</center>\n%% col-break %%\n<center>", one HTML block) gets no class at
+ * all; plugins' own elements always have one.
  */
 function isReplacedSection(el: HTMLElement): boolean {
 	if (el.classList.contains("markdown-preview-pusher")) return true;
 	const cls = el.className;
+	if (cls === "" && el.tagName === "DIV") return true;
 	return (cls.startsWith("el-") || cls.includes(" el-")) && !el.classList.contains("mod-frontmatter");
 }
 
