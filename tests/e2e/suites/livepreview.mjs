@@ -40,6 +40,30 @@ export default [
 		},
 	},
 	{
+		name: "column buttons can be placed above the column, away from the resize handle (#40)",
+		async run(o) {
+			const setPos = (pos) => o.ev(`(async () => { const p = app.plugins.plugins["advanced-multi-column"]; p.settings.columnControlsPosition = ${JSON.stringify(pos)}; await p.saveSettings(); return true; })()`);
+			await o.call("layout", "C2.md");
+			await o.sleep(1200);
+			await setPos("top");
+			try {
+				const pt = await o.ev(`(() => { const c = ${leafEl}.querySelector(".amc-columns-host .column-item"); const r = c.getBoundingClientRect(); return {x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2)}; })()`);
+				await o.send("Input.dispatchMouseEvent", {type: "mouseMoved", x: pt.x, y: pt.y});
+				await o.sleep(400);
+				const rects = await o.ev(`(() => {
+					const c = ${leafEl}.querySelector(".amc-columns-host .column-item");
+					const b = c.querySelector(".column-remove-btn").getBoundingClientRect(), r = c.getBoundingClientRect();
+					return {btnTop: b.top, btnRight: b.right, colTop: r.top, colRight: r.right, shown: getComputedStyle(c.querySelector(".column-toolbar")).opacity};
+				})()`);
+				assert.equal(rects.shown, "1");
+				assert.ok(rects.btnTop < rects.colTop, `remove button not above the column: ${JSON.stringify(rects)}`);
+				assert.ok(rects.colRight - rects.btnRight >= 10, `remove button too close to the column's edge: ${JSON.stringify(rects)}`);
+			} finally {
+				await setPos("side");
+			}
+		},
+	},
+	{
 		name: "shows footnote definitions written in columns",
 		async run(o) {
 			await o.call("layout", "FnCols.md");

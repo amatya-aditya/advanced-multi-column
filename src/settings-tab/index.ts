@@ -6,6 +6,7 @@ import {
 	ColumnsPluginSettings,
 	DIVIDER_STYLE_OPTIONS,
 	STYLE_COLOR_OPTIONS,
+	COLUMN_CONTROLS_OPTIONS,
 	STYLE_TARGET_OPTIONS,
 } from "../settings";
 import {renderAbout} from "./about";
@@ -77,12 +78,13 @@ export class ColumnsSettingTab extends PluginSettingTab {
 					{
 						type: "page",
 						name: "Editing",
-						desc: "Drag handles and slash suggestions in columns.",
+						desc: "Drag handles, column buttons and slash suggestions in columns.",
 						items: [
 							{
 								type: "group",
 								items: [
 									{name: "Show drag handles", desc: "Show grip icons for drag-and-drop reordering.", control: {type: "toggle", key: "showDragHandles"}},
+									{name: "Column buttons", desc: "Where a column's add and remove buttons appear. Above the column keeps them away from the resize handle between columns.", control: {type: "dropdown", key: "columnControlsPosition", options: COLUMN_CONTROLS_OPTIONS}},
 									{name: "Enable slash suggest", desc: "Show plugin slash command suggestions in column editors.", control: {type: "toggle", key: "enableSlashSuggest"}},
 								],
 							},

@@ -249,6 +249,9 @@ export default class ColumnsPlugin extends Plugin {
 		s.minColumnWidthPercent = Math.max(5, Math.min(30, s.minColumnWidthPercent));
 		// Type-check boolean fields
 		if (typeof s.showDragHandles !== "boolean") s.showDragHandles = DEFAULT_SETTINGS.showDragHandles;
+		if (s.columnControlsPosition !== "side" && s.columnControlsPosition !== "top") {
+			s.columnControlsPosition = DEFAULT_SETTINGS.columnControlsPosition;
+		}
 		if (typeof s.enableLivePreview !== "boolean") s.enableLivePreview = DEFAULT_SETTINGS.enableLivePreview;
 		if (typeof s.enableReadingView !== "boolean") s.enableReadingView = DEFAULT_SETTINGS.enableReadingView;
 		if (typeof s.foldNotePropertiesByDefault !== "boolean") {

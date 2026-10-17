@@ -1,6 +1,8 @@
 import {createMocTemplate, MocTemplate} from "./moc/types";
 
 export type StyleTargetMode = "all" | "specific";
+/** Where a column shows its add and remove buttons in live preview. */
+export type ColumnControlsPosition = "side" | "top";
 export type ColumnBackgroundOption =
 	| "transparent"
 	| "primary"
@@ -52,6 +54,7 @@ export interface ColumnsPluginSettings {
 	defaultColumnCount: number;
 	minColumnWidthPercent: number;
 	showDragHandles: boolean;
+	columnControlsPosition: ColumnControlsPosition;
 	enableLivePreview: boolean;
 	enableReadingView: boolean;
 	foldNotePropertiesByDefault: boolean;
@@ -83,6 +86,7 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	defaultColumnCount: 2,
 	minColumnWidthPercent: 10,
 	showDragHandles: true,
+	columnControlsPosition: "side",
 	enableLivePreview: true,
 	enableReadingView: true,
 	foldNotePropertiesByDefault: false,
@@ -109,6 +113,11 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 };
 
 // ── Option maps ──────────────────────────────────────────────────────
+
+export const COLUMN_CONTROLS_OPTIONS: Record<ColumnControlsPosition, string> = {
+	side: "Beside the column",
+	top: "Above the column",
+};
 
 export const STYLE_TARGET_OPTIONS: Record<StyleTargetMode, string> = {
 	all: "All columns",
