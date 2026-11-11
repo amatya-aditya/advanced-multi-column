@@ -490,6 +490,22 @@ export class MocForm extends Component {
 
 	private renderList(body: HTMLElement, change: () => Promise<void>): void {
 		const {template} = this.opts;
+		new Setting(body)
+			.setName("Storage")
+			.setDesc(
+				"Persistent writes real Markdown links, so the MOC appears in Graph View and search. "
+				+ "Virtual stores only the compact rule marker and resolves the links live; nothing generated is written to the note.",
+			)
+			.addDropdown((dd) => dd
+				.addOptions({
+					persistent: "Persistent (Markdown links)",
+					virtual: "Virtual (live render)",
+				})
+				.setValue(template.storage)
+				.onChange(async (value) => {
+					template.storage = value === "virtual" ? "virtual" : "persistent";
+					await change();
+				}));
 		const sortSetting = new Setting(body).setName("Sort notes by");
 		const reverseSetting = new Setting(body)
 			.setName("Reverse sort order")
@@ -557,7 +573,11 @@ export class MocForm extends Component {
 			cls: "setting-item-description",
 			text: `${mocColumnCount(template, groups)} column(s), up to ${PREVIEW_LIMIT} notes per group.${where}`,
 		});
-		const block = generateMocBlock(app, template, sourcePath ?? "", undefined, PREVIEW_LIMIT);
+		// The preview always shows resolved links, even for a virtual MOC.
+		const previewTemplate = template.storage === "virtual"
+			? {...template, storage: "persistent" as const}
+			: template;
+		const block = generateMocBlock(app, previewTemplate, sourcePath ?? "", undefined, PREVIEW_LIMIT);
 		const region = findColumnRegions(block)[0];
 		if (!region) return;
 		const previewHost = el.createDiv({cls: "markdown-rendered amc-moc-preview-body"});

@@ -1,0 +1,108 @@
+/* ==========================================================================
+   Advanced Multi Column — Apple HIG design tokens
+   Warm-neutral alabaster surfaces, specular hairlines, squircle radii and
+   tinted pastel accents. Dark mode follows the macOS/iPadOS semantic palette.
+   Every token is scoped to :root so Minimal and other themes can override it
+   without fighting component selectors.
+   ========================================================================== */
+
+:root,
+.theme-light {
+	/* Apple HIG Surface Palette (Light) */
+	--amc-surface-canvas: #F5F5F7;
+	--amc-surface-card: #FFFFFF;
+	--amc-surface-elevated: rgba(255, 255, 255, 0.82);
+	--amc-surface-secondary: #FAFAFC;
+	--amc-border-hairline: rgba(0, 0, 0, 0.08);
+	--amc-border-focus: rgba(0, 122, 255, 0.45);
+
+	/* Apple Pastel Soft Tints (Backgrounds & Borders) */
+	--amc-tint-blue-bg: #F0F7FF;
+	--amc-tint-blue-border: #CCE4FF;
+	--amc-tint-blue-text: #004085;
+
+	--amc-tint-mint-bg: #F0FBF6;
+	--amc-tint-mint-border: #C3EFE0;
+	--amc-tint-mint-text: #0B5345;
+
+	--amc-tint-amber-bg: #FFF9EB;
+	--amc-tint-amber-border: #FDE2A8;
+	--amc-tint-amber-text: #7A4F01;
+
+	--amc-tint-rose-bg: #FFF2F4;
+	--amc-tint-rose-border: #FAD1D8;
+	--amc-tint-rose-text: #801B2B;
+
+	--amc-tint-purple-bg: #F7F2FF;
+	--amc-tint-purple-border: #E0CFFC;
+	--amc-tint-purple-text: #4A1D96;
+
+	--amc-tint-slate-bg: #F4F5F7;
+	--amc-tint-slate-border: #DFE1E6;
+	--amc-tint-slate-text: #2C2C2E;
+
+	/* Typography & Elevation */
+	--amc-text-primary: #1D1D1F;
+	--amc-text-secondary: #86868B;
+	--amc-radius-container: 14px;
+	--amc-radius-column: 12px;
+	--amc-radius-pill: 999px;
+	--amc-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+	--amc-shadow-hover: 0 6px 18px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
+	--amc-shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
+	--amc-ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+
+	/* Extra semantic surfaces used by presets and controls. */
+	--amc-glass-bg: rgba(255, 255, 255, 0.62);
+	--amc-glass-border: rgba(255, 255, 255, 0.72);
+	--amc-control-bg: rgba(255, 255, 255, 0.86);
+	--amc-control-hover-bg: rgba(0, 0, 0, 0.055);
+	--amc-divider-hairline: rgba(0, 0, 0, 0.09);
+	--amc-grabber: #86868B;
+}
+
+.theme-dark {
+	/* Apple macOS Dark Mode Adaptation */
+	--amc-surface-canvas: #1C1C1E;
+	--amc-surface-card: #2C2C2E;
+	--amc-surface-elevated: rgba(44, 44, 46, 0.78);
+	--amc-surface-secondary: #242426;
+	--amc-border-hairline: rgba(255, 255, 255, 0.10);
+	--amc-border-focus: rgba(10, 132, 255, 0.55);
+
+	--amc-tint-blue-bg: rgba(10, 132, 255, 0.14);
+	--amc-tint-blue-border: rgba(10, 132, 255, 0.32);
+	--amc-tint-blue-text: #82BFFF;
+
+	--amc-tint-mint-bg: rgba(48, 209, 88, 0.14);
+	--amc-tint-mint-border: rgba(48, 209, 88, 0.32);
+	--amc-tint-mint-text: #7AF59B;
+
+	--amc-tint-amber-bg: rgba(255, 159, 10, 0.14);
+	--amc-tint-amber-border: rgba(255, 159, 10, 0.32);
+	--amc-tint-amber-text: #FFD180;
+
+	--amc-tint-rose-bg: rgba(255, 55, 95, 0.14);
+	--amc-tint-rose-border: rgba(255, 55, 95, 0.32);
+	--amc-tint-rose-text: #FF94A8;
+
+	--amc-tint-purple-bg: rgba(191, 90, 242, 0.14);
+	--amc-tint-purple-border: rgba(191, 90, 242, 0.32);
+	--amc-tint-purple-text: #E5A8FF;
+
+	--amc-tint-slate-bg: rgba(142, 142, 147, 0.14);
+	--amc-tint-slate-border: rgba(142, 142, 147, 0.28);
+	--amc-tint-slate-text: #E5E5EA;
+
+	--amc-text-primary: #F5F5F7;
+	--amc-text-secondary: #98989D;
+	--amc-shadow-card: 0 2px 10px rgba(0, 0, 0, 0.28);
+	--amc-shadow-hover: 0 6px 20px rgba(0, 0, 0, 0.38);
+
+	--amc-glass-bg: rgba(44, 44, 46, 0.58);
+	--amc-glass-border: rgba(255, 255, 255, 0.14);
+	--amc-control-bg: rgba(58, 58, 60, 0.88);
+	--amc-control-hover-bg: rgba(255, 255, 255, 0.09);
+	--amc-divider-hairline: rgba(255, 255, 255, 0.12);
+	--amc-grabber: #98989D;
+}

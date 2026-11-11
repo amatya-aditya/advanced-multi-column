@@ -13,9 +13,10 @@ import {setBulletStyleSink} from "./column/render/better-bullets";
 import {closeActivePopover} from "./column/render/style-context-menu";
 import {collapsePropertiesInOpenNotes, registerDefaultPropertyFolding} from "./properties-fold";
 import {LAYOUT_TEMPLATES, LayoutTemplate} from "./layouts";
+import {LayoutPickerModal, PickerTemplate} from "./layout-picker";
 import {MocSync} from "./moc/sync";
 import {openMocEditor, openNewMocBuilder} from "./moc/builder-modal";
-import {generateMocBlock} from "./moc/generate";
+import {generateMocBlock, MOC_REFRESH_EVENT} from "./moc/generate";
 import {MocTemplate, sanitizeMocTemplate} from "./moc/types";
 
 class MocTemplateModal extends SuggestModal<MocTemplate> {
@@ -75,6 +76,13 @@ export default class ColumnsPlugin extends Plugin {
 			});
 		}
 
+		this.addCommand({
+			id: "insert-bento-template",
+			name: "Insert bento / column template",
+			icon: "layout-dashboard",
+			editorCallback: (editor: Editor) => this.openBentoPicker(editor),
+		});
+
 		this.settingTab = new ColumnsSettingTab(this.app, this);
 		this.addSettingTab(this.settingTab);
 
@@ -120,6 +128,13 @@ export default class ColumnsPlugin extends Plugin {
 							.setIcon(layout.icon)
 							.onClick(() => this.insertLayout(editor, layout)),
 					);
+				}
+				if (shown("insert-bento")) {
+					menu.addItem((item) => item
+						.setSection("insert")
+						.setTitle("Insert bento / column template…")
+						.setIcon("layout-dashboard")
+						.onClick(() => this.openBentoPicker(editor)));
 				}
 				if (shown("insert-layout")) {
 					menu.addItem((item) => {
@@ -216,6 +231,12 @@ export default class ColumnsPlugin extends Plugin {
 		editor.replaceSelection("\n" + layout.lines(this.settings).join("\n") + "\n");
 	}
 
+	private openBentoPicker(editor: Editor): void {
+		new LayoutPickerModal(this.app, (template: PickerTemplate) => {
+			editor.replaceSelection("\n" + template.lines.join("\n") + "\n");
+		}).open();
+	}
+
 	async loadSettings() {
 		const savedData = ((await this.loadData()) ?? {}) as Partial<ColumnsPluginSettings> & {
 			hideNoteProperties?: boolean;
@@ -303,6 +324,22 @@ export default class ColumnsPlugin extends Plugin {
 	private liveRenderFingerprint(): string {
 		const s = this.settings;
 		return JSON.stringify([s.enableLivePreview, s.enableHeaders, s.headerTypes]);
+	}
+
+	/**
+	 * Virtual MOCs resolve links from the metadata cache, so a vault change
+	 * does not touch any note. Refresh every open column view instead.
+	 */
+	notifyVirtualMocChange(): void {
+		if (!this.settings.mocTemplates.some((template) => template.storage === "virtual")) return;
+		this.refreshLivePreviewColumns();
+		const docs = new Set<Document>();
+		docs.add(this.app.workspace.containerEl.ownerDocument);
+		this.app.workspace.iterateAllLeaves((leaf) => docs.add(leaf.view.containerEl.ownerDocument));
+		for (const doc of docs) {
+			const EventCtor = doc.defaultView?.CustomEvent ?? CustomEvent;
+			doc.dispatchEvent(new EventCtor(MOC_REFRESH_EVENT));
+		}
 	}
 
 	/** Re-render live preview columns so rendering settings take effect. */

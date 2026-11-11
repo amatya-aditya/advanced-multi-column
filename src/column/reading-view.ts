@@ -8,6 +8,7 @@ import {
 	TFile,
 } from "obsidian";
 import {findColumnRegions} from "./core/parser";
+import {hydrateVirtualMocRegion, MOC_REFRESH_EVENT} from "../moc/generate";
 import {NoteFootnotes} from "./core/footnotes";
 import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
 import {wireReadingLinkEvents} from "./render/reading-link-events";
@@ -606,6 +607,10 @@ function buildColumnsRegion(
 ): void {
 	if (depth > 8) return;
 
+	if (region.virtual) {
+		hydrateVirtualMocRegion(plugin.app, plugin.settings.mocTemplates, region, sourcePath);
+	}
+
 	const containerEl = parent.createDiv({cls: "columns-container columns-ui columns-reading"});
 	const isContainerStacked = region.layout === "stack";
 	if (isContainerStacked) containerEl.classList.add("columns-stacked");
@@ -615,6 +620,8 @@ function buildColumnsRegion(
 	const groups = isContainerStacked
 		? [{indices: region.columns.map((_, i) => i), isStack: true}]
 		: groupColumns(region.columns);
+	containerEl.classList.toggle("amc-cols-many", groups.length >= 3);
+	containerEl.dataset.amcColumns = String(region.columns.length);
 
 	for (let gi = 0; gi < groups.length; gi++) {
 		const group = groups[gi]!;
@@ -685,6 +692,24 @@ function buildColumnsRegion(
 							headerEl.createSpan({
 								cls: "column-header-title",
 								text: headerParsed.title,
+							});
+						}
+
+						if (col.style?.fold) {
+							colEl.classList.add("columns-foldable");
+							const toggle = headerEl.createEl("button", {
+								cls: "amc-column-fold-toggle",
+								attr: {"aria-label": "Collapse column", "aria-expanded": "true"},
+							});
+							toggle.type = "button";
+							setIcon(toggle, "chevron-down");
+							toggle.addEventListener("click", (evt) => {
+								evt.preventDefault();
+								evt.stopPropagation();
+								const folded = colEl.classList.toggle("amc-column-folded");
+								toggle.classList.toggle("is-folded", folded);
+								toggle.setAttribute("aria-expanded", String(!folded));
+								toggle.setAttribute("aria-label", folded ? "Expand column" : "Collapse column");
 							});
 						}
 
@@ -1005,6 +1030,8 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	const sourceHints = new WeakMap<HTMLElement, string>();
 	const retryCounts = new WeakMap<HTMLElement, number>();
 	const activeSizers = new Set<HTMLElement>();
+	/** Bumped when a virtual MOC's in-memory links may have changed. */
+	let virtualMocRevision = 0;
 	const buildTimes = new WeakMap<HTMLElement, {fingerprint: string; time: number}[]>();
 	const suppressedSizers = new WeakSet<HTMLElement>();
 	/** Times a render waited for the note's header (see renderSizer). */
@@ -1422,7 +1449,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 			return;
 		}
 
-		const fingerprint = textFingerprint(sourcePath, text, regions);
+		const fingerprint = `${textFingerprint(sourcePath, text, regions)}|vm:${virtualMocRevision}`;
 		const existing = states.get(sizer);
 		if (
 			existing
@@ -1668,6 +1695,31 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 	// Switching a pane from editing to reading shows the editor's latest text.
 	plugin.registerEvent(plugin.app.workspace.on("layout-change", () => rescheduleForPath(null, "layout-change")));
 
+	// Virtual MOC data comes from the metadata cache, not the note text: bump
+	// the render revision so the fingerprint reuse path cannot keep a stale
+	// wrapper, then rebuild every reading pane that is currently showing
+	// columns. Live preview is refreshed by the plugin's own event handler.
+	const mocRefreshDocs = new Set<Document>();
+	const onMocRefresh = (): void => {
+		virtualMocRevision++;
+		for (const sizer of activeSizers) {
+			invalidateRenderToken(sizer);
+			scheduleRender(sizer, currentPathForSizer(sizer), "virtual-moc-refresh", 0);
+		}
+	};
+	const listenForMocRefresh = (doc: Document): void => {
+		if (mocRefreshDocs.has(doc)) return;
+		mocRefreshDocs.add(doc);
+		doc.addEventListener(MOC_REFRESH_EVENT, onMocRefresh);
+	};
+	const stopListeningForMocRefresh = (doc: Document): void => {
+		if (!mocRefreshDocs.delete(doc)) return;
+		doc.removeEventListener(MOC_REFRESH_EVENT, onMocRefresh);
+	};
+	listenForMocRefresh(plugin.app.workspace.containerEl.ownerDocument);
+	plugin.registerEvent(plugin.app.workspace.on("window-open", (win) => listenForMocRefresh(win.doc)));
+	plugin.registerEvent(plugin.app.workspace.on("window-close", (win) => stopListeningForMocRefresh(win.doc)));
+
 	/**
 	 * The view's note has columns but reading view has no layer for it yet:
 	 * it was just opened, or the pane shows the editor (the layer is built when
@@ -1800,6 +1852,7 @@ export function registerReadingView(plugin: ColumnsPlugin): () => void {
 
 	// Return cleanup function for plugin onunload
 	return () => {
+		for (const doc of [...mocRefreshDocs]) stopListeningForMocRefresh(doc);
 		for (const sizer of activeSizers) {
 			teardownSizer(sizer, states, "plugin-unload");
 			const timer = timers.get(sizer);

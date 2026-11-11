@@ -138,7 +138,9 @@
 .amc-columns-host,
 .columns-rv-wrapper {
 	container-type: inline-size;
-	container-name: amc-columns;
+	/* `amc-row` drives the Apple responsive tiers; `amc-columns` is kept for
+	   the user-configurable narrow-stack breakpoint in runtime-styles. */
+	container-name: amc-columns amc-row;
 }
 
 .amc-columns-host {

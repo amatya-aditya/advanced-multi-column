@@ -1,19 +1,21 @@
+import {columnPresetClass, isColumnPreset, type ColumnPreset} from "./presets";
+
 // Every palette entry is a CSS variable with the built-in value as fallback,
 // so themes and snippets can recolor the palette, e.g.
 // `body { --amc-bg-red-soft: #f3d6d6; --amc-color-red: #c24; }`.
 export const BACKGROUND_CSS = {
 	transparent: "var(--amc-bg-transparent, transparent)",
-	primary: "var(--amc-bg-primary, var(--background-primary))",
-	secondary: "var(--amc-bg-secondary, var(--background-secondary))",
-	alt: "var(--amc-bg-alt, var(--background-primary-alt))",
+	primary: "var(--amc-bg-primary, var(--amc-surface-card, var(--background-primary)))",
+	secondary: "var(--amc-bg-secondary, var(--amc-surface-secondary, var(--background-secondary)))",
+	alt: "var(--amc-bg-alt, var(--amc-surface-canvas, var(--background-primary-alt)))",
 	"accent-soft": "var(--amc-bg-accent-soft, color-mix(in srgb, var(--interactive-accent) 14%, transparent))",
-	"red-soft": "var(--amc-bg-red-soft, rgba(239, 68, 68, 0.14))",
-	"orange-soft": "var(--amc-bg-orange-soft, rgba(245, 158, 11, 0.14))",
-	"yellow-soft": "var(--amc-bg-yellow-soft, rgba(234, 179, 8, 0.14))",
-	"green-soft": "var(--amc-bg-green-soft, rgba(34, 197, 94, 0.14))",
-	"cyan-soft": "var(--amc-bg-cyan-soft, rgba(6, 182, 212, 0.14))",
-	"blue-soft": "var(--amc-bg-blue-soft, rgba(59, 130, 246, 0.14))",
-	"pink-soft": "var(--amc-bg-pink-soft, rgba(236, 72, 153, 0.14))",
+	"red-soft": "var(--amc-bg-red-soft, var(--amc-tint-rose-bg, rgba(239, 68, 68, 0.14)))",
+	"orange-soft": "var(--amc-bg-orange-soft, var(--amc-tint-amber-bg, rgba(245, 158, 11, 0.14)))",
+	"yellow-soft": "var(--amc-bg-yellow-soft, var(--amc-tint-amber-bg, rgba(234, 179, 8, 0.14)))",
+	"green-soft": "var(--amc-bg-green-soft, var(--amc-tint-mint-bg, rgba(34, 197, 94, 0.14)))",
+	"cyan-soft": "var(--amc-bg-cyan-soft, var(--amc-tint-blue-bg, rgba(6, 182, 212, 0.14)))",
+	"blue-soft": "var(--amc-bg-blue-soft, var(--amc-tint-blue-bg, rgba(59, 130, 246, 0.14)))",
+	"pink-soft": "var(--amc-bg-pink-soft, var(--amc-tint-rose-bg, rgba(236, 72, 153, 0.14)))",
 } as const;
 
 /** Solid/opaque colors that correspond to each soft background – used for
@@ -66,6 +68,9 @@ type ColumnStyleData = {
 	separatorStyle?: SeparatorLineStyle;
 	separatorWidth?: number;
 	separatorCustomChar?: string;
+	preset?: ColumnPreset;
+	maxHeight?: number;
+	fold?: boolean;
 };
 
 const COLUMN_STYLE_VAR_KEYS = [
@@ -148,6 +153,20 @@ function toStyleData(style: unknown): ColumnStyleData | null {
 		parsed.leftBorder = record.leftBorder;
 	}
 
+	const preset = record.preset;
+	if (typeof preset === "string" && isColumnPreset(preset)) {
+		parsed.preset = preset;
+	}
+
+	const maxHeight = record.maxHeight;
+	if (typeof maxHeight === "number" && maxHeight >= 80 && maxHeight <= 4000) {
+		parsed.maxHeight = Math.round(maxHeight);
+	}
+
+	if (typeof record.fold === "boolean") {
+		parsed.fold = record.fold;
+	}
+
 	return Object.keys(parsed).length > 0 ? parsed : null;
 }
 
@@ -188,6 +207,10 @@ function buildColumnCssProps(parsed: ColumnStyleData): Record<string, string> {
 		}
 	}
 
+	if (parsed.maxHeight !== undefined) {
+		cssProps["--amc-column-max-height"] = `${parsed.maxHeight}px`;
+	}
+
 	return cssProps;
 }
 
@@ -225,6 +248,10 @@ function applyStyleVars(
 	const clearProps: Record<string, string> = {};
 	for (const key of varKeysToClear) clearProps[key] = "";
 	element.setCssProps(clearProps);
+	for (const cls of Array.from(element.classList)) {
+		if (cls.startsWith("amc-preset-")) element.classList.remove(cls);
+	}
+	element.classList.remove("columns-max-height", "columns-foldable");
 
 	const parsed = toStyleData(style);
 	if (!parsed) {
@@ -233,6 +260,10 @@ function applyStyleVars(
 	}
 
 	element.addClass("columns-custom-style");
+	const presetClass = columnPresetClass(parsed.preset);
+	if (presetClass) element.addClass(presetClass);
+	element.classList.toggle("columns-max-height", parsed.maxHeight !== undefined);
+	element.classList.toggle("columns-foldable", parsed.fold === true);
 	element.setCssProps(cssBuilder(parsed));
 }
 

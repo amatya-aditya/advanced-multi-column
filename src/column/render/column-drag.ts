@@ -140,7 +140,13 @@ export function moveColumnBetweenBlocks(
 	const sourceReplacement =
 		nextSourceRoot === null
 			? ""
-			: serializeColumns(nextSourceRoot, sourceRegion.containerStyle, sourceRegion.layout, sourceRegion.mocId);
+			: serializeColumns(
+				nextSourceRoot,
+				sourceRegion.containerStyle,
+				sourceRegion.layout,
+				sourceRegion.mocId,
+				sourceRegion.virtual,
+			);
 
 	const changes = [
 		{
@@ -193,7 +199,13 @@ export function moveColumnToCursorBlock(sourceDrag: ActiveDragState, view: Edito
 	const sourceReplacement =
 		nextSourceRoot === null
 			? ""
-			: serializeColumns(nextSourceRoot, sourceRegion.containerStyle, sourceRegion.layout, sourceRegion.mocId);
+			: serializeColumns(
+				nextSourceRoot,
+				sourceRegion.containerStyle,
+				sourceRegion.layout,
+				sourceRegion.mocId,
+				sourceRegion.virtual,
+			);
 
 	const changes = [
 		{

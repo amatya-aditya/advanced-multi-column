@@ -177,6 +177,28 @@ Width and style tokens can be combined:
 | `t:` / `tc:` | Text color | Same as border color |
 | `sb:` | Show border | `1`/`0`, `true`/`false`, `yes`/`no`, `on`/`off` |
 | `h:` / `hd:` | Horizontal dividers | Same as show border |
+| `preset:` | Named design preset | `apple-card`, `apple-bento`, `glass-panel`, `soft-blue`, `soft-mint`, `soft-amber`, `soft-rose`, `soft-purple`, `minimal-flush` |
+| `mh:` | Max column height | `80`–`4000` (pixels); the column body scrolls with soft edge fades |
+| `fold:` | Foldable header | `1`/`0`; adds a chevron to the column header |
+
+### Named presets
+
+Presets replace long token strings with an Apple HIG design name. Explicit
+tokens still win, so a preset can be combined with overrides:
+
+```md
+%% col-start:preset:apple-bento %%
+%% col-break:40,preset:soft-blue %%
+Sidebar
+%% col-break:60,preset:apple-card,mh:420,fold:1 %%
+Main card with a scrollable body and a fold chevron.
+%% col-end %%
+```
+
+The right-click style popover shows the presets with swatches, plus fold and
+max-height controls. `apple-card`, `apple-bento`, `glass-panel`, the five
+`soft-*` callout tints and `minimal-flush` are available in both light and
+dark mode.
 
 ## Nested Layout Example
 
@@ -209,6 +231,7 @@ Nested content.
 | Insert 4-wide layout | Four equal columns |
 | Insert layout (custom count) | Uses default count from settings |
 | Insert nested layout | Parent with child columns template |
+| Insert bento / column template | Visual picker for 2-up, sidebar, inspector, dashboard, Apple Bento and Holy Grail layouts |
 
 ## Editing
 
@@ -243,7 +266,7 @@ Right-click any column to:
 
 A MOC lists notes as links in columns and keeps itself up to date. Right-click in a note and choose **Insert MOC → New MOC…**: choose its notes with rules on folders, tags and properties joined by **And** / **Or** (by default the note's own folder, with its subfolders as columns), see a live preview, and insert. Save options you reuse as templates in **Settings → Advanced Multi Column → Maps of content**; right-click a MOC → **Edit MOC** to change it later.
 
-The links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
+By default the links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. Choose **Storage → Virtual (live render)** in the MOC options to keep only the compact rule marker in the note and resolve the links in memory instead: the MOC still updates from metadata changes, but generated links never pollute the note, search, sync or Git history. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
 
 ## Privacy and vault access
 
@@ -253,7 +276,7 @@ What it accesses, and why:
 
 - **Notes you open** are read to render columns in Reading view and when exporting to PDF.
 - **The list of notes and their metadata** (file paths, tags, properties — from Obsidian's metadata cache) is used only by **MOC** to find the notes a MOC lists. MOC can be turned off in **Settings → Advanced Multi Column → Maps of content**.
-- **Notes are written** only when you edit columns, insert a layout or MOC, or when an inserted MOC updates its own list of links.
+- **Notes are written** only when you edit columns, insert a layout or MOC, or when a persistent MOC updates its own list of links. Virtual MOCs write only their compact `v:1` marker.
 - **Pasted images** in a column editor are saved in the note's folder; pasting reads only what you paste.
 
 ## Installation

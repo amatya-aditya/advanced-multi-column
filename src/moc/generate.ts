@@ -1,7 +1,10 @@
 import type {App} from "obsidian";
-import {findColumnRegions, serializeColumns} from "../column/core/parser";
+import {findColumnRegions, serializeColumns, serializeVirtualMocMarker} from "../column/core/parser";
 import type {ColumnData, ColumnRegion} from "../column/core/types";
 import {collectMocGroups, MocGroup, MocQueryCache, visibleMocGroups} from "./query";
+
+/** Document event that asks open column views to re-render virtual MOCs. */
+export const MOC_REFRESH_EVENT = "amc-moc-refresh";
 
 /** What a MOC note currently lists, used to decide which changes affect it. */
 export interface MocNoteUsage {
@@ -105,6 +108,14 @@ export function generateMocBlock(
 			for (const file of group.files) usage.listed.add(file.path);
 		}
 	}
+
+	// Virtual MOC: keep only the compact marker in the note. The grouped
+	// links are recomputed at render time from the metadata cache, so the
+	// vault stays free of generated text (and of sync/Git churn).
+	if (template.storage === "virtual") {
+		return serializeVirtualMocMarker(template.id, existing?.containerStyle, existing?.layout);
+	}
+
 	const plans = planMocColumns(template, groups);
 	const columns: ColumnData[] = plans.map((plan, i) => ({
 		content: renderColumnContent(app, template, plan, sourcePath),
@@ -112,6 +123,50 @@ export function generateMocBlock(
 		style: existing?.columns[i]?.style ?? {background: "primary"},
 	}));
 	return serializeColumns(columns, existing?.containerStyle, existing?.layout, template.id);
+}
+
+/**
+ * Columns for a virtual MOC block, resolved in memory. Styles already present
+ * on the block (a user may have styled the placeholder columns) are kept.
+ */
+export function resolveVirtualMocColumns(
+	app: App,
+	template: MocTemplate,
+	sourcePath: string,
+	existing?: ColumnRegion,
+): ColumnData[] {
+	const groups = visibleMocGroups(template, collectMocGroups(app, template, sourcePath));
+	const plans = planMocColumns(template, groups);
+	return plans.map((plan, i) => ({
+		content: renderColumnContent(app, template, plan, sourcePath),
+		widthPercent: 0,
+		style: existing?.columns[i]?.style ?? {background: "primary"},
+	}));
+}
+
+/**
+ * Fill a `v:1` region in place. Called by live preview and reading view just
+ * before rendering; never writes to the note.
+ */
+export function hydrateVirtualMocRegion(
+	app: App,
+	templates: ReadonlyArray<MocTemplate>,
+	region: ColumnRegion,
+	sourcePath: string,
+): void {
+	if (!region.virtual || !region.mocId) return;
+	const template = templates.find((candidate) => candidate.id === region.mocId);
+	if (!template) {
+		region.columns = [{
+			content: `_MOC template not found: ${region.mocId}_`,
+			widthPercent: 0,
+			style: {background: "secondary"},
+		}];
+		return;
+	}
+	region.columns = resolveVirtualMocColumns(app, template, sourcePath, region);
+	region.columnContentRanges = [];
+	region.columnLineRanges = [];
 }
 
 /**

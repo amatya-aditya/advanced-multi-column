@@ -44,10 +44,11 @@ function enterBlock(view: EditorView, dir: 1 | -1): boolean {
 	if (!block) return false;
 	const host = blockHost(view, block.from);
 	if (!host) return false;
-	// Top-level columns with an editor (columns holding nested blocks have none).
-	const columns = Array.from(host.querySelectorAll<HTMLElement>(`[${EDIT_KEY_ATTR}]`))
-		.filter((el) => /^c\d+$/.test(el.getAttribute(EDIT_KEY_ATTR) ?? ""));
-	const target = dir === 1 ? columns[0] : columns[columns.length - 1];
+	// Every editable target, in DOM order: top-level columns, text segments
+	// around nested blocks and nested columns themselves. A parent column that
+	// holds nested blocks has no editor of its own and therefore no attribute.
+	const targets = Array.from(host.querySelectorAll<HTMLElement>(`[${EDIT_KEY_ATTR}]`));
+	const target = dir === 1 ? targets[0] : targets[targets.length - 1];
 	if (!target) return false;
 	const at: EnterEditAt = dir === 1 ? "start" : "end";
 	target.dispatchEvent(new CustomEvent(ENTER_EDIT_EVENT, {detail: at}));

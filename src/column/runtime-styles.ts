@@ -16,9 +16,15 @@ function buildAppearanceRules(settings: ColumnsPluginSettings): string {
 		: 0;
 	const dividerWidth = clampPx(settings.verticalDividerWidthPx, 0, 8);
 
+	// The container defaults to the warm alabaster canvas; columns themselves
+	// still use the card colour (BACKGROUND_CSS.primary). Users can pick a
+	// different container background in Appearance.
+	const containerBackground = settings.containerBackground === "primary"
+		? "var(--amc-surface-canvas)"
+		: (BACKGROUND_CSS_MAP[settings.containerBackground] ?? BACKGROUND_CSS.primary);
 	const rules = [`
 .columns-container {
-	--amc-container-bg: ${BACKGROUND_CSS_MAP[settings.containerBackground] ?? BACKGROUND_CSS.primary};
+	--amc-container-bg: ${containerBackground};
 	--amc-container-text: ${COLOR_CSS_MAP[settings.containerTextColor] ?? COLOR_CSS.text};
 	--amc-container-border-width: ${borderWidth}px;
 	--amc-container-border-color: ${COLOR_CSS_MAP[settings.containerBorderColor] ?? COLOR_CSS.gray};

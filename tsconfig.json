@@ -22,7 +22,8 @@
 			"ES5",
 			"ES6",
 			"ES7"
-		]
+		],
+		"skipLibCheck": true
 	},
 	"include": [
 		"src/**/*.ts"

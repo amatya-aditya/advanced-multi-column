@@ -176,6 +176,10 @@ export class MocSync {
 			this.rerun = false;
 			this.scheduleRefresh();
 		}
+		// Persistent MOCs are rendered from their written links. Virtual ones
+		// are resolved in memory, so open views must be told to rebuild even
+		// though no note text changed.
+		this.plugin.notifyVirtualMocChange();
 	}
 
 	async refreshFile(file: TFile, cache: MocQueryCache = new Map()): Promise<void> {

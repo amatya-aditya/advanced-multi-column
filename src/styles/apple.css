@@ -1,0 +1,746 @@
+/* ==========================================================================
+   Advanced Multi Column — Apple HIG component layer
+   Applied after the structural layout so it can restyle surfaces without
+   changing the flex/grid mechanics the plugin relies on. Legacy callout
+   styles are untouched (their selectors are unrelated).
+   ========================================================================== */
+
+/* ── Containers & column cards ─────────────────────────────────────────── */
+
+.columns-container {
+	border-radius: var(--amc-container-radius, var(--amc-radius-container, 14px));
+	padding: 8px;
+	background: var(--columns-block-bg, var(--amc-container-bg, var(--amc-surface-canvas)));
+	border-color: var(--columns-block-border-color, var(--amc-border-hairline));
+	transition:
+		background-color 0.2s var(--amc-ease-spring),
+		border-color 0.2s var(--amc-ease-spring),
+		box-shadow 0.2s var(--amc-ease-spring);
+}
+
+.columns-container.columns-nested {
+	padding: 6px;
+	border-radius: calc(var(--amc-container-radius, var(--amc-radius-container, 14px)) - 2px);
+}
+
+.columns-container .column-item {
+	border-radius: var(--amc-radius-column, 12px);
+	transition:
+		background-color 0.2s var(--amc-ease-spring),
+		border-color 0.2s var(--amc-ease-spring),
+		box-shadow 0.2s var(--amc-ease-spring),
+		transform 0.2s var(--amc-ease-spring);
+}
+
+/* Default card: white on alabaster, hairline border, soft specular shadow. */
+.columns-container .column-item:not(.columns-custom-style) {
+	background: var(--amc-surface-card);
+	border: 1px solid var(--amc-border-hairline);
+	box-shadow: var(--amc-shadow-card);
+}
+
+.columns-container .column-item:not(.columns-custom-style):hover {
+	background: var(--amc-surface-card);
+	border-color: var(--amc-border-hairline);
+	box-shadow: var(--amc-shadow-hover);
+}
+
+.columns-container .column-item.columns-custom-style {
+	border-radius: var(--amc-radius-column, 12px);
+	box-shadow: var(--amc-shadow-card);
+}
+
+.columns-container .column-item.columns-custom-style:hover {
+	box-shadow: var(--amc-shadow-hover);
+}
+
+/* Preset cards own their text colour; keep links readable on the tint. */
+.columns-container .column-item[class*="amc-preset-"] :is(
+	a,
+	a.internal-link,
+	a.external-link,
+	a.tag,
+	.cm-link,
+	.cm-hmd-internal-link
+) {
+	color: inherit;
+}
+
+/* Reading view cards follow the same palette. These selectors match the
+   specificity of the reading-view rules in layout.css, so cards keep their
+   surface and hairline on hover instead of falling back to transparent. */
+.columns-container.columns-reading .column-item {
+	border-radius: var(--amc-radius-column, 12px);
+}
+
+.columns-container.columns-reading .column-item:not(.columns-custom-style) {
+	background: var(--amc-surface-card);
+	border: 1px solid var(--amc-border-hairline);
+	box-shadow: var(--amc-shadow-card);
+}
+
+.columns-container.columns-reading .column-item:not(.columns-custom-style):hover {
+	background: var(--amc-surface-card);
+	border-color: var(--amc-border-hairline);
+	box-shadow: var(--amc-shadow-hover);
+}
+
+/* Apple focus halo while a column's editor is active. */
+.columns-container .column-item.is-editing,
+.columns-container .column-item:focus-within {
+	border-color: var(--amc-border-focus);
+	box-shadow: 0 0 0 3px var(--amc-border-focus), var(--amc-shadow-card);
+}
+
+/* Make the left-border variant read like a tinted callout card. */
+.columns-container .column-item.columns-left-border {
+	border-radius: 0 var(--amc-radius-column, 12px) var(--amc-radius-column, 12px) 0;
+}
+
+/* ── Frosted floating controls (+ / × / drag) ──────────────────────────── */
+
+.columns-container .column-toolbar {
+	padding: 4px;
+	border: 1px solid var(--amc-border-hairline);
+	border-radius: var(--amc-radius-pill, 999px);
+	background: var(--amc-surface-elevated);
+	box-shadow: var(--amc-shadow-card);
+	-webkit-backdrop-filter: blur(12px) saturate(180%);
+	backdrop-filter: blur(12px) saturate(180%);
+	transition: opacity 0.18s var(--amc-ease-spring), transform 0.18s var(--amc-ease-spring);
+	transform: translateY(-1px);
+}
+
+.columns-container .column-item:hover .column-toolbar,
+.columns-container .column-item.is-editing .column-toolbar,
+.columns-container .column-item:focus-within .column-toolbar {
+	opacity: 1;
+	pointer-events: auto;
+	transform: translateY(0);
+}
+
+.columns-container .column-toolbar-actions {
+	gap: 2px;
+}
+
+.columns-container :is(.column-add-btn, .column-remove-btn) {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border-radius: var(--amc-radius-pill, 999px);
+	color: var(--amc-text-secondary);
+	background: transparent;
+	transition:
+		color 0.15s var(--amc-ease-spring),
+		background-color 0.15s var(--amc-ease-spring),
+		transform 0.15s var(--amc-ease-spring);
+}
+
+.columns-container :is(.column-add-btn, .column-remove-btn):hover {
+	color: var(--amc-text-primary);
+	background: var(--amc-control-hover-bg);
+	transform: scale(1.04);
+}
+
+.columns-container :is(.column-add-btn, .column-remove-btn):active {
+	transform: scale(0.94);
+}
+
+.columns-container .column-drag-gutter > .column-drag-handle {
+	width: 20px;
+	height: 20px;
+	margin-inline: auto;
+	padding: 0;
+	border-radius: var(--amc-radius-pill, 999px);
+	color: var(--amc-text-secondary);
+}
+
+.columns-container .column-drag-handle:hover {
+	color: var(--amc-text-primary);
+	background: var(--amc-control-hover-bg);
+}
+
+/* ── Hairline resize gutter with a centered grabber pill ───────────────── */
+
+.columns-container .column-resize-handle {
+	/* Keep the 10px layout width the renderer's flex maths assumes; the
+	   hairline and grabber are drawn inside it. */
+	width: 10px;
+	flex: 0 0 10px;
+	margin: 0 -1px;
+}
+
+.columns-container .column-resize-handle:not(.has-separator):not(.has-separator-custom)::before {
+	top: 10px;
+	bottom: 10px;
+	border-left: 1px solid var(--amc-divider-hairline);
+}
+
+.columns-container .column-resize-handle.has-separator::before {
+	top: 10px;
+	bottom: 10px;
+}
+
+.columns-container .column-resize-handle::after {
+	left: 50%;
+	top: 50%;
+	width: 4px;
+	height: 28px;
+	border-radius: var(--amc-radius-pill, 999px);
+	background: var(--amc-grabber);
+	opacity: 0;
+	transform: translate(-50%, -50%);
+	transition: opacity 0.16s var(--amc-ease-spring), height 0.16s var(--amc-ease-spring);
+}
+
+.columns-container .column-resize-handle:hover::after,
+.columns-container .column-resize-handle.is-active::after {
+	opacity: 0.85;
+	height: 32px;
+}
+
+.columns-container .column-resize-handle.is-active::after {
+	opacity: 1;
+}
+
+.columns-container .column-resize-handle.is-active:not(.has-separator):not(.no-separator)::before {
+	opacity: 0.35;
+}
+
+/* Floating Apple pill shown while dragging a divider. */
+.amc-resize-tooltip {
+	position: fixed;
+	z-index: var(--layer-tooltip, 2200);
+	padding: 4px 10px;
+	border: 1px solid var(--amc-border-hairline);
+	border-radius: var(--amc-radius-pill, 999px);
+	background: var(--amc-surface-elevated);
+	-webkit-backdrop-filter: blur(16px) saturate(180%);
+	backdrop-filter: blur(16px) saturate(180%);
+	box-shadow: var(--amc-shadow-popover);
+	color: var(--amc-text-primary);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+	line-height: 1.4;
+	letter-spacing: 0.01em;
+	pointer-events: none;
+	transform: translate(-50%, -145%);
+	white-space: nowrap;
+}
+
+/* ── Named presets ─────────────────────────────────────────────────────── */
+
+.amc-preset-apple-card {
+	--columns-col-bg: var(--amc-surface-card);
+	--columns-col-text: var(--amc-text-primary);
+	--columns-col-border-color: var(--amc-border-hairline);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-surface-card);
+	--columns-block-text: var(--amc-text-primary);
+	--columns-block-border-color: var(--amc-border-hairline);
+	--columns-block-border-width: 1px;
+}
+
+.amc-preset-apple-bento {
+	--columns-col-bg: var(--amc-surface-card);
+	--columns-col-text: var(--amc-text-primary);
+	--columns-col-border-color: var(--amc-border-hairline);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-surface-canvas);
+	--columns-block-text: var(--amc-text-primary);
+	--columns-block-border-color: var(--amc-border-hairline);
+	--columns-block-border-width: 1px;
+}
+
+/* Bento wrapper: elevated white inner cards on the warm canvas. */
+.columns-container.amc-preset-apple-bento > :is(.column-item, .columns-stack-group) > .column-item,
+.columns-container.columns-custom-style.amc-preset-apple-bento > .column-item {
+	background: var(--amc-surface-card);
+	border: 1px solid var(--amc-border-hairline);
+	box-shadow: var(--amc-shadow-card);
+}
+
+.amc-preset-glass-panel {
+	--columns-col-bg: var(--amc-glass-bg);
+	--columns-col-text: var(--amc-text-primary);
+	--columns-col-border-color: var(--amc-glass-border);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-glass-bg);
+	--columns-block-text: var(--amc-text-primary);
+	--columns-block-border-color: var(--amc-glass-border);
+	--columns-block-border-width: 1px;
+	-webkit-backdrop-filter: blur(18px) saturate(180%);
+	backdrop-filter: blur(18px) saturate(180%);
+}
+
+.amc-preset-soft-blue {
+	--columns-col-bg: var(--amc-tint-blue-bg);
+	--columns-col-text: var(--amc-tint-blue-text);
+	--columns-col-border-color: var(--amc-tint-blue-border);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-tint-blue-bg);
+	--columns-block-text: var(--amc-tint-blue-text);
+	--columns-block-border-color: var(--amc-tint-blue-border);
+	--columns-block-border-width: 1px;
+}
+
+.amc-preset-soft-mint {
+	--columns-col-bg: var(--amc-tint-mint-bg);
+	--columns-col-text: var(--amc-tint-mint-text);
+	--columns-col-border-color: var(--amc-tint-mint-border);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-tint-mint-bg);
+	--columns-block-text: var(--amc-tint-mint-text);
+	--columns-block-border-color: var(--amc-tint-mint-border);
+	--columns-block-border-width: 1px;
+}
+
+.amc-preset-soft-amber {
+	--columns-col-bg: var(--amc-tint-amber-bg);
+	--columns-col-text: var(--amc-tint-amber-text);
+	--columns-col-border-color: var(--amc-tint-amber-border);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-tint-amber-bg);
+	--columns-block-text: var(--amc-tint-amber-text);
+	--columns-block-border-color: var(--amc-tint-amber-border);
+	--columns-block-border-width: 1px;
+}
+
+.amc-preset-soft-rose {
+	--columns-col-bg: var(--amc-tint-rose-bg);
+	--columns-col-text: var(--amc-tint-rose-text);
+	--columns-col-border-color: var(--amc-tint-rose-border);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-tint-rose-bg);
+	--columns-block-text: var(--amc-tint-rose-text);
+	--columns-block-border-color: var(--amc-tint-rose-border);
+	--columns-block-border-width: 1px;
+}
+
+.amc-preset-soft-purple {
+	--columns-col-bg: var(--amc-tint-purple-bg);
+	--columns-col-text: var(--amc-tint-purple-text);
+	--columns-col-border-color: var(--amc-tint-purple-border);
+	--columns-col-border-width: 1px;
+	--columns-block-bg: var(--amc-tint-purple-bg);
+	--columns-block-text: var(--amc-tint-purple-text);
+	--columns-block-border-color: var(--amc-tint-purple-border);
+	--columns-block-border-width: 1px;
+}
+
+.amc-preset-minimal-flush {
+	--columns-col-bg: transparent;
+	--columns-col-text: inherit;
+	--columns-col-border-color: transparent;
+	--columns-col-border-width: 0px;
+	--columns-block-bg: transparent;
+	--columns-block-text: inherit;
+	--columns-block-border-color: transparent;
+	--columns-block-border-width: 0px;
+	box-shadow: none;
+	border-radius: 0;
+}
+
+.columns-container .column-item.amc-preset-minimal-flush {
+	box-shadow: none;
+	border-radius: 0;
+}
+
+.columns-container .column-item.amc-preset-minimal-flush:hover {
+	background: transparent;
+	border-color: transparent;
+	box-shadow: none;
+}
+
+/* Generated virtual MOC columns are display-only. */
+.columns-container .column-item.amc-virtual-column > .column-toolbar,
+.columns-container .column-item.amc-virtual-column > .column-drag-gutter {
+	display: none;
+}
+
+/* ── Foldable columns ──────────────────────────────────────────────────── */
+
+.columns-container .column-header {
+	border-radius: calc(var(--amc-radius-column, 12px) - 4px);
+	transition: border-radius 0.2s var(--amc-ease-spring);
+}
+
+.columns-container .amc-column-fold-toggle {
+	width: 20px;
+	height: 20px;
+	margin-inline-start: auto;
+	padding: 0;
+	border: none;
+	border-radius: var(--amc-radius-pill, 999px);
+	background: transparent;
+	box-shadow: none;
+	color: inherit;
+	opacity: 0.65;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: opacity 0.15s var(--amc-ease-spring), transform 0.18s var(--amc-ease-spring);
+}
+
+.columns-container .amc-column-fold-toggle:hover {
+	opacity: 1;
+	background: var(--amc-control-hover-bg);
+}
+
+.columns-container .amc-column-fold-toggle .svg-icon {
+	width: 14px;
+	height: 14px;
+	transition: transform 0.18s var(--amc-ease-spring);
+}
+
+.columns-container .amc-column-fold-toggle.is-folded .svg-icon {
+	transform: rotate(-90deg);
+}
+
+.columns-container .column-item.amc-column-folded {
+	min-height: 0;
+}
+
+.columns-container .column-item.amc-column-folded > .column-preview,
+.columns-container .column-item.amc-column-folded > .column-inline-edit-block {
+	display: none;
+}
+
+.columns-container .column-item.amc-column-folded > .column-header {
+	margin-bottom: 0;
+}
+
+/* ── Max-height scrollable columns ─────────────────────────────────────── */
+
+.columns-container .column-item.columns-max-height {
+	display: flex;
+	flex-direction: column;
+	max-height: var(--amc-column-max-height, 320px);
+	overflow: hidden;
+}
+
+.columns-container .column-item.columns-max-height > .column-preview {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	scrollbar-color: var(--amc-grabber) transparent;
+	padding-block: 2px;
+	-webkit-mask-image: linear-gradient(
+		to bottom,
+		transparent 0,
+		#000 10px,
+		#000 calc(100% - 12px),
+		transparent 100%
+	);
+	mask-image: linear-gradient(
+		to bottom,
+		transparent 0,
+		#000 10px,
+		#000 calc(100% - 12px),
+		transparent 100%
+	);
+}
+
+.columns-container .column-item.columns-max-height > .column-preview::-webkit-scrollbar {
+	width: 8px;
+}
+
+.columns-container .column-item.columns-max-height > .column-preview::-webkit-scrollbar-thumb {
+	background: color-mix(in srgb, var(--amc-grabber) 55%, transparent);
+	border-radius: 999px;
+}
+
+/* ── Wide tables scroll inside a column, with an edge shadow ───────────── */
+
+.columns-container .column-preview .table-wrapper {
+	max-width: 100%;
+	overflow-x: auto;
+	overscroll-behavior-x: contain;
+	scrollbar-width: thin;
+	-webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
+	mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
+}
+
+.columns-container .column-preview table {
+	max-width: 100%;
+}
+
+/* ── Right-click style popover: frosted Apple panel ────────────────────── */
+
+.columns-style-popover {
+	border-radius: var(--amc-radius-container, 14px);
+	border-color: var(--amc-border-hairline);
+	background: var(--amc-surface-elevated);
+	-webkit-backdrop-filter: blur(24px) saturate(180%);
+	backdrop-filter: blur(24px) saturate(180%);
+	box-shadow: var(--amc-shadow-popover);
+	color: var(--amc-text-primary);
+}
+
+.columns-style-popover .amc-menu-header {
+	border-bottom-color: var(--amc-border-hairline);
+}
+
+.columns-style-popover .amc-menu-segmented {
+	background: color-mix(in srgb, var(--amc-surface-secondary) 82%, transparent);
+	border: 1px solid var(--amc-border-hairline);
+	border-radius: var(--amc-radius-pill, 999px);
+	padding: 3px;
+}
+
+.columns-style-popover .amc-menu-segmented > button {
+	border-radius: var(--amc-radius-pill, 999px);
+}
+
+.columns-style-popover .amc-menu-segmented > button.is-active,
+.columns-style-popover .amc-menu-segmented > button[aria-selected="true"] {
+	background: var(--amc-surface-card);
+	box-shadow: var(--amc-shadow-card);
+	color: var(--amc-text-primary);
+}
+
+.columns-style-popover .amc-menu-icon-btn,
+.columns-style-popover .amc-menu-text-btn {
+	border-radius: 8px;
+	transition: background-color 0.15s var(--amc-ease-spring), color 0.15s var(--amc-ease-spring);
+}
+
+.columns-style-popover .amc-menu-icon-btn:hover,
+.columns-style-popover .amc-menu-text-btn:hover {
+	background: var(--amc-control-hover-bg);
+}
+
+.columns-style-popover .amc-menu-preset-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 6px;
+	padding: 2px 0 8px;
+}
+
+.columns-style-popover .amc-menu-preset-card {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 4px;
+	padding: 8px;
+	border: 1px solid var(--amc-border-hairline);
+	border-radius: 10px;
+	background: var(--amc-surface-card);
+	color: var(--amc-text-primary);
+	font-size: 11px;
+	line-height: 1.25;
+	cursor: pointer;
+	box-shadow: var(--amc-shadow-card);
+}
+
+.columns-style-popover .amc-menu-preset-card:hover {
+	box-shadow: var(--amc-shadow-hover);
+	transform: translateY(-1px);
+}
+
+.columns-style-popover .amc-menu-preset-card.is-selected {
+	border-color: var(--amc-border-focus);
+	box-shadow: 0 0 0 2px var(--amc-border-focus);
+}
+
+.columns-style-popover .amc-menu-preset-swatch {
+	width: 100%;
+	height: 18px;
+	border-radius: 6px;
+	border: 1px solid var(--amc-border-hairline);
+	background: var(--columns-col-bg, var(--amc-surface-card));
+}
+
+.columns-style-popover .amc-menu-preset-swatch.amc-preset-none {
+	background: linear-gradient(
+		135deg,
+		var(--amc-surface-secondary) 0 45%,
+		var(--amc-border-hairline) 45% 55%,
+		var(--amc-surface-secondary) 55% 100%
+	);
+}
+
+.columns-style-popover .amc-menu-preset-label {
+	font-size: 10px;
+	line-height: 1.2;
+	color: var(--amc-text-secondary);
+}
+
+/* ── Layout / Bento picker modal ───────────────────────────────────────── */
+
+.amc-layout-picker-modal {
+	max-width: min(760px, calc(100vw - 32px));
+}
+
+.amc-layout-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.amc-layout-picker-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+	gap: 10px;
+}
+
+.amc-layout-card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	border: 1px solid var(--amc-border-hairline);
+	border-radius: var(--amc-radius-column, 12px);
+	background: var(--amc-surface-card);
+	box-shadow: var(--amc-shadow-card);
+	cursor: pointer;
+	text-align: start;
+	transition: box-shadow 0.2s var(--amc-ease-spring), transform 0.2s var(--amc-ease-spring);
+}
+
+.amc-layout-card:hover,
+.amc-layout-card:focus-visible {
+	box-shadow: var(--amc-shadow-hover);
+	transform: translateY(-1px);
+	outline: none;
+}
+
+.amc-layout-card-title {
+	font-weight: 600;
+	color: var(--amc-text-primary);
+}
+
+.amc-layout-card-desc {
+	font-size: var(--font-ui-smaller);
+	color: var(--amc-text-secondary);
+}
+
+.amc-layout-preview {
+	display: flex;
+	gap: 4px;
+	height: 54px;
+	padding: 4px;
+	border-radius: 8px;
+	background: var(--amc-surface-canvas);
+	border: 1px solid var(--amc-border-hairline);
+}
+
+.amc-layout-preview-cell {
+	border-radius: 5px;
+	background: var(--amc-surface-card);
+	border: 1px solid var(--amc-border-hairline);
+	box-shadow: var(--amc-shadow-card);
+}
+
+.amc-layout-preview-cell.is-tinted {
+	background: var(--amc-tint-blue-bg);
+	border-color: var(--amc-tint-blue-border);
+}
+
+.amc-layout-preview-column {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 0 0 calc(var(--amc-preview-width, 50%) - 4px);
+}
+
+.amc-layout-preview-cell {
+	flex: 1 1 0;
+}
+
+/* ── Container-responsive layout engine (Phase 4) ──────────────────────── */
+
+/* Desktop / full width: exact user widths are already expressed as flex
+   bases by the renderer; nothing to override. */
+
+@container amc-row (min-width: 480px) and (max-width: 760px) {
+	.columns-container.amc-cols-many:not(.columns-stacked) {
+		display: grid !important;
+		grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+		gap: 12px;
+		align-items: start;
+	}
+
+	.columns-container.amc-cols-many:not(.columns-stacked) > :is(.column-item, .columns-stack-group) {
+		width: auto !important;
+		flex: none !important;
+		min-width: 0;
+		margin: 0 !important;
+	}
+
+	.columns-container.amc-cols-many > .column-resize-handle {
+		display: none;
+	}
+}
+
+@container amc-row (max-width: 479px) {
+	.columns-container:not(.columns-stacked) {
+		flex-direction: column !important;
+		flex-wrap: nowrap !important;
+		gap: 12px;
+		padding: 4px 0;
+	}
+
+	.columns-container:not(.columns-stacked) > :is(.column-item, .columns-stack-group) {
+		width: 100% !important;
+		max-width: 100% !important;
+		flex: none !important;
+		margin: 0 !important;
+	}
+
+	.columns-container:not(.columns-stacked) > .column-resize-handle {
+		display: none;
+	}
+
+	.columns-container.columns-nested {
+		padding: 4px;
+	}
+}
+
+/* Apple HIG minimum touch target: 44 × 44pt. */
+@media (pointer: coarse) {
+	.columns-container .column-toolbar {
+		opacity: 1;
+		pointer-events: auto;
+	}
+
+	.columns-container .column-toolbar-actions {
+		gap: 4px;
+	}
+
+	.columns-container :is(.column-add-btn, .column-remove-btn) {
+		width: 44px;
+		height: 44px;
+	}
+
+	.columns-container .column-drag-gutter {
+		width: 44px;
+	}
+
+	.columns-container .column-drag-gutter > .column-drag-handle {
+		width: 44px;
+		height: 44px;
+	}
+
+	/* 44px invisible hit target without consuming 44px of layout width. */
+	.columns-container .column-resize-handle {
+		width: 44px;
+		flex: 0 0 44px;
+		margin: 0 -17px;
+	}
+
+	.columns-container .column-resize-handle::after {
+		width: 6px;
+		height: 36px;
+		opacity: 0.55;
+	}
+
+	.columns-container .amc-column-fold-toggle {
+		width: 44px;
+		height: 44px;
+	}
+}

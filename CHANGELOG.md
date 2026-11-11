@@ -4,6 +4,22 @@ All notable changes to **Advanced Multi Column** are listed here, newest first.
 Versions follow [Semantic Versioning](https://semver.org/). Each version links to its
 [GitHub release](https://github.com/amatya-aditya/advanced-multi-column/releases).
 
+## [Unreleased]
+
+### Added
+- **Apple HIG design system**: warm alabaster surfaces, white cards with hairline borders and soft shadows, 12px squircle corners, frosted floating controls, a focus halo while editing, and a full dark-mode palette.
+- **Named presets**: `preset:apple-card`, `preset:apple-bento`, `preset:glass-panel`, `preset:soft-blue|mint|amber|rose|purple` and `preset:minimal-flush`, available from the style popover with live swatches.
+- **Column height and folding**: `mh:<px>` caps a column body with a smooth internal scrollbar and edge fades; `fold:1` adds a chevron that collapses a column to its header.
+- **Magnetic resizing**: dividers snap to 20/25/33.3/50/66.7/75/80% within ±2.5%, show a floating `33% | 67%` pill, and equalize on double-click (Shift + double-click for the whole row).
+- **Bento / layout picker**: a visual command and right-click menu entry for 2-up, sidebar, inspector, dashboard, Apple Bento and Holy Grail layouts.
+- **Virtual MOCs**: a Storage option that stores only a compact `v:1` marker and resolves links live from the metadata cache; persistent MOCs keep writing Markdown links but are only written when their content actually changes.
+
+### Changed
+- **Live Preview parser** now uses the Lezer syntax tree, so markers inside fenced code, inline code, math and raw HTML are ignored. Edits re-parse only the intersecting column block; the rest are mapped incrementally.
+- **Real-time column editing**: typing in a top-level column editor is mirrored into the note immediately, and `Mod-Z` / `Mod-Shift-Z` delegate to the note's unified undo/redo history instead of a detached sub-editor buffer. Nested text segments keep the safe commit-on-blur path.
+- **Segmented navigation**: arrow keys and Tab step through text segments around nested column blocks and into nested columns in document order.
+- **Responsive rows** use container queries (`amc-row`): exact widths on wide rows, a 2-column card grid for 3+ columns in split panes, full-width stacking under 480px, and 44px touch targets on coarse pointers.
+
 ## [2.6.0](https://github.com/amatya-aditya/advanced-multi-column/releases/tag/2.6.0) - 2026-10-17
 
 ### Added

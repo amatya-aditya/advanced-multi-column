@@ -5,6 +5,11 @@ import type {EditorView} from "@codemirror/view";
 import type {ViewUpdate} from "@codemirror/view";
 import type {ColumnRegion} from "../core/types";
 import type {ActiveEditState} from "../core/widget-types";
+import {
+	beginStructuralHold,
+	endStructuralHold,
+	SubEditorSyncAnnotation,
+} from "../core/sync-guard";
 import {refreshRegionPosition} from "../core/region-position";
 import {
 	createEmbeddedEditor,
@@ -69,6 +74,14 @@ export interface LiveEditConfig {
 	blurDelay?: number;
 	/** Persist edit state across widget rebuilds. */
 	editState: LiveEditState;
+	/**
+	 * Absolute document range the editor mirrors (top-level column content).
+	 * When present, local changes are mirrored into the note immediately and
+	 * undo/redo is delegated to the note's own history.
+	 */
+	getContentRange?: () => {from: number; to: number} | undefined;
+	/** Top-level widget host; keyboard navigation walks its editor targets. */
+	rootEl?: HTMLElement;
 	/** Tab outside a list moves to the sibling editor this returns. */
 	onNavigate?: (dir: 1 | -1) => LiveEditNavigationTarget | null;
 	/** Arrow keys left the column's first (-1) or last (1) line; it is committed first. */
@@ -210,6 +223,15 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 	const owner = {};
 	let active: EmbeddedEditorHandle | null = null;
 	let blurTimer: number | null = null;
+	/** A parent-originated edit is being written into the sub-editor. */
+	let applyingExternal = false;
+	/** The sub-editor has mirrored at least one change into the note. */
+	let syncedSinceOpen = false;
+
+	const mirroringEnabled = !!config.getContentRange;
+
+	/** The editor of the pane that owns this column (for undo/redo). */
+	const parentEditor = (): Editor | null => openEditorFor(app, sourcePath, editState.view);
 
 	config.hostEl.setAttribute(EDIT_KEY_ATTR, editState.key);
 	const sourcePath = editState.view.state.field(editorInfoField, false)?.file?.path ?? "";
@@ -235,9 +257,12 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		handle.destroy();
 		config.hostEl.classList.remove("is-editing");
 		clearEditState();
-		if (nextValue !== config.getContent()) {
+		// While mirroring, the note already has the text; still commit once on
+		// close so the hidden preview DOM is rebuilt with what was typed.
+		if (nextValue !== config.getContent() || syncedSinceOpen) {
 			config.onCommit(nextValue);
 		}
+		syncedSinceOpen = false;
 	};
 
 	/** Commit shortly after the editor loses focus, unless the focus comes back. */
@@ -253,42 +278,178 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		}, blurDelay);
 	};
 
+	/**
+	 * Mirror a sub-editor transaction into the note immediately. The parent
+	 * transaction is annotated so the state field maps the existing block
+	 * decoration and refreshes its parsed columns in place instead of
+	 * remounting the widget and destroying this editor.
+	 */
+	const mirrorChanges = (update: ViewUpdate): void => {
+		if (applyingExternal || !mirroringEnabled) return;
+		const st = getInteractionState(editState.view).activeEdit;
+		if (st?.owner !== owner || st.contentStart === undefined || st.contentEnd === undefined) return;
+
+		const changes: {from: number; to: number; insert: string}[] = [];
+		update.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+			changes.push({
+				from: st.contentStart! + fromA,
+				to: st.contentStart! + toA,
+				insert: inserted.toString(),
+			});
+		});
+		if (changes.length === 0) return;
+
+		// A compact empty column (`%% col-break %%` directly followed by the
+		// next marker) has its insertion point at the next marker's line
+		// start. Typing there would merge the text into that marker, so the
+		// first insertion gets a separating newline. The local editor keeps
+		// only the typed text; contentEnd is corrected below.
+		const wasEmpty = st.contentStart === st.contentEnd;
+		let syntheticNewline = 0;
+		if (
+			wasEmpty
+			&& changes.length === 1
+			&& changes[0]!.from === st.contentStart
+			&& changes[0]!.to === st.contentStart
+		) {
+			const inserted = changes[0]!.insert;
+			// Always keep one separator line after the text, even when the
+			// insertion itself ends in a newline: the caret at the local end
+			// must map before the end marker, never onto it.
+			changes[0]!.insert = `${inserted}\n`;
+			syntheticNewline = 1;
+		}
+
+		const parentView = editState.view;
+		const tr = parentView.state.update({
+			changes,
+			annotations: SubEditorSyncAnnotation.of(true),
+		});
+		// The view's interactionPositionTracker maps contentStart/contentEnd
+		// through this transaction exactly once. Mapping them here as well
+		// would shift the end twice for insertions at the end of the column.
+		parentView.dispatch(tr);
+		if (syntheticNewline) {
+			// Exclude the separator newline from the mirrored text range; the
+			// next keystroke must land before it, not in the marker line.
+			st.contentEnd = st.contentStart + changes[0]!.insert.length - syntheticNewline;
+		}
+		syncedSinceOpen = true;
+	};
+
+	/** Read the note's current column text back into the sub-editor. */
+	const syncLocalFromParent = (): void => {
+		const handle = active;
+		if (!handle) return;
+		const st = getInteractionState(editState.view).activeEdit;
+		if (!st || st.contentStart === undefined || st.contentEnd === undefined) return;
+		const doc = editState.view.state.doc;
+		const from = Math.max(0, Math.min(st.contentStart, doc.length));
+		const to = Math.max(from, Math.min(st.contentEnd, doc.length));
+		const content = doc.sliceString(from, to);
+		const cm = handle.editor.cm;
+		if (content === cm.state.doc.toString()) return;
+		const head = Math.min(cm.state.selection.main.head, content.length);
+		applyingExternal = true;
+		try {
+			cm.dispatch({
+				changes: {from: 0, to: cm.state.doc.length, insert: content},
+				selection: {anchor: head, head},
+			});
+		} finally {
+			applyingExternal = false;
+		}
+		st.value = content;
+		st.base = content;
+		st.cursorStart = head;
+		st.cursorEnd = head;
+		syncedSinceOpen = true;
+	};
+
+	const undoOrRedo = (redo: boolean): boolean => {
+		const editor = parentEditor();
+		if (!editor) return false;
+		// Keep the widget DOM alive across the parent transaction; the column
+		// editor is a view onto the note, not a separate undo history.
+		beginStructuralHold();
+		try {
+			if (redo) editor.redo();
+			else editor.undo();
+		} catch {
+			return false;
+		} finally {
+			endStructuralHold();
+		}
+		syncLocalFromParent();
+		return true;
+	};
+
 	const trackChange = (update: ViewUpdate) => {
+		if (applyingExternal) return;
+		mirrorChanges(update);
 		const st = getInteractionState(editState.view).activeEdit;
 		if (st?.owner !== owner) return;
-		st.value = update.state.doc.toString();
+		const value = update.state.doc.toString();
+		st.value = value;
+		// The draft is already in the note; do not treat it as an unsaved
+		// draft if the widget is later rebuilt for an unrelated reason.
+		if (mirroringEnabled) st.base = value;
 		const sel = update.state.selection.main;
 		st.cursorStart = sel.from;
 		st.cursorEnd = sel.to;
 	};
 
+	/**
+	 * Move to the next editable target in this block (text segment, top-level
+	 * column or nested column), in DOM order. The target is registered before
+	 * the commit so a rebuilt widget re-opens it; targetOnly makes the rebuilt
+	 * editor read its own current content rather than a stale copy.
+	 */
 	const navigate = (dir: 1 | -1): boolean => {
-		const target = config.onNavigate?.(dir) ?? null;
-		const container = config.container;
-		if (target) {
-			// Register the sibling first: if this commit rebuilds the widget,
-			// the rebuilt sibling editor re-opens from this state.
-			refreshRegionPosition(editState.region);
-			getInteractionState(editState.view).activeEdit = {
-				filePath: sourcePath,
-				regionFrom: editState.region.from,
-				regionSource: editState.regionSource,
-				key: target.key,
-				cursorStart: target.value.length,
-				cursorEnd: target.value.length,
-				scrollTop: 0,
-				value: target.value,
-				base: target.value,
-			};
+		let target: LiveEditNavigationTarget | null = null;
+		const root = config.rootEl ?? config.container;
+		const targets = Array.from(root.querySelectorAll<HTMLElement>(`[${EDIT_KEY_ATTR}]`));
+		const current = targets.indexOf(config.hostEl);
+		if (current >= 0) {
+			const sibling = targets[current + dir];
+			const key = sibling?.getAttribute(EDIT_KEY_ATTR);
+			if (key) target = {key, value: ""};
 		}
+		target ??= config.onNavigate?.(dir) ?? null;
+		if (!target) return false;
+
+		// Register the sibling first: if this commit rebuilds the widget, the
+		// rebuilt sibling editor re-opens from this state.
+		refreshRegionPosition(editState.region);
+		getInteractionState(editState.view).activeEdit = {
+			filePath: sourcePath,
+			regionFrom: editState.region.from,
+			regionSource: editState.regionSource,
+			key: target.key,
+			cursorStart: 0,
+			cursorEnd: 0,
+			scrollTop: 0,
+			value: "",
+			targetOnly: true,
+		};
 		commitAndClose();
-		if (!target || !container.isConnected) return true;
+		if (!root.isConnected) return true;
 		// No rebuild happened: open the sibling in the current DOM.
-		const sibling = container.querySelector<HTMLElement>(
+		const sibling = root.querySelector<HTMLElement>(
 			`[${EDIT_KEY_ATTR}="${CSS.escape(target.key)}"]`,
 		);
 		sibling?.dispatchEvent(new CustomEvent(RESTORE_EVENT));
 		return true;
+	};
+
+	/** Current absolute range of the text this editor mirrors, if any. */
+	const contentRange = (): {from: number; to: number} | undefined => {
+		try {
+			refreshRegionPosition(editState.region);
+			return config.getContentRange?.();
+		} catch {
+			return undefined;
+		}
 	};
 
 	const enterEdit = (restore?: LiveEditRestoreState, restoring = false) => {
@@ -302,6 +463,7 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		// rebuilds the widget DOM, and the rebuild re-opens this editor from
 		// the interaction state.
 		refreshRegionPosition(editState.region);
+		const range = contentRange();
 		getInteractionState(editState.view).activeEdit = {
 			filePath: sourcePath,
 			regionFrom: editState.region.from,
@@ -313,7 +475,9 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			value,
 			base,
 			owner,
+			...(range ? {contentStart: range.from, contentEnd: range.to} : {}),
 		};
+		syncedSinceOpen = false;
 
 		if (!restoring) {
 			// Commit and close other open editors in this container.
@@ -338,12 +502,13 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 			onBlur: () => scheduleBlurCommit(),
 			onChange: trackChange,
 			onPaste: handleEditorImagePaste,
-			onArrowExit: config.onArrowExit
-				? (dir) => {
-					commitAndClose();
-					config.onArrowExit?.(dir);
-				}
-				: undefined,
+			onArrowExit: (dir) => {
+				if (navigate(dir)) return;
+				commitAndClose();
+				config.onArrowExit?.(dir);
+			},
+			onUndo: mirroringEnabled ? () => undoOrRedo(false) : undefined,
+			onRedo: mirroringEnabled ? () => undoOrRedo(true) : undefined,
 			onTab: config.onNavigate
 				? (shift) => {
 					const current = active;
@@ -427,6 +592,12 @@ export function wireLivePreviewEdit(config: LiveEditConfig): LiveEditHandle {
 		if (active) return;
 		const st = getInteractionState(editState.view).activeEdit;
 		if (!matchesEditState(st, editState, sourcePath)) return;
+		if (st.targetOnly) {
+			// Keyboard navigation: the rebuilt column owns the current content.
+			const value = config.getContent();
+			enterEdit({value, cursorStart: 0, cursorEnd: 0, focus: st.focused}, true);
+			return;
+		}
 		const restore = {value: st.value, cursorStart: st.cursorStart, cursorEnd: st.cursorEnd};
 		// The block was rebuilt because the note changed; if this column's text
 		// changed too, a stale draft would overwrite it on commit.
