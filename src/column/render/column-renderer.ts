@@ -21,6 +21,7 @@ import {buildResizeHandle} from "./column-resizer";
 import {applyNoteFootnotes, livePreviewFootnotes, renderLiveFootnoteDefinitions, wireLivePreviewFootnotes} from "./footnote-render";
 import {extractFootnoteDefinitions} from "../core/footnotes";
 import {wireDragItem} from "./column-drag";
+import {hydrateVirtualMocRegion} from "../../moc/generate";
 import {applyBetterBullets} from "./better-bullets";
 import {addFoldControls} from "./fold";
 import {
@@ -48,7 +49,7 @@ export function parseColumnHeader(content: string): {type: string; title: string
 	return null;
 }
 
-function renderColumnHeader(colEl: HTMLElement, content: string): string {
+function renderColumnHeader(colEl: HTMLElement, content: string, style?: ColumnStyleData): string {
 	const plugin = getPluginInstance();
 	if (!plugin.settings.enableHeaders) return content;
 
@@ -69,6 +70,26 @@ function renderColumnHeader(colEl: HTMLElement, content: string): string {
 
 	if (parsed.title) {
 		headerEl.createSpan({cls: "column-header-title", text: parsed.title});
+	}
+
+	// A foldable column keeps its header visible and collapses the body. It is
+	// opt-in (`fold:1`) and only exists when headers are enabled.
+	if (style?.fold) {
+		colEl.classList.add("columns-foldable");
+		const toggle = headerEl.createEl("button", {
+			cls: "amc-column-fold-toggle",
+			attr: {"aria-label": "Collapse column", "aria-expanded": "true"},
+		});
+		toggle.type = "button";
+		setIcon(toggle, "chevron-down");
+		toggle.addEventListener("click", (evt) => {
+			evt.preventDefault();
+			evt.stopPropagation();
+			const folded = colEl.classList.toggle("amc-column-folded");
+			toggle.classList.toggle("is-folded", folded);
+			toggle.setAttribute("aria-expanded", String(!folded));
+			toggle.setAttribute("aria-label", folded ? "Expand column" : "Collapse column");
+		});
 	}
 
 	// Set the left-border accent color from the header background so it
@@ -933,6 +954,7 @@ function renderEditableTextSegment(
 	onCommit: (nextText: string) => void,
 	ctx: RenderContext,
 	key: string,
+	rootEl: HTMLElement,
 ): void {
 	const block = parent.createDiv({cls: "column-inline-edit-block"});
 
@@ -954,6 +976,7 @@ function renderEditableTextSegment(
 	if (isEmbeddedEditorAvailable()) {
 		wireLivePreviewEdit({
 			container: block,
+			rootEl,
 			hostEl: block,
 			previewEl: preview,
 			components: ctx.components,
@@ -963,6 +986,10 @@ function renderEditableTextSegment(
 				onCommit(nextText);
 			},
 			editState: {view: ctx.view, region: ctx.region, regionSource: ctx.source, key},
+			onArrowExit: (dir) => {
+				refreshRegionPosition(ctx.region);
+				leaveColumnBlock(ctx.view, ctx.region.from, dir);
+			},
 		});
 		return;
 	}
@@ -1079,6 +1106,7 @@ function renderColumnContent(
 				},
 				ctx,
 				`${editKey(containerPath, columnIndex)}/s${partIndex}`,
+				parent.closest<HTMLElement>(".amc-columns-host") ?? parent,
 			);
 			continue;
 		}
@@ -1141,6 +1169,8 @@ function renderNestedRegion(
 	const groups = isContainerStacked
 		? [{indices: region.columns.map((_, i) => i), isStack: true}]
 		: groupColumns(region.columns);
+	container.classList.toggle("amc-cols-many", groups.length >= 3);
+	container.dataset.amcColumns = String(region.columns.length);
 
 	for (let gi = 0; gi < groups.length; gi++) {
 		const group = groups[gi]!;
@@ -1193,7 +1223,7 @@ function renderNestedRegion(
 			}
 			applyColumnStyle(colEl, col.style);
 
-			const colContent = renderColumnHeader(colEl, col.content);
+			const colContent = renderColumnHeader(colEl, col.content, col.style);
 
 			const toolbar = colEl.createDiv({cls: "column-toolbar"});
 			const dragHandle = buildDragHandle(colEl);
@@ -1295,6 +1325,7 @@ function renderNestedRegion(
 				if (isEmbeddedEditorAvailable()) {
 					liveEdit = wireLivePreviewEdit({
 						container,
+						rootEl: container.closest<HTMLElement>(".amc-columns-host") ?? container,
 						hostEl: colEl,
 						previewEl,
 						components: ctx.components,
@@ -1306,6 +1337,10 @@ function renderNestedRegion(
 							return !!(currentNested && clickedNested && clickedNested !== currentNested);
 						},
 						editState: {view: ctx.view, region: ctx.region, regionSource: ctx.source, key: editKey(containerPath, i)},
+						onArrowExit: (dir) => {
+							refreshRegionPosition(ctx.region);
+							leaveColumnBlock(ctx.view, ctx.region.from, dir);
+						},
 					});
 				} else {
 					const textarea = colEl.createEl("textarea", {cls: "column-editor"});
@@ -1330,11 +1365,14 @@ function renderNestedRegion(
 // ── Build Columns (top-level) ───────────────────────────────
 
 export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
+	const plugin = getPluginInstance();
+	const sourcePath = ctx.sourcePath;
+	if (ctx.region.virtual) {
+		hydrateVirtualMocRegion(plugin.app, plugin.settings.mocTemplates, ctx.region, sourcePath);
+	}
 	const {columns} = ctx.region;
 	const isContainerStacked = ctx.region.layout === "stack";
 	if (isContainerStacked) container.classList.add("columns-stacked");
-	const plugin = getPluginInstance();
-	const sourcePath = ctx.sourcePath;
 
 	// Clear any stale selection state when the container is rebuilt
 	// (updateDOM reuses the same DOM element but empties its children,
@@ -1355,6 +1393,8 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 	});
 
 	const groups = isContainerStacked ? [{indices: columns.map((_, i) => i), isStack: true}] : groupColumns(columns);
+	container.classList.toggle("amc-cols-many", groups.length >= 3);
+	container.dataset.amcColumns = String(columns.length);
 
 	for (let gi = 0; gi < groups.length; gi++) {
 		const group = groups[gi]!;
@@ -1400,6 +1440,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 			}
 
 			const colEl = groupParent.createDiv({cls: "column-item"});
+			if (ctx.region.virtual) colEl.classList.add("amc-virtual-column");
 			if (useStackWrapper) {
 				// Stacked columns: full width via CSS
 			} else if (!isContainerStacked && col.widthPercent > 0) {
@@ -1411,7 +1452,7 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 			colEl.dataset.colIndex = String(i);
 
 			try {
-				const colContent = renderColumnHeader(colEl, col.content);
+				const colContent = renderColumnHeader(colEl, col.content, col.style);
 				const hasNestedRegions = findColumnRegions(colContent).length > 0;
 
 				const toolbar = colEl.createDiv({cls: "column-toolbar"});
@@ -1462,10 +1503,12 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 					);
 				}
 
-				if (!hasNestedRegions) {
+				if (!hasNestedRegions && !ctx.region.virtual) {
 					if (isEmbeddedEditorAvailable()) {
+						const rootEl = container.closest<HTMLElement>(".amc-columns-host") ?? container;
 						liveEdit = wireLivePreviewEdit({
 							container,
+							rootEl,
 							hostEl: colEl,
 							previewEl,
 							components: ctx.components,
@@ -1474,13 +1517,9 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 							clickGuard: (target) => !!target.closest(".columns-nested"),
 							blurDelay: 200,
 							editState: {view: ctx.view, region: ctx.region, regionSource: ctx.source, key: editKey([], i)},
-							onNavigate: (dir) => {
-								const next = i + dir;
-								const nextCol = ctx.region.columns[next];
-								if (!nextCol) return null;
-								// Columns holding nested blocks have no single editor.
-								if (findColumnRegions(nextCol.content).length > 0) return null;
-								return {key: editKey([], next), value: nextCol.content};
+							getContentRange: () => {
+								const range = ctx.region.columnContentRanges[i];
+								return range ? {from: range[0], to: range[1]} : undefined;
 							},
 							onArrowExit: (dir) => {
 								refreshRegionPosition(ctx.region);
@@ -1520,18 +1559,20 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 						editMoc: ctx.region.mocId && plugin.settings.enableMoc
 							? () => plugin.editMoc(ctx.region.mocId!, ctx.sourcePath)
 							: undefined,
-						editColumn: liveEdit ? () => liveEdit?.enterEdit() : undefined,
-						addColumn: (latest) => {
+						editColumn: !ctx.region.virtual && liveEdit ? () => liveEdit?.enterEdit() : undefined,
+						// Virtual MOCs are generated: structural actions have
+						// nothing to persist and would only rewrite the marker.
+						addColumn: ctx.region.virtual ? undefined : (latest) => {
 							const updated = insertColumnAfter(latest.columns, i);
 							dispatchUpdate(ctx.region, updated, ctx.view, latest.containerStyle);
 						},
-						addChild: (latest) => {
+						addChild: ctx.region.virtual ? undefined : (latest) => {
 							const updated = latest.columns.map((c, idx) =>
 								idx === i ? {...c, content: addChildColumnToContent(c.content)} : c,
 							);
 							dispatchUpdate(ctx.region, updated, ctx.view, latest.containerStyle);
 						},
-						deleteColumn,
+						deleteColumn: ctx.region.virtual ? undefined : deleteColumn,
 					},
 					undefined,
 					container,
@@ -1542,7 +1583,13 @@ export function buildColumns(container: HTMLElement, ctx: RenderContext): void {
 							changes: {
 								from: ctx.region.from,
 								to: ctx.region.to,
-								insert: serializeColumns(nextColumns, nextContainerStyle, nextLayout, ctx.region.mocId),
+								insert: serializeColumns(
+									nextColumns,
+									nextContainerStyle,
+									nextLayout,
+									ctx.region.mocId,
+									ctx.region.virtual,
+								),
 							},
 						});
 					},

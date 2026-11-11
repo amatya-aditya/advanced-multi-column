@@ -59,20 +59,22 @@ You always see the full layout, making multi-column editing feel natural instead
 
 - **Marker-based syntax** — `%% col-start %%`, `%% col-break %%`, `%% col-end %%`
 - **Live Preview + Reading View** — renders in both modes, toggleable independently
-- **Nested columns** — columns inside columns, unlimited depth
+- **Apple HIG design** — light and dark palette, white cards, hairline borders, soft shadows, a focus halo while editing and frosted floating controls
+- **Responsive by container** — columns adapt to the pane, Canvas card or hover popover width; 3+ column rows become a card grid in split panes and stack below 480px
+- **Nested columns** — columns inside columns, unlimited depth; arrow keys and Tab step through text segments and child columns
 - **Drag to reorder** — grab handle or Alt+drag to rearrange columns
-- **Resize by dragging** — drag the vertical divider between columns
-- **Right-click style popover** — per-column and container styling
-- **Inline editing** — click to edit with live markdown preview
+- **Magnetic resize** — drag the divider to snap to clean ratios, with a live ratio pill; double-click a divider to equalize its columns (Shift+double-click for the row)
+- **Right-click style popover** — per-column and container styling, named presets with swatches, foldable headers and max-height controls
+- **Inline editing** — click to edit with live markdown preview; top-level editors mirror into the note as you type and share the note's undo history
 - **Wikilink autocomplete** — `[[` triggers file suggestions inside column editors
 - **Image paste** — paste images to auto-save and insert `![[image.png]]`
 - **Colored column headers** — start a column with `!tip: Title` for a colored header bar with an icon; built-in `note`, `info`, `tip`, `warning` and `danger` types, plus your own custom types (icon, background, text color, size, weight)
 - **Footnotes in columns** — `[^1]` and inline `^[...]` footnotes work inside columns and tables in columns, numbered with the rest of the note and listed at the end of it
 - **PDF export** — **Export to PDF** keeps your column layout, styles and headers instead of flattening them
-- **Style tokens** — portable styling via marker parameters (`b:`, `bc:`, `t:`, `sb:`, `hd:`)
+- **Style tokens and presets** — portable styling via marker parameters (`b:`, `bc:`, `t:`, `sb:`, `hd:`, `preset:`, `mh:`, `fold:`)
 - **Quick add/remove** — `+` / `×` buttons on each column; removing a column with content asks first
 - **Global settings** — default layout, colors, borders, dividers
-- **MOC (map of content)** — auto-updating columns of links to notes from a folder, tags or properties, grouped into columns you choose
+- **MOC (map of content)** — auto-updating columns of links to notes from a folder, tags or properties, grouped into columns you choose; persistent links for Graph View or virtual live rendering with no generated text in the note
 
 ## Screenshots
 
@@ -177,6 +179,28 @@ Width and style tokens can be combined:
 | `t:` / `tc:` | Text color | Same as border color |
 | `sb:` | Show border | `1`/`0`, `true`/`false`, `yes`/`no`, `on`/`off` |
 | `h:` / `hd:` | Horizontal dividers | Same as show border |
+| `preset:` | Named design preset | `apple-card`, `apple-bento`, `glass-panel`, `soft-blue`, `soft-mint`, `soft-amber`, `soft-rose`, `soft-purple`, `minimal-flush` |
+| `mh:` | Max column height | `80`–`4000` (pixels); the column body scrolls with soft edge fades |
+| `fold:` | Foldable header | `1`/`0`; adds a chevron to the column header |
+
+### Named presets
+
+Presets replace long token strings with an Apple HIG design name. Explicit
+tokens still win, so a preset can be combined with overrides:
+
+```md
+%% col-start:preset:apple-bento %%
+%% col-break:40,preset:soft-blue %%
+Sidebar
+%% col-break:60,preset:apple-card,mh:420,fold:1 %%
+Main card with a scrollable body and a fold chevron.
+%% col-end %%
+```
+
+The right-click style popover shows the presets with swatches, plus fold and
+max-height controls. `apple-card`, `apple-bento`, `glass-panel`, the five
+`soft-*` callout tints and `minimal-flush` are available in both light and
+dark mode.
 
 ## Nested Layout Example
 
@@ -209,11 +233,14 @@ Nested content.
 | Insert 4-wide layout | Four equal columns |
 | Insert layout (custom count) | Uses default count from settings |
 | Insert nested layout | Parent with child columns template |
+| Insert bento / column template | Visual picker for 2-up, sidebar, inspector, dashboard, Apple Bento and Holy Grail layouts |
 
 ## Editing
 
 - **Click** preview content to enter edit mode
-- **Tab** / **Shift+Tab** — indent/unindent list items, or cycle through columns
+- **Arrow Up / Arrow Down** — enter a column block from the note, move through its text segments and child columns, and leave at the edge
+- **Tab** / **Shift+Tab** — indent/unindent list items, or cycle through columns, text segments and child columns
+- **Mod-Z / Mod-Shift-Z** — undo/redo through the note's history while editing a top-level column
 - **Esc** — commit and exit edit mode
 - **`[[`** — wikilink suggestions
 - **Ctrl/Cmd+B** — bold, **Ctrl/Cmd+I** — italic
@@ -225,6 +252,8 @@ Nested content.
 
 Right-click any column to:
 - Style current column (background, border, text, toggles)
+- Choose a named preset with a live swatch
+- Make the header foldable or cap the column height
 - Style parent container
 - Add column / add child column
 - Reset styles (column or parent)
@@ -235,7 +264,7 @@ Right-click any column to:
 **Settings → Community Plugins → Advanced Multi Column**
 
 - **General** — enable/disable live preview and reading view, drag handles and where the column buttons appear, default column count, minimum column width, stacking on narrow screens
-- **MOC** — reusable MOC templates: sources (rules on folders, tags and properties, joined by And / Or), grouping, columns, and a live preview
+- **MOC** — reusable MOC templates: sources (rules on folders, tags and properties, joined by And / Or), grouping, columns, and a live preview; each MOC can use persistent links or virtual live rendering
 - **Column headers** — turn column headers on or off, edit the built-in header types and add your own
 - **Appearance** — style target (all or specific column), container background/border/radius/text, vertical and horizontal divider configuration
 
@@ -243,7 +272,7 @@ Right-click any column to:
 
 A MOC lists notes as links in columns and keeps itself up to date. Right-click in a note and choose **Insert MOC → New MOC…**: choose its notes with rules on folders, tags and properties joined by **And** / **Or** (by default the note's own folder, with its subfolders as columns), see a live preview, and insert. Save options you reuse as templates in **Settings → Advanced Multi Column → Maps of content**; right-click a MOC → **Edit MOC** to change it later.
 
-The links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
+By default the links are written into the note, so they show in graph view and backlinks. When notes are added, renamed, deleted or retagged, the MOC updates automatically. Choose **Storage → Virtual (live render)** in the MOC options to keep only the compact rule marker in the note and resolve the links in memory instead: the MOC still updates from metadata changes, but generated links never pollute the note, search, sync or Git history. See the [MOC guide](https://github.com/amatya-aditya/advanced-multi-column/wiki/10-moc-map-of-content) for details.
 
 ## Privacy and vault access
 
@@ -253,7 +282,7 @@ What it accesses, and why:
 
 - **Notes you open** are read to render columns in Reading view and when exporting to PDF.
 - **The list of notes and their metadata** (file paths, tags, properties — from Obsidian's metadata cache) is used only by **MOC** to find the notes a MOC lists. MOC can be turned off in **Settings → Advanced Multi Column → Maps of content**.
-- **Notes are written** only when you edit columns, insert a layout or MOC, or when an inserted MOC updates its own list of links.
+- **Notes are written** only when you edit columns, insert a layout or MOC, or when a persistent MOC updates its own list of links. Virtual MOCs write only their compact `v:1` marker.
 - **Pasted images** in a column editor are saved in the note's folder; pasting reads only what you paste.
 
 ## Installation
@@ -312,8 +341,11 @@ If `[!col-md]` appears as plain text, the nested callout structure is malformed.
 
 ```bash
 npm install
-npm run dev      # watch mode
-npm run build    # production
+npm run dev        # watch mode
+npm run build      # production
+npm run test:unit  # parser, presets, resize and layout tests
+npm run lint
+npx tsc --noEmit
 ```
 
 ## Other Plugins

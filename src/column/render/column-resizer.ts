@@ -4,6 +4,7 @@ import type {ColumnData} from "../core/types";
 import type {StyleColorOption} from "../../settings";
 import type {ColumnGroup} from "./column-renderer";
 import {groupColumns, getColumnElements} from "./column-renderer";
+import {equalGroupWidths, ratioLabel, snapPairRatio} from "./resize-math";
 
 let widthCacheKey = "";
 let widthCacheResult: number[] = [];
@@ -112,6 +113,8 @@ export function buildResizeHandle(
 	let totalPct = 0;
 	let containerWidth = 0;
 	let activePointer: number | null = null;
+	let moved = false;
+	let tooltip: HTMLElement | null = null;
 
 	const groups = groupColumns(columns);
 	const handleShrink = (groups.length - 1) * 8 / groups.length;
@@ -129,19 +132,56 @@ export function buildResizeHandle(
 	const computeNewSizes = (dx: number): {newLeft: number; newRight: number} => {
 		const delta = (dx / containerWidth) * 100;
 		const min = getPluginInstance().settings.minColumnWidthPercent;
-		const newLeft = Math.max(min, Math.min(totalPct - min, startLeftPct + delta));
+		const rawLeft = Math.max(min, Math.min(totalPct - min, startLeftPct + delta));
+		// Snap in the pair's own percentage space, then re-clamp so a snap can
+		// never push a column below the user's minimum width.
+		const snapped = snapPairRatio(rawLeft, totalPct);
+		const newLeft = Math.max(min, Math.min(totalPct - min, snapped.left));
 		return {newLeft, newRight: totalPct - newLeft};
+	};
+
+	const removeTooltip = (): void => {
+		tooltip?.remove();
+		tooltip = null;
+	};
+
+	const showTooltip = (event: PointerEvent, newLeft: number): void => {
+		if (!tooltip) {
+			tooltip = handle.ownerDocument.body.createDiv({cls: "amc-resize-tooltip"});
+		}
+		tooltip.setText(ratioLabel(newLeft, totalPct));
+		tooltip.style.left = `${event.clientX}px`;
+		tooltip.style.top = `${event.clientY}px`;
+	};
+
+	const applyWidths = (widths: ReadonlyArray<number>): void => {
+		// Rounding eight equal 12.5% groups must still add up to 100%, so the
+		// last group absorbs the sub-percent remainder.
+		const rounded = widths.map((width) => Math.round(width));
+		if (rounded.length > 0) {
+			const sum = rounded.reduce((total, width) => total + width, 0);
+			rounded[rounded.length - 1] = Math.max(0, rounded[rounded.length - 1]! + (100 - sum));
+		}
+		const updated = columns.map((col, i) => {
+			const gi = groups.findIndex((g) => g.indices.includes(i));
+			if (gi < 0) return col;
+			const isFirstInGroup = groups[gi]!.indices[0] === i;
+			return {...col, widthPercent: isFirstInGroup ? rounded[gi]! : 0};
+		});
+		onColumnsChange(updated);
 	};
 
 	const onPointerMove = (e: PointerEvent) => {
 		if (e.pointerId !== activePointer || containerWidth === 0) return;
 		const {newLeft, newRight} = computeNewSizes(e.clientX - startX);
+		moved = moved || Math.abs(e.clientX - startX) >= 2;
 
 		const items = getColumnElements(container);
 		const leftEl = resolveResizeEl(items[resizeIndex]);
 		const rightEl = resolveResizeEl(items[resizeIndex + 1]);
 		if (leftEl) leftEl.style.flex = `0 0 calc(${newLeft}% - ${handleShrink.toFixed(1)}px)`;
 		if (rightEl) rightEl.style.flex = `0 0 calc(${newRight}% - ${handleShrink.toFixed(1)}px)`;
+		showTooltip(e, newLeft);
 	};
 
 	const onPointerUp = (e: PointerEvent) => {
@@ -153,6 +193,15 @@ export function buildResizeHandle(
 		if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
 		container.classList.remove("columns-resizing");
 		handle.classList.remove("is-active");
+		removeTooltip();
+
+		// A click (or a double-click's first press) must not rebuild the row:
+		// rebuilding would replace this handle before `dblclick` fires.
+		if (!moved) {
+			moved = false;
+			return;
+		}
+		moved = false;
 
 		const {newLeft, newRight} = computeNewSizes(e.clientX - startX);
 
@@ -164,17 +213,26 @@ export function buildResizeHandle(
 			if (gi === rightGroupIdx) return newRight;
 			return w;
 		});
-
-		const updated = columns.map((col, i) => {
-			const gi = groups.findIndex((g) => g.indices.includes(i));
-			if (gi < 0) return col;
-			// Only store width on the first column of each group to avoid
-			// sum > 100% when multiple stacked columns each carry the group width.
-			const isFirstInGroup = groups[gi]!.indices[0] === i;
-			return {...col, widthPercent: isFirstInGroup ? Math.round(finalGroupWidths[gi]!) : 0};
-		});
-		onColumnsChange(updated);
+		applyWidths(finalGroupWidths);
 	};
+
+	// Double-click: equalize this pair; Shift + double-click: the whole row.
+	handle.addEventListener("dblclick", (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		const current = resolveGroupEffectiveWidths(groups, columns);
+		let widths: number[];
+		if (e.shiftKey) {
+			widths = equalGroupWidths(groups.length);
+		} else {
+			if (leftGroupIdx < 0 || rightGroupIdx < 0) return;
+			const pair = current[leftGroupIdx]! + current[rightGroupIdx]!;
+			widths = current.map((w, gi) => (
+				gi === leftGroupIdx || gi === rightGroupIdx ? pair / 2 : w
+			));
+		}
+		applyWidths(widths);
+	});
 
 	// Pointer events: a touch drag (iPad, phones) sends no mouse events.
 	handle.addEventListener("pointerdown", (e) => {
@@ -183,6 +241,7 @@ export function buildResizeHandle(
 		e.stopPropagation();
 		activePointer = e.pointerId;
 		startX = e.clientX;
+		moved = false;
 		containerWidth = container.getBoundingClientRect().width;
 		container.classList.add("columns-resizing");
 		handle.classList.add("is-active");

@@ -1,6 +1,7 @@
 import {setIcon} from "obsidian";
 import type {ColumnBackgroundOption, StyleColorOption} from "../../settings";
 import type {ColumnData, ColumnLayout, ColumnStyleData, SeparatorLineStyle} from "../core/types";
+import {COLUMN_PRESETS, type ColumnPreset} from "../core/presets";
 import type {ColumnContextActions, MenuEdits} from "../core/widget-types";
 import {applyColumnStyle, applyContainerStyle} from "../core/column-style";
 import {getPluginInstance} from "../core/plugin-ref";
@@ -27,6 +28,9 @@ const CLEAR_STYLE_PATCH: StylePatch = {
 	separatorStyle: undefined,
 	separatorWidth: undefined,
 	separatorCustomChar: undefined,
+	preset: undefined,
+	maxHeight: undefined,
+	fold: undefined,
 };
 
 export type LayoutChangeHandler = (
@@ -295,6 +299,36 @@ function createSegmented<T extends string>(
 	}
 }
 
+/**
+ * Visual preset picker. Each swatch carries the same `amc-preset-*` class the
+ * rendered column uses, so the picker previews the real token palette.
+ */
+function createPresetGrid(
+	parent: HTMLElement,
+	value: ColumnPreset | undefined,
+	onChange: (preset: ColumnPreset | undefined) => void,
+): void {
+	parent.createDiv({cls: "amc-menu-label", text: "Design preset"});
+	const grid = parent.createDiv({cls: "amc-menu-preset-grid", attr: {role: "radiogroup", "aria-label": "Design preset"}});
+	const card = (preset: ColumnPreset | undefined, label: string) => {
+		const button = grid.createEl("button", {cls: "amc-menu-preset-card", attr: {type: "button", role: "radio"}});
+		button.setAttribute("aria-checked", String((value ?? "") === (preset ?? "")));
+		button.toggleClass("is-selected", (value ?? "") === (preset ?? ""));
+		const swatch = button.createDiv({
+			cls: `amc-menu-preset-swatch${preset ? ` amc-preset-${preset}` : " amc-preset-none"}`,
+		});
+		swatch.setAttribute("aria-hidden", "true");
+		button.createDiv({cls: "amc-menu-preset-label", text: label});
+		button.addEventListener("click", (evt) => {
+			evt.preventDefault();
+			evt.stopPropagation();
+			onChange(preset);
+		});
+	};
+	card(undefined, "None");
+	for (const preset of COLUMN_PRESETS) card(preset.id, preset.label);
+}
+
 function createTextInput(
 	parent: HTMLElement,
 	config: {label: string; value: string; placeholder?: string; maxLength?: number; onChange: (value: string) => void},
@@ -382,6 +416,9 @@ function normalizeStyle(
 	if (differs("separatorStyle")) next.separatorStyle = style.separatorStyle;
 	if (differs("separatorWidth")) next.separatorWidth = style.separatorWidth;
 	if (differs("separatorCustomChar")) next.separatorCustomChar = style.separatorCustomChar;
+	if (style.preset !== undefined) next.preset = style.preset;
+	if (style.maxHeight !== undefined) next.maxHeight = style.maxHeight;
+	if (style.fold !== undefined) next.fold = style.fold;
 
 	if (Object.keys(next).length === 0) return undefined;
 	return next;
@@ -458,6 +495,21 @@ function patchStyleData(
 			case "leftBorder":
 				if (style.leftBorder === nextValue) break;
 				style.leftBorder = nextValue as boolean;
+				changed = true;
+				break;
+			case "preset":
+				if (style.preset === nextValue) break;
+				style.preset = nextValue as ColumnPreset | undefined;
+				changed = true;
+				break;
+			case "maxHeight":
+				if (style.maxHeight === nextValue) break;
+				style.maxHeight = nextValue as number | undefined;
+				changed = true;
+				break;
+			case "fold":
+				if (style.fold === nextValue) break;
+				style.fold = nextValue as boolean | undefined;
 				changed = true;
 				break;
 		}
@@ -763,6 +815,9 @@ interface EffectiveColumnStyle {
 	separatorColor: StyleColorOption;
 	separatorWidth: number;
 	separatorCustomChar: string;
+	preset?: ColumnPreset;
+	maxHeight?: number;
+	fold: boolean;
 }
 
 function effectiveColumnStyle(state: PopoverRenderState, index: number): EffectiveColumnStyle {
@@ -786,6 +841,9 @@ function effectiveColumnStyle(state: PopoverRenderState, index: number): Effecti
 		separatorWidth: style.separatorWidth
 			?? (separatorFromGlobal ? s.verticalDividerWidthPx : COLUMN_DEFAULTS.separatorWidth),
 		separatorCustomChar: style.separatorCustomChar ?? COLUMN_DEFAULTS.separatorCustomChar,
+		preset: style.preset,
+		maxHeight: style.maxHeight,
+		fold: style.fold ?? false,
 	};
 }
 
@@ -795,6 +853,7 @@ interface EffectiveContainerStyle {
 	showBorder: boolean;
 	borderColor: StyleColorOption;
 	globalBorder: boolean;
+	preset?: ColumnPreset;
 }
 
 function effectiveContainerStyle(state: PopoverRenderState): EffectiveContainerStyle {
@@ -807,6 +866,7 @@ function effectiveContainerStyle(state: PopoverRenderState): EffectiveContainerS
 		showBorder: style.showBorder ?? (style.borderColor !== undefined || globalBorder),
 		borderColor: style.borderColor ?? s.containerBorderColor,
 		globalBorder,
+		preset: style.preset,
 	};
 }
 
@@ -922,6 +982,21 @@ function renderColumnTab(
 		onChange: (value) => patch({textColor: value}),
 	});
 
+	createPresetGrid(body, eff.preset, (preset) => patch({preset}));
+
+	createToggle(createRow(body, "Foldable header"), "Foldable header", eff.fold, () =>
+		patch({fold: eff.fold ? undefined : true}),
+	);
+	createTextInput(createRow(body, "Max height (px)"), {
+		label: "Maximum column height in pixels",
+		value: eff.maxHeight === undefined ? "" : String(eff.maxHeight),
+		placeholder: "none",
+		onChange: (value) => {
+			const height = parseInt(value, 10);
+			patch({maxHeight: Number.isFinite(height) && height >= 80 ? Math.min(4000, height) : undefined});
+		},
+	});
+
 	const border = createRow(body, "Border");
 	createDropdown(border, {
 		label: "Border color",
@@ -1035,6 +1110,8 @@ function renderBlockTab(
 		options: STYLE_COLOR_OPTION_ITEMS,
 		onChange: (value) => patch({textColor: value}),
 	});
+
+	createPresetGrid(body, eff.preset, (preset) => patch({preset}));
 
 	const border = createRow(body, "Border");
 	createDropdown(border, {

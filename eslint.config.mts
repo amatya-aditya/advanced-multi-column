@@ -44,6 +44,9 @@ export default tseslint.config(
 		"version-bump.mjs",
 		"versions.json",
 		"main.js",
+		// Unit-test bundle output.
+		".test-dist",
+		".npm-cache",
 		// End-to-end tests run in Node and in Obsidian's page, not in the plugin.
 		"tests",
 	]),

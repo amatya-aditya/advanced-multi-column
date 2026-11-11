@@ -102,7 +102,7 @@ export const DEFAULT_SETTINGS: ColumnsPluginSettings = {
 	showContainerBorder: true,
 	containerBorderWidthPx: 1,
 	containerBorderColor: "gray",
-	containerCornerRadiusPx: 8,
+	containerCornerRadiusPx: 14,
 	containerTextColor: "text",
 	verticalDividerWidthPx: 1,
 	verticalDividerStyle: "solid",
@@ -126,6 +126,7 @@ export const EDITOR_MENU_ITEMS: ReadonlyArray<{id: string; name: string}> = [
 	{id: "insert-2-columns", name: "Insert 2 columns"},
 	{id: "insert-3-columns", name: "Insert 3 columns"},
 	{id: "insert-4-columns", name: "Insert 4 columns"},
+	{id: "insert-bento", name: "Insert Bento / Column Template"},
 	{id: "insert-layout", name: "Insert layout"},
 	{id: "insert-moc", name: "Insert MOC"},
 ];

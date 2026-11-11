@@ -268,7 +268,15 @@ export function dispatchUpdate(
 ): void {
 	const effectiveStyle = containerStyle !== undefined ? containerStyle : region.containerStyle;
 	const effectiveLayout = layout !== undefined ? layout : region.layout;
-	const insert = serializeColumns(columns, effectiveStyle, effectiveLayout, region.mocId);
+	// A virtual MOC stores only its compact marker: structural actions must
+	// never write generated links into the note.
+	const insert = serializeColumns(
+		columns,
+		effectiveStyle,
+		effectiveLayout,
+		region.mocId,
+		region.virtual,
+	);
 
 	if (captureSink) {
 		captureSink(insert);

@@ -11,7 +11,8 @@
 		"lint": "eslint .",
 		"setup:hooks": "node scripts/setup-git-hooks.mjs",
 		"commit": "node scripts/commit.mjs",
-		"test:e2e": "node tests/e2e/run.mjs"
+		"test:e2e": "node tests/e2e/run.mjs",
+		"test:unit": "node scripts/test-unit.mjs"
 	},
 	"keywords": [],
 	"license": "0-BSD",

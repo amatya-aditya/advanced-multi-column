@@ -163,6 +163,9 @@ export interface EmbeddedEditorOptions {
 	onTab?: (shift: boolean) => boolean;
 	/** Arrow Up on the first line (-1) or Down on the last line (1). */
 	onArrowExit?: (dir: 1 | -1) => void;
+	/** Delegate undo/redo to the parent editor's history. Return false to fall back. */
+	onUndo?: () => boolean;
+	onRedo?: () => boolean;
 }
 
 /**
@@ -279,6 +282,18 @@ export function createEmbeddedEditor(
 					preventDefault: true,
 				},
 			];
+			// The column is a view onto the note, so undo must walk the note's
+			// history, not a detached sub-editor buffer. The parent view
+			// dispatches and this handler resynchronizes the local document.
+			if (options.onUndo) {
+				keys.push({key: "Mod-z", run: () => options.onUndo!(), preventDefault: true});
+			}
+			if (options.onRedo) {
+				keys.push(
+					{key: "Mod-Shift-z", run: () => options.onRedo!(), preventDefault: true},
+					{key: "Mod-y", run: () => options.onRedo!(), preventDefault: true},
+				);
+			}
 			if (options.onTab) {
 				keys.push({
 					key: "Tab",

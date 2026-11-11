@@ -36,6 +36,15 @@ export interface ActiveEditState {
 	regionSource?: string;
 	/** Identifies the editor inside the block, e.g. "c0" or "c1/0.0/c2/s1". */
 	key: string;
+	/**
+	 * Absolute range of the text the embedded editor mirrors (trimmed column
+	 * content, or a text segment). Mapped through every transaction so a
+	 * parent undo or a pane sync can update the editor in place.
+	 */
+	contentStart?: number;
+	contentEnd?: number;
+	/** Opened only to move the caret from the keyboard; load current content. */
+	targetOnly?: boolean;
 	cursorStart: number;
 	cursorEnd: number;
 	scrollTop: number;

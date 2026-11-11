@@ -14,6 +14,12 @@ export type MocRuleOp = "and" | "or";
  * contains the MOC (so one template works in every folder).
  */
 export type MocFolderMode = "fixed" | "note" | "parent";
+/**
+ * Persistent: the note stores real `[[links]]` (Graph View + full-text search).
+ * Virtual: the note stores only `%% col-start:moc:<id>,v:1 %%`; links are
+ * resolved in memory on every render, so sync/Git never see generated text.
+ */
+export type MocStorageMode = "persistent" | "virtual";
 
 export interface MocFolderRule {
 	type: "folder";
@@ -73,6 +79,8 @@ export interface MocTemplate {
 	showBullets: boolean;
 	/** 0 = no limit. */
 	maxPerGroup: number;
+	/** How generated links are stored in the note (default: persistent). */
+	storage: MocStorageMode;
 }
 
 export const MAX_MOC_COLUMNS = 6;
@@ -93,6 +101,7 @@ export function createMocTemplate(id: string, name: string): MocTemplate {
 		showHeadings: true,
 		showBullets: true,
 		maxPerGroup: 0,
+		storage: "persistent",
 	};
 }
 
@@ -180,6 +189,7 @@ export function sanitizeMocTemplate(raw: unknown): MocTemplate | null {
 	pick("showHeadings", (v) => typeof v === "boolean");
 	pick("showBullets", (v) => typeof v === "boolean");
 	pick("maxPerGroup", (v) => typeof v === "number" && v >= 0);
+	pick("storage", (v) => v === "persistent" || v === "virtual");
 	base.columns = Math.round(base.columns);
 	return base;
 }
