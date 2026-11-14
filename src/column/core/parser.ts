@@ -8,6 +8,51 @@ export function isColumnMarkerLine(line: string): boolean {
 	return START_RE.test(trimmed) || BREAK_RE.test(trimmed) || END_RE.test(trimmed);
 }
 
+function isLineWhitespace(ch: number, text: string, index: number): boolean {
+	if (ch === 32 || ch === 9 || ch === 13) return true;
+	if (ch > 32 && ch < 127) return false;
+	return /\s/.test(text[index]!);
+}
+
+/**
+ * Strip leading and trailing blank lines while keeping horizontal whitespace
+ * on the first and last non-blank lines (such as `- [ ] ` at the end of a
+ * column, whose trailing space makes it a task checkbox in Markdown).
+ */
+export function trimBlankLines(text: string): string {
+	const len = text.length;
+	let start = 0;
+	let lineStart = 0;
+	let foundStart = false;
+	for (let i = 0; i <= len; i++) {
+		const ch = i < len ? text.charCodeAt(i) : 10;
+		if (ch === 10) {
+			lineStart = i + 1;
+		} else if (!isLineWhitespace(ch, text, i)) {
+			start = lineStart;
+			foundStart = true;
+			break;
+		}
+	}
+	if (!foundStart) return "";
+
+	let end = len;
+	let lineEnd = len;
+	for (let i = len - 1; i >= start; i--) {
+		const ch = text.charCodeAt(i);
+		if (ch === 10) {
+			lineEnd = i;
+		} else if (!isLineWhitespace(ch, text, i)) {
+			end = lineEnd;
+			break;
+		}
+	}
+	while (end > start && text.charCodeAt(end - 1) === 13) {
+		end--;
+	}
+	return text.slice(start, end);
+}
+
 const BACKGROUND_OPTION_VALUES = [
 	"transparent",
 	"primary",
@@ -423,7 +468,7 @@ export function findColumnRegions(doc: string): ColumnRegion[] {
 							from: regionStartOffset,
 							to: offset + line.length,
 							columns: clampedColumns.map((column) => ({
-								content: column.lines.join("\n").trim(),
+								content: trimBlankLines(column.lines.join("\n")),
 								widthPercent: column.width,
 								style: column.style,
 								...(column.stacked && column.stacked > 0 ? {stacked: column.stacked} : {}),
