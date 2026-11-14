@@ -1,5 +1,5 @@
 import {EditorView} from "@codemirror/view";
-import {findColumnRegions, serializeColumns} from "./parser";
+import {findColumnRegions, serializeColumns, trimBlankLines} from "./parser";
 import type {ColumnData, ColumnLayout, ColumnRegion, ColumnStyleData} from "./types";
 import type {ContainerPath} from "./widget-types";
 import {getPluginInstance} from "./plugin-ref";
@@ -129,11 +129,10 @@ export function addChildColumnToContent(content: string): string {
 		);
 	}
 
-	const trailingWhitespace = content.match(/\s*$/)?.[0] ?? "";
-	const withoutTrailing = content.slice(0, content.length - trailingWhitespace.length);
+	const withoutTrailing = trimBlankLines(content);
 	const separator = withoutTrailing.length > 0 ? "\n\n" : "";
 	const nestedBlock = serializeColumns([{content: "", widthPercent: 0, style: defaultNewColumnStyle()}]);
-	return `${withoutTrailing}${separator}${nestedBlock}${trailingWhitespace}`;
+	return `${withoutTrailing}${separator}${nestedBlock}`;
 }
 
 export function removeColumnAtPath(

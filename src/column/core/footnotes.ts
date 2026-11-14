@@ -1,3 +1,5 @@
+import {trimBlankLines} from "./parser";
+
 /**
  * Note-wide footnotes for content rendered outside Obsidian's own note
  * renderer. Columns (and, in reading view, the text between them) are
@@ -316,7 +318,7 @@ export class NoteFootnotes {
 			const [first, ...rest] = d.markdown.split("\n");
 			return [`[^${d.label}]: ${first}`, ...rest.map((line) => (line ? `    ${line}` : line))].join("\n");
 		});
-		return `${body.replace(/\s+$/, "")}\n\n${defs.join("\n")}\n`;
+		return `${trimBlankLines(body)}\n\n${defs.join("\n")}\n`;
 	}
 
 	/**

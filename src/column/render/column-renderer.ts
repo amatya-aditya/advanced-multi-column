@@ -1,6 +1,6 @@
 import {EditorView} from "@codemirror/view";
 import {Component, MarkdownRenderer, Scope, setIcon} from "obsidian";
-import {findColumnRegions, serializeColumns} from "../core/parser";
+import {findColumnRegions, serializeColumns, trimBlankLines} from "../core/parser";
 import {getPluginInstance} from "../core/plugin-ref";
 import {ColumnEditorSuggest, SlashCommandSuggest} from "../editor/editor-suggest";
 import {ThirdPartySuggestBridge} from "../editor/third-party-suggest";
@@ -42,7 +42,7 @@ export function parseColumnHeader(content: string): {type: string; title: string
 		if (trimmed.length === 0) continue;
 		const match = trimmed.match(HEADER_RE);
 		if (!match) return null;
-		const rest = [...lines.slice(0, i), ...lines.slice(i + 1)].join("\n").trim();
+		const rest = trimBlankLines([...lines.slice(0, i), ...lines.slice(i + 1)].join("\n"));
 		return {type: match[1]!, title: match[2]!.trim(), restContent: rest};
 	}
 	return null;
@@ -1004,9 +1004,9 @@ function renderEditableTextSegment(
  * `col-start` line and break the whole layout.
  */
 function spliceTextSegment(content: string, from: number, to: number, text: string): string {
-	const before = content.slice(0, from).replace(/\s+$/, "");
-	const after = content.slice(to).replace(/^\s*\n/, "");
-	const middle = text.replace(/^\n+|\s+$/g, "");
+	const before = trimBlankLines(content.slice(0, from));
+	const after = trimBlankLines(content.slice(to));
+	const middle = trimBlankLines(text);
 	return [before, middle, after].filter((part) => part.length > 0).join("\n\n");
 }
 
@@ -1045,7 +1045,7 @@ function renderColumnContent(
 			kind: "text",
 			from: cursor,
 			to: region.from,
-			text: content.slice(cursor, region.from),
+			text: trimBlankLines(content.slice(cursor, region.from)),
 		});
 		parts.push({kind: "region", region, regionIndex});
 		cursor = region.to;
@@ -1054,7 +1054,7 @@ function renderColumnContent(
 		kind: "text",
 		from: cursor,
 		to: content.length,
-		text: content.slice(cursor),
+		text: trimBlankLines(content.slice(cursor)),
 	});
 
 	const hasNonEmptyText = parts.some(

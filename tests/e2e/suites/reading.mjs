@@ -413,4 +413,38 @@ export default [
 			assert.ok(samples.some((s) => s.layer === "Long.md"), "the columns never appeared");
 		},
 	},
+	...["preview", "source"].map((mode) => ({
+		name: `empty task checkboxes at the end of a column render as checkboxes (#51, ${mode === "preview" ? "reading view" : "live preview"})`,
+		async run(o) {
+			const md = [
+				"%% col-start %%",
+				"%% col-break %%",
+				"- [ ] ",
+				"%% col-break %%",
+				"- [ ] Task with text",
+				"* [ ] ",
+				"",
+				"%% col-break %%",
+				"1. [ ] ",
+				"%% col-end %%",
+				"",
+			].join("\n");
+			await o.call("write", "TrailingTasks.md", md);
+			await o.call("layout", "TrailingTasks.md", undefined, mode);
+			await o.sleep(1000);
+			const cols = await o.ev(`(() => {
+				const c = [...${leafSelector}.querySelectorAll(".columns-container")]
+					.find((el) => el.getClientRects().length > 0 && !el.closest(".amc-rv-hidden, .internal-embed"));
+				return [...c.querySelectorAll(":scope > .column-item")].map((col) => ({
+					checkboxes: col.querySelectorAll("li.task-list-item > input[type='checkbox'], li.task-list-item > .task-list-item-checkbox").length,
+					text: col.querySelector(".column-preview")?.textContent.trim() ?? "",
+				}));
+			})()`);
+			assert.deepEqual(cols, [
+				{checkboxes: 1, text: ""},
+				{checkboxes: 2, text: "Task with text"},
+				{checkboxes: 1, text: ""},
+			]);
+		},
+	})),
 ];

@@ -7,7 +7,7 @@ import {
 	setIcon,
 	TFile,
 } from "obsidian";
-import {findColumnRegions} from "./core/parser";
+import {findColumnRegions, trimBlankLines} from "./core/parser";
 import {NoteFootnotes} from "./core/footnotes";
 import {applyNoteFootnotes, buildFootnoteSection, wireReadingFootnotes} from "./render/footnote-render";
 import {wireReadingLinkEvents} from "./render/reading-link-events";
@@ -730,7 +730,7 @@ function buildColumnContent(
 	let cursor = 0;
 	for (const region of sorted) {
 		if (region.from > cursor) {
-			const text = content.slice(cursor, region.from).trim();
+			const text = trimBlankLines(content.slice(cursor, region.from));
 			if (text) renderMarkdownInto(plugin, component, parent.createDiv(), text, sourcePath, tasks);
 		}
 		buildColumnsRegion(plugin, component, parent, region, sourcePath, depth, tasks);
@@ -738,7 +738,7 @@ function buildColumnContent(
 	}
 
 	if (cursor < content.length) {
-		const text = content.slice(cursor).trim();
+		const text = trimBlankLines(content.slice(cursor));
 		if (text) renderMarkdownInto(plugin, component, parent.createDiv(), text, sourcePath, tasks);
 	}
 }
